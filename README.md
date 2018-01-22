@@ -12,3 +12,5 @@ The key preliminary features are:
 
 The need for this autoscaler is dervied from our own experiences with very large batch workloads being scheduled that can't be force-drained by the default autoscaler.
 
+## Documentation and Design
+See [Docs](docs/)
