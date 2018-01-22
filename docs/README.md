@@ -19,5 +19,6 @@ The initial algorithm is designed to be as simple as possible to achieve our goa
 - A reaper routine will routinely check for MARKED nodes with no running pods and terminate them if the grace period has expired
 
 
-# UML.png
-Basic idea of System Architecture. Subject to chage dramatically
+# System Architecture
+Basic idea of System Architecture. Subject to chage dramatically. Update image when design changes
+![UML](UML.png)
