@@ -1,0 +1,9 @@
+{
+	"ImportPath": "github.com/atlassian/escalator",
+	"GoVersion": "go1.9",
+	"GodepVersion": "v79",
+	"Packages": [
+		"./..."
+	],
+	"Deps": []
+}
