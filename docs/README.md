@@ -28,6 +28,7 @@ The initial algorithm is designed to be as simple as possible to achieve our goa
         - Set a grace period for the node
 - A reaper routine will routinely check for MARKED nodes with no running pods and terminate them if the grace period has expired
 
+![Algorithm](Algorithm.png)
 
 # System Architecture
 Basic idea of System Architecture. Subject to chage dramatically. Update image when design changes
