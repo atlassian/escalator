@@ -1,8 +1,8 @@
 # Documentation
 General infomation on documentation
 
-# Dependancies
-We used `godep` for dependancy managment
+# Dependencies
+We used `godep` for dependency managment
 ## Install: 
 - `go get github.com/tools/godep`
 ## To add a package: 
