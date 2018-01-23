@@ -1,5 +1,6 @@
 # Documentation
-General infomation on documentation
+General system documentation
+*Design is very early and subject to change at anytime*
 
 # Dependencies
 We used `godep` for dependency managment
@@ -33,3 +34,6 @@ The initial algorithm is designed to be as simple as possible to achieve our goa
 # System Architecture
 Basic idea of System Architecture. Subject to chage dramatically. Update image when design changes
 ![UML](UML.png)
+
+# Packages Layout and Usages
+![Packages](Packages.png)
