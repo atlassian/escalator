@@ -1,6 +1,16 @@
 # Documentation
 General infomation on documentation
 
+# Dependencies
+We used `godep` for dependency managment
+## Install: 
+- `go get github.com/tools/godep`
+## To add a package: 
+1. `go get your.package/name`
+2. add `import "your.package/name"` to your code
+3. `godep save ./...`
+This should add the package to the vendor/ folder
+
 # System Algorithm Design
 The initial algorithm is designed to be as simple as possible to achieve our goal
 
