@@ -16,6 +16,18 @@
 			"Rev": "5bd2802263f21d8788851d5305584c82a5c75d7e"
 		},
 		{
+			"ImportPath": "github.com/alecthomas/template",
+			"Rev": "a0175ee3bccc567396460bf5acd36800cb10c49c"
+		},
+		{
+			"ImportPath": "github.com/alecthomas/template/parse",
+			"Rev": "a0175ee3bccc567396460bf5acd36800cb10c49c"
+		},
+		{
+			"ImportPath": "github.com/alecthomas/units",
+			"Rev": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/aws",
 			"Comment": "v1.12.67-1-g85827b2b",
 			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
@@ -378,6 +390,11 @@
 		{
 			"ImportPath": "golang.org/x/text/width",
 			"Rev": "b19bf474d317b857955b12035d2c5acb57ce8b01"
+		},
+		{
+			"ImportPath": "gopkg.in/alecthomas/kingpin.v2",
+			"Comment": "v2.2.6",
+			"Rev": "947dcec5ba9c011838740e680966fd7087a71d0d"
 		},
 		{
 			"ImportPath": "gopkg.in/inf.v0",
