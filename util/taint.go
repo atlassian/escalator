@@ -12,6 +12,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Utility functions that assist with the tainting of nodes
+// ----
+// Taint Scheme:
+// Key: ToBeRemovedByAutoscaler
+// Value: time.Now().Unix()
+// Effect: NoSchedule
+
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
 	ToBeRemovedByAutoscalerKey = "ToBeRemovedByAutoscaler"
