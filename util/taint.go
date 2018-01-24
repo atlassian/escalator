@@ -37,7 +37,6 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Nod
 	var taintExists bool
 	for _, taint := range updatedNode.Spec.Taints {
 		if taint.Key == ToBeRemovedByAutoscalerKey {
-			log.Debugf("%v already present on node %v", ToBeRemovedByAutoscalerKey, updatedNode.Name)
 			taintExists = true
 			break
 		}
@@ -45,6 +44,7 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Nod
 
 	// don't need to re-add the taint
 	if taintExists {
+		log.Debugf("%v already present on node %v", ToBeRemovedByAutoscalerKey, updatedNode.Name)
 		return node, nil
 	}
 
