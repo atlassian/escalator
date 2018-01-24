@@ -24,9 +24,9 @@ const (
 	ToBeRemovedByAutoscalerKey = "ToBeRemovedByAutoscaler"
 )
 
-// ToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
+// AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
-func ToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
+func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
 	// fetch the latest version of the node to avoid conflict
 	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
