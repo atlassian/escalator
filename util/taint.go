@@ -17,9 +17,9 @@ const (
 	ToBeRemovedByAutoscalerKey = "ToBeRemovedByAutoscaler"
 )
 
-// TaintNode takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
+// ToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
-func TaintNode(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
+func ToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
 	// fetch the latest version of the node to avoid conflict
 	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
@@ -48,10 +48,11 @@ func TaintNode(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) 
 	})
 
 	updatedNodeWithTaint, err := client.CoreV1().Nodes().Update(updatedNode)
-	if err != nil {
-		return updatedNode, fmt.Errorf("failed to update node %v after taint: %v", updatedNode.Name, err)
+	if err != nil || updatedNodeWithTaint == nil {
+		return updatedNode, fmt.Errorf("failed to update node %v after adding taint: %v", updatedNode.Name, err)
 	}
 
+	log.Infof("Successfully added taint on node %v", updatedNodeWithTaint.Name)
 	return updatedNodeWithTaint, nil
 }
 
@@ -78,4 +79,33 @@ func GetToBeRemovedTime(node *apiv1.Node) (*time.Time, error) {
 		return &result, nil
 	}
 	return nil, nil
+}
+
+// DeleteToBeRemovedTaint removes the ToBeRemovedByAutoscaler taint fromt the node if it exists
+// returns the latest successful update of the node
+func DeleteToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
+	// fetch the latest version of the node to avoid conflict
+	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+	if err != nil || updatedNode == nil {
+		return node, fmt.Errorf("failed to get node %v: %v", node.Name, err)
+	}
+
+	for i, taint := range updatedNode.Spec.Taints {
+		if taint.Key == ToBeRemovedByAutoscalerKey {
+			// Delete the element from the array without preserving order
+			// https://github.com/golang/go/wiki/SliceTricks#delete-without-preserving-order
+			updatedNode.Spec.Taints[i] = updatedNode.Spec.Taints[len(updatedNode.Spec.Taints)-1]
+			updatedNode.Spec.Taints = updatedNode.Spec.Taints[:len(updatedNode.Spec.Taints)-1]
+
+			updatedNodeWithoutTaint, err := client.CoreV1().Nodes().Update(updatedNode)
+			if err != nil || updatedNodeWithoutTaint == nil {
+				return updatedNode, fmt.Errorf("failed to update node %v after deleting taint: %v", updatedNode.Name, err)
+			}
+
+			log.Infof("Successfully removed taint on node %v", updatedNodeWithoutTaint.Name)
+			return updatedNodeWithoutTaint, nil
+		}
+	}
+
+	return updatedNode, nil
 }
