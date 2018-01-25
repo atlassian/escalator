@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -16,13 +17,18 @@ type Client struct {
 
 // ListerGroup is just a light wrapper around a few listers
 type ListerGroup struct {
-	AllPods     PodLister
-	allPodsStop chan struct{}
+	AllPods   PodLister
+	informers []cache.InformerSynced
 }
 
-// Shutdown will send the Stop() command to all listers in the group
-func (lg *ListerGroup) Shutdown() {
-	lg.allPodsStop <- struct{}{}
+// WaitForSync wait for the cache sync for all the registered listers
+// it will try <tries> times and return the result
+func (lg *ListerGroup) WaitForSync(tries int) bool {
+	synced := false
+	for i := 0; i < 10 && !synced; i++ {
+		synced = cache.WaitForCacheSync(nil, lg.informers...)
+	}
+	return synced
 }
 
 func NewOutOfClusterClient(kubeconfig string) *kubernetes.Clientset {
@@ -41,11 +47,23 @@ func NewOutOfClusterClient(kubeconfig string) *kubernetes.Clientset {
 }
 
 // NewClient creates a new Client wrapper over the k8sclient with some pod and node listers
+// It will wait for the cache to sync
 func NewClient(k8sClient kubernetes.Interface) *Client {
-	allPodsStopChan := make(chan struct{})
+	var allInformers []cache.InformerSynced
+
+	allPodsLister, allPodsInformer := NewAllPodsLister(k8sClient, v1.NamespaceAll)
+	allInformers = append(allInformers, allPodsInformer)
+
 	listers := &ListerGroup{
-		AllPods:     NewAllPodsLister(k8sClient, v1.NamespaceAll, allPodsStopChan),
-		allPodsStop: allPodsStopChan,
+		AllPods:   allPodsLister,
+		informers: allInformers,
+	}
+
+	synced := listers.WaitForSync(3)
+	if !synced {
+		log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", 3)
+	} else {
+		log.Debugln("Caches have been synced. Proceeding with server.")
 	}
 
 	client := Client{
