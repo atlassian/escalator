@@ -295,6 +295,11 @@
 			"Rev": "06bc6e01f4baf4ee783ffcd23abfcb0b0f9dfada"
 		},
 		{
+			"ImportPath": "github.com/prometheus/client_golang/prometheus/promhttp",
+			"Comment": "v0.9.0-pre1-29-g06bc6e0",
+			"Rev": "06bc6e01f4baf4ee783ffcd23abfcb0b0f9dfada"
+		},
+		{
 			"ImportPath": "github.com/prometheus/client_model/go",
 			"Comment": "model-0.0.2-16-g99fa1f4",
 			"Rev": "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"
@@ -305,6 +310,10 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
+			"Rev": "89604d197083d4781071d3c65855d24ecfb0a563"
+		},
+		{
+			"ImportPath": "github.com/prometheus/common/log",
 			"Rev": "89604d197083d4781071d3c65855d24ecfb0a563"
 		},
 		{
@@ -359,6 +368,14 @@
 		},
 		{
 			"ImportPath": "golang.org/x/sys/windows",
+			"Rev": "95c6576299259db960f6c5b9b69ea52422860fce"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows/registry",
+			"Rev": "95c6576299259db960f6c5b9b69ea52422860fce"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows/svc/eventlog",
 			"Rev": "95c6576299259db960f6c5b9b69ea52422860fce"
 		},
 		{
