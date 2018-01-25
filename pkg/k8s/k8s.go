@@ -18,6 +18,7 @@ type Client struct {
 // ListerGroup is just a light wrapper around a few listers
 type ListerGroup struct {
 	AllPods   PodLister
+	AllNodes  NodeLister
 	informers []cache.InformerSynced
 }
 
@@ -51,11 +52,17 @@ func NewOutOfClusterClient(kubeconfig string) *kubernetes.Clientset {
 func NewClient(k8sClient kubernetes.Interface) *Client {
 	var allInformers []cache.InformerSynced
 
+	// create the pods lister for all pods
 	allPodsLister, allPodsInformer := NewAllPodsLister(k8sClient, v1.NamespaceAll)
 	allInformers = append(allInformers, allPodsInformer)
 
+	// create the node lister for all nodes
+	allNodesLister, allNodesInformer := NewAllNodesLister(k8sClient, v1.NamespaceAll)
+	allInformers = append(allInformers, allNodesInformer)
+
 	listers := &ListerGroup{
 		AllPods:   allPodsLister,
+		AllNodes:  allNodesLister,
 		informers: allInformers,
 	}
 

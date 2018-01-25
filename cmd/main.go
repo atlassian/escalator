@@ -28,10 +28,11 @@ func main() {
 
 	for {
 		pods, err := client.Listers.AllPods.List()
+		nodes, err := client.Listers.AllNodes.List()
 		if err != nil {
 			log.Error(err)
 		}
-		log.Infof("pod counts: %v", len(pods))
+		log.Infof("pod counts: %v: node counts: %v", len(pods), len(nodes))
 		time.Sleep(1 * time.Second)
 	}
 
