@@ -6,6 +6,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -16,14 +17,13 @@ type PodLister interface {
 	List() ([]*v1.Pod, error)
 }
 
-// AllPodsLister lists all pods
+// AllPodsLister lists all pods regardless of state
 type AllPodsLister struct {
 	podLister v1lister.PodLister
-	stopChan  chan struct{}
 }
 
-// NewAllPodsLister creates a lister that lists all pods in a given namespace
-func NewAllPodsLister(client kubernetes.Interface, namespace string, stopChan <-chan struct{}) PodLister {
+// NewAllPodsLister creates a new lister and informerSynced for all pods
+func NewAllPodsLister(client kubernetes.Interface, namespace string) (PodLister, cache.InformerSynced) {
 	selector := fields.Everything()
 	podsListWatch := cache.NewListWatchFromClient(
 		client.CoreV1().RESTClient(),
@@ -31,23 +31,24 @@ func NewAllPodsLister(client kubernetes.Interface, namespace string, stopChan <-
 		namespace,
 		selector,
 	)
-	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
-		cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-	})
-	podLister := v1lister.NewPodLister(store)
-	podReflector := cache.NewReflector(
+
+	podIndexer, podController := cache.NewIndexerInformer(
 		podsListWatch,
 		&v1.Pod{},
-		store,
-		time.Hour,
+		1*time.Hour,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{
+			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+		},
 	)
-	go podReflector.Run(stopChan)
+	podLister := v1lister.NewPodLister(podIndexer)
+	go podController.Run(wait.NeverStop)
 	return &AllPodsLister{
-		podLister: podLister,
-	}
+		podLister,
+	}, podController.HasSynced
 }
 
-// List all pods regardless
+// List lists all pods from the cache
 func (lister *AllPodsLister) List() ([]*v1.Pod, error) {
 	return lister.podLister.List(labels.Everything())
 }
