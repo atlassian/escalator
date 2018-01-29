@@ -18,13 +18,6 @@ type Client struct {
 	allNodeLister v1lister.NodeLister
 }
 
-// Customer represents a model a customer running on our cluster
-type Customer struct {
-	Name       string
-	Namespaces []string
-	NodeLabels []string
-}
-
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
 func NewClient(k8sClient kubernetes.Interface, customers []*Customer) *Client {
