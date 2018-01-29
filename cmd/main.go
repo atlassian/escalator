@@ -20,8 +20,10 @@ var (
 func main() {
 	kingpin.Parse()
 
+	// for now we'll just use the out of cluster one for testing
 	k8sClient := k8s.NewOutOfClusterClient(*kubeconfig)
 
+	// endpoints
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(*addr, nil)
 

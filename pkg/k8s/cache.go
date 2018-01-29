@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// NewCachePodWatcher creates a new IndexerInformer for watching pods from cache
 func NewCachePodWatcher(client kubernetes.Interface) (v1lister.PodLister, cache.InformerSynced) {
 	selector := fields.ParseSelectorOrDie(fmt.Sprint("status.phase!=", v1.PodSucceeded, ",status.phase!=", v1.PodFailed))
 	podsListWatch := cache.NewListWatchFromClient(
@@ -34,6 +35,7 @@ func NewCachePodWatcher(client kubernetes.Interface) (v1lister.PodLister, cache.
 	return podLister, podController.HasSynced
 }
 
+// NewCacheNodeWatcher creates a new IndexerInformer for watching nodes from cache
 func NewCacheNodeWatcher(client kubernetes.Interface) (v1lister.NodeLister, cache.InformerSynced) {
 	selector := fields.Everything()
 	nodesListWatch := cache.NewListWatchFromClient(

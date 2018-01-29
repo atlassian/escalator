@@ -6,6 +6,7 @@ import (
 )
 
 // CustomerLister is just a light wrapper around a pod lister and node lister
+// Used for grouping a customer and their listers
 type CustomerLister struct {
 	// Pod lister
 	Pods k8s.PodLister

@@ -7,16 +7,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Controller contains the core logic of the Autoscaler
 type Controller struct {
 	Client *Client
 }
 
+// Opts provide the Controller with config for runtime
 type Opts struct {
 	Addr         string
 	ScanInterval time.Duration
 	K8SClient    *kubernetes.Clientset
 }
 
+// NewController creates a new controller with the specified options
 func NewController(opts *Opts) *Controller {
 	testClient := NewClient(opts.K8SClient, []*Customer{
 		&Customer{
@@ -30,7 +33,10 @@ func NewController(opts *Opts) *Controller {
 	}
 }
 
+// Run starts the autoscaler process and blocks
 func (c Controller) Run() error {
+	// Testing stuff
+	// TODO: use a proper ticker
 	log.Infoln("pods\t\tnodes")
 	for {
 		for customer, lister := range c.Client.Listers {
