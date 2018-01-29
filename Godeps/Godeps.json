@@ -28,121 +28,6 @@
 			"Rev": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a"
 		},
 		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/awserr",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/awsutil",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/client",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/client/metadata",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/corehandlers",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/credentials",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/credentials/endpointcreds",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/credentials/stscreds",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/defaults",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/ec2metadata",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/endpoints",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/request",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/session",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/aws/signer/v4",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/internal/shareddefaults",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/query",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/query/queryutil",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/rest",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/service/sts",
-			"Comment": "v1.12.67-1-g85827b2b",
-			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
-		},
-		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
 			"Rev": "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 		},
@@ -164,11 +49,6 @@
 		{
 			"ImportPath": "github.com/ghodss/yaml",
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
-		},
-		{
-			"ImportPath": "github.com/go-ini/ini",
-			"Comment": "v1.32.0",
-			"Rev": "32e4c1e6bc4e7d0d8451aa6b75200d19e37a536a"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
@@ -257,9 +137,13 @@
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
 		{
-			"ImportPath": "github.com/jmespath/go-jmespath",
-			"Comment": "0.2.2-20-gdd801d4",
-			"Rev": "dd801d4f4ce7ac746e7e7b4489d2fa600b3b096b"
+			"ImportPath": "github.com/howeyc/gopass",
+			"Rev": "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
+		},
+		{
+			"ImportPath": "github.com/imdario/mergo",
+			"Comment": "0.1.3-8-g6633656",
+			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
 		},
 		{
 			"ImportPath": "github.com/json-iterator/go",
@@ -1109,12 +993,32 @@
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/tools/auth",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/tools/cache",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/tools/clientcmd",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/tools/clientcmd/api",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/tools/clientcmd/api/latest",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/tools/clientcmd/api/v1",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
@@ -1125,11 +1029,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/tools/pager",
-			"Comment": "v6.0.0",
-			"Rev": "78700dec6369ba22221b72770783300f143df150"
-		},
-		{
-			"ImportPath": "k8s.io/client-go/tools/clientcmd",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
@@ -1155,6 +1054,11 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/util/flowcontrol",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/util/homedir",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
