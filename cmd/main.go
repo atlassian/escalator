@@ -2,13 +2,11 @@ package main
 
 import (
 	"net/http"
-	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/k8s"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -20,29 +18,19 @@ var (
 )
 
 func main() {
-
 	kingpin.Parse()
 
+	// for now we'll just use the out of cluster one for testing
 	k8sClient := k8s.NewOutOfClusterClient(*kubeconfig)
-	client := k8s.NewClient(k8sClient)
 
-	for {
-		pods, err := client.Listers.AllPods.List()
-		nodes, err := client.Listers.AllNodes.List()
-		if err != nil {
-			log.Error(err)
-		}
-		log.Infof("pod counts: %v: node counts: %v", len(pods), len(nodes))
-		time.Sleep(1 * time.Second)
-	}
-
+	// endpoints
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(*addr, nil)
 
 	opts := &controller.Opts{
-		*addr,
-		*scanInterval,
-		*kubeconfig,
+		Addr:         *addr,
+		ScanInterval: *scanInterval,
+		K8SClient:    k8sClient,
 	}
 
 	c := controller.NewController(opts)
