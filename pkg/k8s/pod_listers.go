@@ -6,6 +6,10 @@ import (
 	v1lister "k8s.io/client-go/listers/core/v1"
 )
 
+// PodFilterFunc provides a definition for a predicate based on matching a pod
+// return true for keep node
+type PodFilterFunc func(*v1.Pod) bool
+
 // PodLister provides an interface for anything that can list a pod
 type PodLister interface {
 	List() ([]*v1.Pod, error)
@@ -13,15 +17,15 @@ type PodLister interface {
 
 // FilteredPodsLister lists pods from a podLister and filters out by namespace
 type FilteredPodsLister struct {
-	namespaces []string
 	podLister  v1lister.PodLister
+	filterFunc PodFilterFunc
 }
 
 // NewFilteredPodsLister creates a new lister and informerSynced for a FilteredPodsLister
-func NewFilteredPodsLister(podLister v1lister.PodLister, namespaces []string) PodLister {
+func NewFilteredPodsLister(podLister v1lister.PodLister, filterFunc PodFilterFunc) PodLister {
 	return &FilteredPodsLister{
-		namespaces,
 		podLister,
+		filterFunc,
 	}
 }
 
@@ -34,13 +38,10 @@ func (lister *FilteredPodsLister) List() ([]*v1.Pod, error) {
 	}
 
 	filteredPods = make([]*v1.Pod, 0, len(allPods))
-	// only include pods that are in one of the namespaces of a customer
+	// only include pods that match the filtering function
 	for _, pod := range allPods {
-		for _, namespace := range lister.namespaces {
-			if pod.Namespace == namespace {
-				filteredPods = append(filteredPods, pod)
-				break
-			}
+		if lister.filterFunc(pod) {
+			filteredPods = append(filteredPods, pod)
 		}
 	}
 
