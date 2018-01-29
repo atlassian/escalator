@@ -4,15 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	v1lister "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func NewCachePodWatcher(client kubernetes.Interface) (v1lister.PodLister, cache.InformerSynced) {
@@ -67,36 +64,4 @@ func WaitForSync(tries int, informers ...cache.InformerSynced) bool {
 		synced = cache.WaitForCacheSync(nil, informers...)
 	}
 	return synced
-}
-
-// NewOutOfClusterClient returns a new kubernetes clientset using a kubeconfig file
-// For running outside the cluster
-func NewOutOfClusterClient(kubeconfig string) *kubernetes.Clientset {
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		log.Fatalf("Failed to create out of cluster config: %v", err)
-	}
-
-	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatalf("Failed to create out of cluster client: %v", err)
-	}
-	return clientset
-}
-
-// NewInClusterClient returns a new kubernetes clientset from inside the cluster
-func NewInClusterClient() *kubernetes.Clientset {
-	// creates the in-cluster config
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatalf("Failed to create in of cluster config: %v", err)
-	}
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatalf("Failed to create in of cluster client: %v", err)
-	}
-	return clientset
 }

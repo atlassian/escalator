@@ -1,4 +1,4 @@
-package lister
+package k8s
 
 import (
 	"k8s.io/api/core/v1"
@@ -11,12 +11,13 @@ type PodLister interface {
 	List() ([]*v1.Pod, error)
 }
 
+// FilteredPodsLister lists pods from a podLister and filters out by namespace
 type FilteredPodsLister struct {
 	namespaces []string
 	podLister  v1lister.PodLister
 }
 
-// NewFilteredPodsLister creates a new lister and informerSynced for scheduled pods
+// NewFilteredPodsLister creates a new lister and informerSynced for a FilteredPodsLister
 func NewFilteredPodsLister(podLister v1lister.PodLister, namespaces []string) PodLister {
 	return &FilteredPodsLister{
 		namespaces,
@@ -24,7 +25,7 @@ func NewFilteredPodsLister(podLister v1lister.PodLister, namespaces []string) Po
 	}
 }
 
-// List lists all pods from the cache
+// List lists all pods from the cache filtering by namespace
 func (lister *FilteredPodsLister) List() ([]*v1.Pod, error) {
 	var filteredPods []*v1.Pod
 	allPods, err := lister.podLister.List(labels.Everything())
@@ -44,30 +45,4 @@ func (lister *FilteredPodsLister) List() ([]*v1.Pod, error) {
 	}
 
 	return filteredPods, nil
-}
-
-// NodeLister provides an interface for anything that can list a pod
-type NodeLister interface {
-	List() ([]*v1.Node, error)
-}
-
-// FilteredNodesLister lists all nodes regardless of state
-type FilteredNodesLister struct {
-	nodeLister v1lister.NodeLister
-	nodeLabels []string
-}
-
-// NewFilteredNodesLister creates a new lister and informerSynced for all nodes filter by customer
-func NewFilteredNodesLister(nodeLister v1lister.NodeLister, nodeLabels []string) NodeLister {
-	return &FilteredNodesLister{
-		nodeLister,
-		nodeLabels,
-	}
-}
-
-// List lists all pods from the cache
-func (lister *FilteredNodesLister) List() ([]*v1.Node, error) {
-
-	// TODO: filter by labels
-	return lister.nodeLister.List(labels.Everything())
 }
