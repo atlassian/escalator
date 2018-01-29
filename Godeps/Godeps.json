@@ -249,6 +249,14 @@
 			"Rev": "787624de3eb7bd915c329cba748687a3b22666a6"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/golang-lru",
+			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
+			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
+		},
+		{
 			"ImportPath": "github.com/jmespath/go-jmespath",
 			"Comment": "0.2.2-20-gdd801d4",
 			"Rev": "dd801d4f4ce7ac746e7e7b4489d2fa600b3b096b"
@@ -345,6 +353,10 @@
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
 			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
 		},
 		{
 			"ImportPath": "golang.org/x/net/http2",
@@ -592,6 +604,11 @@
 			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
 		},
 		{
+			"ImportPath": "k8s.io/apimachinery/pkg/apis/meta/internalversion",
+			"Comment": "kubernetes-1.9.1-beta.0",
+			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
+		},
+		{
 			"ImportPath": "k8s.io/apimachinery/pkg/apis/meta/v1",
 			"Comment": "kubernetes-1.9.1-beta.0",
 			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
@@ -677,7 +694,17 @@
 			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
 		},
 		{
+			"ImportPath": "k8s.io/apimachinery/pkg/util/cache",
+			"Comment": "kubernetes-1.9.1-beta.0",
+			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
+		},
+		{
 			"ImportPath": "k8s.io/apimachinery/pkg/util/clock",
+			"Comment": "kubernetes-1.9.1-beta.0",
+			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
+		},
+		{
+			"ImportPath": "k8s.io/apimachinery/pkg/util/diff",
 			"Comment": "kubernetes-1.9.1-beta.0",
 			"Rev": "180eddb345a5be3a157cea1c624700ad5bd27b8f"
 		},
@@ -1057,6 +1084,11 @@
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/listers/core/v1",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/pkg/version",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
@@ -1077,6 +1109,11 @@
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/tools/cache",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/tools/clientcmd/api",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
@@ -1087,12 +1124,27 @@
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/tools/pager",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/tools/clientcmd",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/tools/reference",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
 		{
 			"ImportPath": "k8s.io/client-go/transport",
+			"Comment": "v6.0.0",
+			"Rev": "78700dec6369ba22221b72770783300f143df150"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/util/buffer",
 			"Comment": "v6.0.0",
 			"Rev": "78700dec6369ba22221b72770783300f143df150"
 		},
@@ -1114,6 +1166,11 @@
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
 			"Rev": "39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/api/v1/pod",
+			"Comment": "v1.10.0-alpha.2-57-g7726877a1e",
+			"Rev": "7726877a1ef514dba06e15261cca9128ebf61c89"
 		}
 	]
 }

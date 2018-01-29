@@ -4,6 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -17,8 +18,15 @@ type Client struct {
 
 // ListerGroup is just a light wrapper around a few listers
 type ListerGroup struct {
-	AllPods   PodLister
-	AllNodes  NodeLister
+	// Pod listers
+	AllPods           PodLister
+	ScheduledPods     PodLister
+	UnschedulablePods PodLister
+
+	// Node listers
+	AllNodes NodeLister
+
+	// informers for cache syncing
 	informers []cache.InformerSynced
 }
 
@@ -32,6 +40,8 @@ func (lg *ListerGroup) WaitForSync(tries int) bool {
 	return synced
 }
 
+// NewOutOfClusterClient returns a new kubernetes clientset using a kubeconfig file
+// For running outside the cluster
 func NewOutOfClusterClient(kubeconfig string) *kubernetes.Clientset {
 	// use the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -47,6 +57,21 @@ func NewOutOfClusterClient(kubeconfig string) *kubernetes.Clientset {
 	return clientset
 }
 
+// NewInClusterClient returns a new kubernetes clientset from inside the cluster
+func NewInClusterClient() *kubernetes.Clientset {
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Fatalf("Failed to create in of cluster config: %v", err)
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("Failed to create in of cluster client: %v", err)
+	}
+	return clientset
+}
+
 // NewClient creates a new Client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync
 func NewClient(k8sClient kubernetes.Interface) *Client {
@@ -56,13 +81,25 @@ func NewClient(k8sClient kubernetes.Interface) *Client {
 	allPodsLister, allPodsInformer := NewAllPodsLister(k8sClient, v1.NamespaceAll)
 	allInformers = append(allInformers, allPodsInformer)
 
+	// create the pods lister for scheduled pods
+	scheduledPodsLister, scheduledPodsInformer := NewScheduledPodsLister(k8sClient, v1.NamespaceAll)
+	allInformers = append(allInformers, scheduledPodsInformer)
+
+	// create the pods lister for unschedulable pods
+	unschedulablePodsLister, unschedulablePodsInformer := NewUnschedulablePodsLister(k8sClient, v1.NamespaceAll)
+	allInformers = append(allInformers, unschedulablePodsInformer)
+
 	// create the node lister for all nodes
-	allNodesLister, allNodesInformer := NewAllNodesLister(k8sClient, v1.NamespaceAll)
+	allNodesLister, allNodesInformer := NewAllNodesLister(k8sClient)
 	allInformers = append(allInformers, allNodesInformer)
 
 	listers := &ListerGroup{
-		AllPods:   allPodsLister,
-		AllNodes:  allNodesLister,
+		AllPods:           allPodsLister,
+		ScheduledPods:     scheduledPodsLister,
+		UnschedulablePods: unschedulablePodsLister,
+
+		AllNodes: allNodesLister,
+
 		informers: allInformers,
 	}
 
