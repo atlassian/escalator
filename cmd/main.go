@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/atlassian/escalator/pkg/client"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 
@@ -23,19 +24,20 @@ func main() {
 	kingpin.Parse()
 
 	k8sClient := k8s.NewOutOfClusterClient(*kubeconfig)
-	client := k8s.NewClient(k8sClient)
+	testClient := client.NewClient(k8sClient)
 
-	log.Infoln("all\tscheduled\tunscheduable\tnodes")
+	log.Infoln("pods\t\tnodes")
 	for {
-		pods, err := client.Listers.AllPods.List()
-		spods, _ := client.Listers.ScheduledPods.List()
-		upods, _ := client.Listers.UnschedulablePods.List()
-		nodes, _ := client.Listers.AllNodes.List()
-		if err != nil {
-			log.Error(err)
+		for customer, lister := range testClient.Listers {
+			log.Info("customer = ", customer)
+			pods, err := lister.Pods.List()
+			nodes, _ := lister.Nodes.List()
+			if err != nil {
+				log.Error(err)
+			}
+			log.Infof("%v\t%v", len(pods), len(nodes))
+			time.Sleep(1 * time.Second)
 		}
-		log.Infof("%v\t%v\t\t%v\t\t%v", len(pods), len(spods), len(upods), len(nodes))
-		time.Sleep(1 * time.Second)
 	}
 
 	http.Handle("/metrics", promhttp.Handler())

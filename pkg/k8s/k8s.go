@@ -1,41 +1,70 @@
 package k8s
 
 import (
+	"fmt"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Client provides a wrapper around a k8s client that includes
-// watching pods and nodes from cache
-type Client struct {
-	kubernetes.Interface
-	Listers *ListerGroup
+func NewCachePodWatcher(client kubernetes.Interface) (v1lister.PodLister, cache.InformerSynced) {
+	selector := fields.ParseSelectorOrDie(fmt.Sprint("status.phase!=", v1.PodSucceeded, ",status.phase!=", v1.PodFailed))
+	podsListWatch := cache.NewListWatchFromClient(
+		client.CoreV1().RESTClient(),
+		"pods",
+		v1.NamespaceAll,
+		selector,
+	)
+	podIndexer, podController := cache.NewIndexerInformer(
+		podsListWatch,
+		&v1.Pod{},
+		1*time.Hour,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{
+			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+		},
+	)
+	podLister := v1lister.NewPodLister(podIndexer)
+	go podController.Run(wait.NeverStop)
+	return podLister, podController.HasSynced
 }
 
-// ListerGroup is just a light wrapper around a few listers
-type ListerGroup struct {
-	// Pod listers
-	AllPods           PodLister
-	ScheduledPods     PodLister
-	UnschedulablePods PodLister
-
-	// Node listers
-	AllNodes NodeLister
-
-	// informers for cache syncing
-	informers []cache.InformerSynced
+func NewCacheNodeWatcher(client kubernetes.Interface) (v1lister.NodeLister, cache.InformerSynced) {
+	selector := fields.Everything()
+	nodesListWatch := cache.NewListWatchFromClient(
+		client.CoreV1().RESTClient(),
+		"nodes",
+		v1.NamespaceAll,
+		selector,
+	)
+	nodeIndexer, nodeController := cache.NewIndexerInformer(
+		nodesListWatch,
+		&v1.Node{},
+		1*time.Hour,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{
+			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+		},
+	)
+	nodeLister := v1lister.NewNodeLister(nodeIndexer)
+	go nodeController.Run(wait.NeverStop)
+	return nodeLister, nodeController.HasSynced
 }
 
 // WaitForSync wait for the cache sync for all the registered listers
 // it will try <tries> times and return the result
-func (lg *ListerGroup) WaitForSync(tries int) bool {
+func WaitForSync(tries int, informers ...cache.InformerSynced) bool {
 	synced := false
-	for i := 0; i < 10 && !synced; i++ {
-		synced = cache.WaitForCacheSync(nil, lg.informers...)
+	for i := 0; i < tries && !synced; i++ {
+		synced = cache.WaitForCacheSync(nil, informers...)
 	}
 	return synced
 }
@@ -70,50 +99,4 @@ func NewInClusterClient() *kubernetes.Clientset {
 		log.Fatalf("Failed to create in of cluster client: %v", err)
 	}
 	return clientset
-}
-
-// NewClient creates a new Client wrapper over the k8sclient with some pod and node listers
-// It will wait for the cache to sync
-func NewClient(k8sClient kubernetes.Interface) *Client {
-	var allInformers []cache.InformerSynced
-
-	// create the pods lister for all pods
-	allPodsLister, allPodsInformer := NewAllPodsLister(k8sClient, v1.NamespaceAll)
-	allInformers = append(allInformers, allPodsInformer)
-
-	// create the pods lister for scheduled pods
-	scheduledPodsLister, scheduledPodsInformer := NewScheduledPodsLister(k8sClient, v1.NamespaceAll)
-	allInformers = append(allInformers, scheduledPodsInformer)
-
-	// create the pods lister for unschedulable pods
-	unschedulablePodsLister, unschedulablePodsInformer := NewUnschedulablePodsLister(k8sClient, v1.NamespaceAll)
-	allInformers = append(allInformers, unschedulablePodsInformer)
-
-	// create the node lister for all nodes
-	allNodesLister, allNodesInformer := NewAllNodesLister(k8sClient)
-	allInformers = append(allInformers, allNodesInformer)
-
-	listers := &ListerGroup{
-		AllPods:           allPodsLister,
-		ScheduledPods:     scheduledPodsLister,
-		UnschedulablePods: unschedulablePodsLister,
-
-		AllNodes: allNodesLister,
-
-		informers: allInformers,
-	}
-
-	synced := listers.WaitForSync(3)
-	if !synced {
-		log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", 3)
-	} else {
-		log.Debugln("Caches have been synced. Proceeding with server.")
-	}
-
-	client := Client{
-		k8sClient,
-		listers,
-	}
-
-	return &client
 }
