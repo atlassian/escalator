@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"sync"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -56,34 +57,45 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
-// RunOnce performs the main autoscaler logic once
-func (c Controller) RunOnce() error {
-	log.Infoln("pods\t\tnodes")
+func (c Controller) scaleLogic(customer string, lister *NodeGroupLister, wait *sync.WaitGroup) {
+	defer wait.Done()
 
-	for customer, lister := range c.Client.Listers {
-		pods, err := lister.Pods.List()
-		nodes, _ := lister.Nodes.List()
-		if err != nil {
-			log.Error(err)
-		}
-		memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
-		memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
-		// log.With("customer", customer).Debugf("cpu:%s , memory:%s", cpuRequest.String(), memRequest.String())
-		// log.With("customer", customer).Debugf("cpuCapacity:%s , memoryCapacity:%s", cpuCapacity.String(), memCapacity.String())
-
-		cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
-		log.With("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
-
+	pods, err := lister.Pods.List()
+	nodes, _ := lister.Nodes.List()
+	if err != nil {
+		log.Error(err)
+		return
 	}
-	return nil
+
+	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
+	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
+
+	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
+	log.With("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
+}
+
+// RunOnce performs the main autoscaler logic once
+func (c Controller) RunOnce() {
+	startTime := time.Now()
+
+	// can perform scale logic for each customer in paralell
+	// not a big deal with few customers, but for scalability if there are many
+	var wait sync.WaitGroup
+	wait.Add(len(c.Client.Listers))
+	for customer, lister := range c.Client.Listers {
+		go c.scaleLogic(customer, lister, &wait)
+	}
+
+	wait.Wait()
+
+	endTime := time.Now()
+	log.Infof("Scaling took a total of %v", endTime.Sub(startTime))
 }
 
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
 func (c Controller) RunForever(runImmediately bool, stop <-chan struct{}) {
 	if runImmediately {
-		if err := c.RunOnce(); err != nil {
-			log.Errorf("Error occured during first execution: %v", err)
-		}
+		c.RunOnce()
 	}
 
 	// Start the main loop
@@ -91,10 +103,8 @@ func (c Controller) RunForever(runImmediately bool, stop <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Debugln("---[AUTOSCALER LOOP]---")
-			if err := c.RunOnce(); err != nil {
-				log.Errorf("Error occured during execution: %v", err)
-			}
+			log.Infoln("---[AUTOSCALER LOOP]---")
+			c.RunOnce()
 		case <-stop:
 			return
 		}

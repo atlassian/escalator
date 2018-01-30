@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"time"
+
 	"github.com/atlassian/escalator/pkg/k8s"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -25,12 +27,14 @@ func NewClient(k8sClient kubernetes.Interface, customers []*NodeGroup) *Client {
 	allPodLister, podSync := k8s.NewCachePodWatcher(k8sClient)
 	allNodeLister, nodeSync := k8s.NewCacheNodeWatcher(k8sClient)
 
+	startTime := time.Now()
+	log.Infoln("Waiting for cache to sync...")
 	synced := k8s.WaitForSync(3, podSync, nodeSync)
 	if !synced {
 		log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", 3)
-	} else {
-		log.Infoln("Caches have been synced!")
 	}
+	endTime := time.Now()
+	log.Infof("Cache took %v to sync", endTime.Sub(startTime))
 
 	// load in all our node group listers from our customers
 	customerMap := make(map[string]*NodeGroupLister)
