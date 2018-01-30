@@ -30,11 +30,10 @@ func NewController(opts *Opts) *Controller {
 			Name:       "default",
 			LabelValue: "shared",
 			LabelKey: "customer",
-
 		},
 		&NodeGroup{
-			Name:       "kitt",
-			LabelValue: "kitt",
+			Name:       "buildeng",
+			LabelValue: "buildeng",
 			LabelKey: "customer",
 		},
 	})

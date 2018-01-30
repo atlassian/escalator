@@ -8,9 +8,13 @@ import (
 
 // Customer represents a model a customer running on our cluster
 type NodeGroup struct {
-	Name       string
-	LabelKey    string
-	LabelValue string
+	Name       				string
+	LabelKey    			string
+	LabelValue 				string
+	// DaemonSetPercentUsage 	int64
+	// minoverhead				int64
+	// minNodes
+	// maxNodes
 }
 
 // CustomerLister is just a light wrapper around a pod lister and node lister
@@ -22,9 +26,30 @@ type CustomerLister struct {
 	Nodes k8s.NodeLister
 }
 
-// NewPodNamespaceFilterFunc creates a new PodFilterFunc based on filtering by namespaces
-func NewPodNamespaceFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
+// NewPodAffinityFilterFunc creates a new PodFilterFunc based on filtering by namespaces
+func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 	return func(pod *v1.Pod) bool {
+
+		for _, ownerrefence := range pod.ObjectMeta.OwnerReferences{
+			if ownerrefence.Kind == "DaemonSet"{
+				return false
+			}
+		}
+
+		if pod.Spec.Affinity != nil{
+			for _, term := range pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				for _, expression := range term.MatchExpressions{
+					if expression.Key == labelKey{
+						for _, value := range expression.Values{
+							if value == labelValue{
+								return true
+							}
+						}
+					}
+				}
+			}
+		}
+
 		if value, ok := pod.Spec.NodeSelector[labelKey]; ok{
 			if value == labelValue{
 				return true
@@ -48,7 +73,14 @@ func NewNodeLabelFilterFunc(labelKey, labelValue string) k8s.NodeFilterFunc {
 
 func NewDefaultPodLister() k8s.PodFilterFunc{
 	return func(pod *v1.Pod) bool {
-		if len(pod.Spec.NodeSelector) == 0{
+
+		for _, ownerrefence := range pod.ObjectMeta.OwnerReferences{
+			if ownerrefence.Kind == "DaemonSet"{
+				return false
+			}
+		}
+
+		if len(pod.Spec.NodeSelector) == 0 && pod.Spec.Affinity == nil{
 			return true
 		}
 		return false
@@ -58,7 +90,7 @@ func NewDefaultPodLister() k8s.PodFilterFunc{
 // NewCustomerLister creates a new group from the backing lister and customer filter
 func NewCustomerLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroup) *CustomerLister {
 	return &CustomerLister{
-		k8s.NewFilteredPodsLister(allPodsLister, NewPodNamespaceFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
+		k8s.NewFilteredPodsLister(allPodsLister, NewPodAffinityFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
 		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
 	}
 }
