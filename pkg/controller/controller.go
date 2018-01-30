@@ -20,7 +20,7 @@ type Controller struct {
 type Opts struct {
 	Addr         string
 	ScanInterval time.Duration
-	K8SClient    *kubernetes.Clientset
+	K8SClient    kubernetes.Interface
 	Customers    []*NodeGroup
 }
 
@@ -37,7 +37,6 @@ func NewController(opts *Opts) *Controller {
 	}
 }
 
-//
 func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
 
 	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
@@ -57,7 +56,7 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
-func (c Controller) scaleLogic(customer string, lister *NodeGroupLister, wait *sync.WaitGroup) {
+func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister, wait *sync.WaitGroup) {
 	defer wait.Done()
 
 	pods, err := lister.Pods.List()
@@ -87,7 +86,7 @@ func (c Controller) RunOnce() {
 	wait.Add(len(c.Client.Listers))
 
 	for customer, lister := range c.Client.Listers {
-		go c.scaleLogic(customer, lister, &wait)
+		go c.scaleNodeGroup(customer, lister, &wait)
 	}
 
 	wait.Wait()
@@ -99,6 +98,7 @@ func (c Controller) RunOnce() {
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
 func (c Controller) RunForever(runImmediately bool, stop <-chan struct{}) {
 	if runImmediately {
+		log.Infoln("---[FIRSTRUN LOOP]---")
 		c.RunOnce()
 	}
 

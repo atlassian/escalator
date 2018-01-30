@@ -1,0 +1,7 @@
+customers:
+  - name: "buildeng"
+    label_key: "customer"
+    label_value: "buildeng"
+  - name: "default"
+    label_key: "customer"
+    label_value: "shared"

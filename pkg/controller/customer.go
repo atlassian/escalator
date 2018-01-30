@@ -1,8 +1,11 @@
 package controller
 
 import (
+	"io"
+
 	"github.com/atlassian/escalator/pkg/k8s"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	v1lister "k8s.io/client-go/listers/core/v1"
 )
 
@@ -12,13 +15,26 @@ const DefaultCustomer = "default"
 // NodeGroup represents a customer running on our cluster
 // We differentiate customers by their node label
 type NodeGroup struct {
-	Name       string
-	LabelKey   string
-	LabelValue string
-	// DaemonSetPercentUsage 	int64
-	// minoverhead				int64
-	// minNodes
-	// maxNodes
+	Name       string `json:"name" yaml:"name"`
+	LabelKey   string `json:"label_key" yaml:"label_key"`
+	LabelValue string `json:"label_value" yaml:"label_value"`
+
+	DaemonSetPercentUsage int64 `json:"daemon_set_percent_usage,omitempty" yaml:"daemon_set_percent_usage,omitempty"`
+	MinSlackSpace         int64 `json:"min_slack_space,omitempty" yaml:"min_slack_space,omitempty"`
+
+	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
+	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`
+}
+
+// UnmarshalNodeGroupsConfig decodes the yaml or json reader into a struct
+func UnmarshalNodeGroupsConfig(reader io.Reader) ([]*NodeGroup, error) {
+	var wrapper struct {
+		Customers []*NodeGroup `json:"customers" yaml:"customers"`
+	}
+	if err := yaml.NewYAMLOrJSONDecoder(reader, 4096).Decode(&wrapper); err != nil {
+		return []*NodeGroup{}, err
+	}
+	return wrapper.Customers, nil
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
