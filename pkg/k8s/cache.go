@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -63,6 +64,7 @@ func NewCacheNodeWatcher(client kubernetes.Interface) (v1lister.NodeLister, cach
 func WaitForSync(tries int, informers ...cache.InformerSynced) bool {
 	synced := false
 	for i := 0; i < tries && !synced; i++ {
+		log.Debugf("Trying to sync cache: tries = %v", tries)
 		synced = cache.WaitForCacheSync(nil, informers...)
 	}
 	return synced

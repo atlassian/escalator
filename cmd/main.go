@@ -2,12 +2,17 @@ package main
 
 import (
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"gopkg.in/alecthomas/kingpin.v2"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -31,8 +36,33 @@ func main() {
 		Addr:         *addr,
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
+
+		Customers: []*controller.NodeGroup{
+			&controller.NodeGroup{
+				Name:       "default",
+				LabelValue: "shared",
+				LabelKey:   "customer",
+			},
+			&controller.NodeGroup{
+				Name:       "buildeng",
+				LabelValue: "buildeng",
+				LabelKey:   "customer",
+			},
+		},
 	}
 
+	signalChan := make(chan os.Signal, 1)
+	stopChan := make(chan struct{})
+
+	// Handle termination signals and shutdown gracefully
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-signalChan
+		log.Infof("Signal received: %v", sig)
+		log.Infoln("Stopping autoscaler gracefully")
+		stopChan <- struct{}{}
+	}()
+
 	c := controller.NewController(opts)
-	c.Run()
+	c.RunForever(true, stopChan)
 }
