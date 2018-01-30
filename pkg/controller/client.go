@@ -11,7 +11,7 @@ import (
 // anything needed by the controller for listing customer pods and nodes based on a filter
 type Client struct {
 	kubernetes.Interface
-	Listers map[string]*CustomerLister
+	Listers map[string]*NodeGroupLister
 
 	// Backing store for all listers used by the Client
 	allPodLister  v1lister.PodLister
@@ -20,7 +20,7 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, customers []*Customer) *Client {
+func NewClient(k8sClient kubernetes.Interface, customers []*NodeGroup) *Client {
 	// Backing store lister for all pods and nodes
 	allPodLister, podSync := k8s.NewCachePodWatcher(k8sClient)
 	allNodeLister, nodeSync := k8s.NewCacheNodeWatcher(k8sClient)
@@ -29,15 +29,19 @@ func NewClient(k8sClient kubernetes.Interface, customers []*Customer) *Client {
 	if !synced {
 		log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", 3)
 	} else {
-		log.Debugln("Caches have been synced. Proceeding with server.")
+		log.Infoln("Caches have been synced!")
 	}
 
-	// load in all our customer listers
-	customerMap := make(map[string]*CustomerLister)
+	// load in all our node group listers from our customers
+	customerMap := make(map[string]*NodeGroupLister)
+
 	for _, customer := range customers {
-		customerMap[customer.Name] = NewCustomerLister(allPodLister, allNodeLister, customer)
+		if customer.Name == DefaultCustomer {
+			customerMap[customer.Name] = NewDefaultNodeGroupLister(allPodLister, allNodeLister, customer)
+		} else {
+			customerMap[customer.Name] = NewNodeGroupLister(allPodLister, allNodeLister, customer)
+		}
 	}
-
 	client := Client{
 		k8sClient,
 		customerMap,
