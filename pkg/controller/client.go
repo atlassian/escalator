@@ -20,7 +20,7 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, customers []*Customer) *Client {
+func NewClient(k8sClient kubernetes.Interface, customers []*NodeGroup) *Client {
 	// Backing store lister for all pods and nodes
 	allPodLister, podSync := k8s.NewCachePodWatcher(k8sClient)
 	allNodeLister, nodeSync := k8s.NewCacheNodeWatcher(k8sClient)
@@ -34,8 +34,13 @@ func NewClient(k8sClient kubernetes.Interface, customers []*Customer) *Client {
 
 	// load in all our customer listers
 	customerMap := make(map[string]*CustomerLister)
+
 	for _, customer := range customers {
-		customerMap[customer.Name] = NewCustomerLister(allPodLister, allNodeLister, customer)
+		if customer.Name == "default"{
+			customerMap[customer.Name] = NewDefaultLister(allPodLister, allNodeLister, customer)
+		} else {
+			customerMap[customer.Name] = NewCustomerLister(allPodLister, allNodeLister, customer)
+		}
 	}
 
 	client := Client{

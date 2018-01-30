@@ -7,10 +7,10 @@ import (
 )
 
 // Customer represents a model a customer running on our cluster
-type Customer struct {
+type NodeGroup struct {
 	Name       string
-	Namespaces []string
-	NodeLabels []string
+	LabelKey    string
+	LabelValue string
 }
 
 // CustomerLister is just a light wrapper around a pod lister and node lister
@@ -23,10 +23,10 @@ type CustomerLister struct {
 }
 
 // NewPodNamespaceFilterFunc creates a new PodFilterFunc based on filtering by namespaces
-func NewPodNamespaceFilterFunc(namespaces []string) k8s.PodFilterFunc {
+func NewPodNamespaceFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 	return func(pod *v1.Pod) bool {
-		for _, namespace := range namespaces {
-			if pod.Namespace == namespace {
+		if value, ok := pod.Spec.NodeSelector[labelKey]; ok{
+			if value == labelValue{
 				return true
 			}
 		}
@@ -35,17 +35,38 @@ func NewPodNamespaceFilterFunc(namespaces []string) k8s.PodFilterFunc {
 }
 
 // NewNodeLabelFilterFunc creates a new NodeFilterFunc based on filtering by node labels
-func NewNodeLabelFilterFunc(namespaces []string) k8s.NodeFilterFunc {
-	return func(pod *v1.Node) bool {
-		// TODO: filter by labels
-		return true
+func NewNodeLabelFilterFunc(labelKey, labelValue string) k8s.NodeFilterFunc {
+	return func(node *v1.Node) bool {
+		if value, ok := node.ObjectMeta.Labels[labelKey]; ok{
+			if value == labelValue{
+				return true
+			}
+		}
+		return false
+	}
+}
+
+func NewDefaultPodLister() k8s.PodFilterFunc{
+	return func(pod *v1.Pod) bool {
+		if len(pod.Spec.NodeSelector) == 0{
+			return true
+		}
+		return false
 	}
 }
 
 // NewCustomerLister creates a new group from the backing lister and customer filter
-func NewCustomerLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, customer *Customer) *CustomerLister {
+func NewCustomerLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroup) *CustomerLister {
 	return &CustomerLister{
-		k8s.NewFilteredPodsLister(allPodsLister, NewPodNamespaceFilterFunc(customer.Namespaces)),
-		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(customer.NodeLabels)),
+		k8s.NewFilteredPodsLister(allPodsLister, NewPodNamespaceFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
+		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
+	}
+}
+
+// NewDefaultLister creates a new group from the backing lister and customer filter
+func NewDefaultLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroup) *CustomerLister {
+	return &CustomerLister{
+		k8s.NewFilteredPodsLister(allPodsLister, NewDefaultPodLister()),
+		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
 	}
 }
