@@ -78,10 +78,14 @@ func (c Controller) scaleLogic(customer string, lister *NodeGroupLister, wait *s
 func (c Controller) RunOnce() {
 	startTime := time.Now()
 
+	// TODO(jgonzalez/dangot): REAPER GOES HERE
+
+	// Perform the ScaleUp/Taint logic
 	// can perform scale logic for each customer in paralell
 	// not a big deal with few customers, but for scalability if there are many
 	var wait sync.WaitGroup
 	wait.Add(len(c.Client.Listers))
+
 	for customer, lister := range c.Client.Listers {
 		go c.scaleLogic(customer, lister, &wait)
 	}
