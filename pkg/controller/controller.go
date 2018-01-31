@@ -21,10 +21,10 @@ type Controller struct {
 
 // Opts provide the Controller with config for runtime
 type Opts struct {
-	Addr         string
+	K8SClient kubernetes.Interface
+	Customers []*NodeGroup
+
 	ScanInterval time.Duration
-	K8SClient    kubernetes.Interface
-	Customers    []*NodeGroup
 }
 
 // NewController creates a new controller with the specified options

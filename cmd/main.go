@@ -52,7 +52,6 @@ func main() {
 	go http.ListenAndServe(*addr, nil)
 
 	opts := &controller.Opts{
-		Addr:         *addr,
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
 		Customers:    customers,

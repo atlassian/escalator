@@ -19,11 +19,21 @@ type NodeGroup struct {
 	LabelKey   string `json:"label_key" yaml:"label_key"`
 	LabelValue string `json:"label_value" yaml:"label_value"`
 
-	DaemonSetPercentUsage int64 `json:"daemon_set_percent_usage,omitempty" yaml:"daemon_set_percent_usage,omitempty"`
-	MinSlackSpace         int64 `json:"min_slack_space,omitempty" yaml:"min_slack_space,omitempty"`
+	DaemonSetUsagePercent int `json:"daemon_set_usage_percent,omitempty" yaml:"daemon_set_usage_percent,omitempty"`
+	MinSlackSpacePercent  int `json:"min_slack_space_percent,omitempty" yaml:"min_slack_space_percent,omitempty"`
 
 	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
 	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`
+
+	DryMode bool `json:"dry_mode,omitempty" yaml:"dry_mode,omitempty"`
+
+	SoftTaintEffectPercent int `json:"soft_taint_effect_percent,omitempty" yaml:"soft_taint_effect_percent,omitempty"`
+
+	DampeningStrength              float64 `json:"dampening_strength,omitempty" yaml:"dampening_strength,omitempty"`
+	UpperCapacityThreshholdPercent int     `json:"upper_capacity_threshhold_percent,omitempty" yaml:"upper_capacity_threshhold_percent,omitempty"`
+	LowerCapacityThreshholdPercent int     `json:"lower_capacity_threshhold_percent,omitempty" yaml:"lower_capacity_threshhold_percent,omitempty"`
+
+	ScaleDownMinGracePeriodSeconds int `json:"scale_down_min_grace_period_seconds,omitempty" yaml:"scale_down_min_grace_period_seconds,omitempty"`
 }
 
 // UnmarshalNodeGroupsConfig decodes the yaml or json reader into a struct
