@@ -1,13 +1,15 @@
 package controller
 
 import (
+	"math"
 	"sync"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
-	"github.com/prometheus/common/log"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Controller contains the core logic of the Autoscaler
@@ -71,7 +73,11 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister, wai
 	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
 
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
-	log.With("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
+	log.WithField("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
+
+	if math.Max(cpuPercent, memPercent) < 50.0 {
+		log.Warningln("Scale down??")
+	}
 }
 
 // RunOnce performs the main autoscaler logic once
