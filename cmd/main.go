@@ -21,7 +21,7 @@ var (
 	addr               = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
 	scanInterval       = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
 	kubeConfigFile     = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
-	customerConfigFile = kingpin.Flag("customerconfig", "Config file for customers nodegroups").Required().String()
+	customerConfigFile = kingpin.Flag("nodegroups", "Config file for customers nodegroups").Required().String()
 )
 
 func main() {
