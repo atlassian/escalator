@@ -58,8 +58,10 @@ func main() {
 		Customers:    customers,
 	}
 
+	// signal channel waits for interrupt
 	signalChan := make(chan os.Signal, 1)
-	stopChan := make(chan struct{})
+	// global stop channel. Close signal will be sent to broadvast a shutdown to everything waiting for it to stop
+	stopChan := make(chan struct{}, 1)
 
 	// Handle termination signals and shutdown gracefully
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -67,9 +69,9 @@ func main() {
 		sig := <-signalChan
 		log.Infof("Signal received: %v", sig)
 		log.Infoln("Stopping autoscaler gracefully")
-		stopChan <- struct{}{}
+		close(stopChan)
 	}()
 
-	c := controller.NewController(opts)
-	c.RunForever(true, stopChan)
+	c := controller.NewController(opts, stopChan)
+	c.RunForever(true)
 }

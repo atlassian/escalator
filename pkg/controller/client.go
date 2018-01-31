@@ -22,17 +22,31 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, customers []*NodeGroup) *Client {
+func NewClient(k8sClient kubernetes.Interface, customers []*NodeGroup, stopCache <-chan struct{}) *Client {
 	// Backing store lister for all pods and nodes
-	allPodLister, podSync := k8s.NewCachePodWatcher(k8sClient)
-	allNodeLister, nodeSync := k8s.NewCacheNodeWatcher(k8sClient)
+	podStopChan := make(chan struct{})
+	nodeStopChan := make(chan struct{})
 
-	startTime := time.Now()
+	allPodLister, podSync := k8s.NewCachePodWatcher(k8sClient, podStopChan)
+	allNodeLister, nodeSync := k8s.NewCacheNodeWatcher(k8sClient, nodeStopChan)
+
+	// Spawn a routine to watch for the global stop signal
+	// once it's received, send the stop signal to the cache informers
+	go func() {
+		<-stopCache
+		log.Infoln("Stop signal recieved. Stopping cache watchers")
+		close(podStopChan)
+		close(nodeStopChan)
+	}()
+
 	log.Infoln("Waiting for cache to sync...")
-	synced := k8s.WaitForSync(3, podSync, nodeSync)
+	startTime := time.Now()
+
+	synced := k8s.WaitForSync(3, stopCache, podSync, nodeSync)
 	if !synced {
-		log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", 3)
+		log.Fatalf("Attempted to wait for caches to be synced %d times. Exiting..", 3)
 	}
+
 	endTime := time.Now()
 	log.Infof("Cache took %v to sync", endTime.Sub(startTime))
 

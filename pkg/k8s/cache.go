@@ -7,14 +7,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	v1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
 // NewCachePodWatcher creates a new IndexerInformer for watching pods from cache
-func NewCachePodWatcher(client kubernetes.Interface) (v1lister.PodLister, cache.InformerSynced) {
+func NewCachePodWatcher(client kubernetes.Interface, stop <-chan struct{}) (v1lister.PodLister, cache.InformerSynced) {
 	selector := fields.ParseSelectorOrDie(fmt.Sprint("status.phase!=", v1.PodSucceeded, ",status.phase!=", v1.PodFailed))
 	podsListWatch := cache.NewListWatchFromClient(
 		client.CoreV1().RESTClient(),
@@ -32,12 +31,12 @@ func NewCachePodWatcher(client kubernetes.Interface) (v1lister.PodLister, cache.
 		},
 	)
 	podLister := v1lister.NewPodLister(podIndexer)
-	go podController.Run(wait.NeverStop)
+	go podController.Run(stop)
 	return podLister, podController.HasSynced
 }
 
 // NewCacheNodeWatcher creates a new IndexerInformer for watching nodes from cache
-func NewCacheNodeWatcher(client kubernetes.Interface) (v1lister.NodeLister, cache.InformerSynced) {
+func NewCacheNodeWatcher(client kubernetes.Interface, stop <-chan struct{}) (v1lister.NodeLister, cache.InformerSynced) {
 	selector := fields.Everything()
 	nodesListWatch := cache.NewListWatchFromClient(
 		client.CoreV1().RESTClient(),
@@ -55,17 +54,17 @@ func NewCacheNodeWatcher(client kubernetes.Interface) (v1lister.NodeLister, cach
 		},
 	)
 	nodeLister := v1lister.NewNodeLister(nodeIndexer)
-	go nodeController.Run(wait.NeverStop)
+	go nodeController.Run(stop)
 	return nodeLister, nodeController.HasSynced
 }
 
 // WaitForSync wait for the cache sync for all the registered listers
 // it will try <tries> times and return the result
-func WaitForSync(tries int, informers ...cache.InformerSynced) bool {
+func WaitForSync(tries int, stopChan <-chan struct{}, informers ...cache.InformerSynced) bool {
 	synced := false
 	for i := 0; i < tries && !synced; i++ {
 		log.Debugf("Trying to sync cache: tries = %v", tries)
-		synced = cache.WaitForCacheSync(nil, informers...)
+		synced = cache.WaitForCacheSync(stopChan, informers...)
 	}
 	return synced
 }

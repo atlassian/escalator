@@ -14,6 +14,7 @@ import (
 type Controller struct {
 	*Client
 	*Opts
+	stopChan <-chan struct{}
 }
 
 // Opts provide the Controller with config for runtime
@@ -25,20 +26,20 @@ type Opts struct {
 }
 
 // NewController creates a new controller with the specified options
-func NewController(opts *Opts) *Controller {
-	client := NewClient(opts.K8SClient, opts.Customers)
+func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
+	client := NewClient(opts.K8SClient, opts.Customers, stopChan)
 	if client == nil {
 		log.Fatalln("Failed to create controller client")
 		return nil
 	}
 	return &Controller{
-		Client: client,
-		Opts:   opts,
+		Client:   client,
+		Opts:     opts,
+		stopChan: stopChan,
 	}
 }
 
 func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
-
 	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
 	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
 	return cpuPercent, memPercent, nil
@@ -96,7 +97,7 @@ func (c Controller) RunOnce() {
 }
 
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
-func (c Controller) RunForever(runImmediately bool, stop <-chan struct{}) {
+func (c Controller) RunForever(runImmediately bool) {
 	if runImmediately {
 		log.Infoln("---[FIRSTRUN LOOP]---")
 		c.RunOnce()
@@ -109,7 +110,9 @@ func (c Controller) RunForever(runImmediately bool, stop <-chan struct{}) {
 		case <-ticker.C:
 			log.Infoln("---[AUTOSCALER LOOP]---")
 			c.RunOnce()
-		case <-stop:
+		case <-c.stopChan:
+			log.Debugf("Stopping main loop")
+			ticker.Stop()
 			return
 		}
 	}
