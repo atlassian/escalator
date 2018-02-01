@@ -17,11 +17,11 @@ customers:
     label_value: "shared"
     daemon_set_usage_percent: 5
     min_slack_space_percent: 5
-    min_nodes: 5
+    min_nodes: 1
     max_nodes: 300
     dry_mode: true
     soft_taint_effect_percent: 30
     dampening_strength: 0.3
-    upper_capacity_threshhold_percent: 10
-    lower_capacity_threshhold_percent: 15
+    upper_capacity_threshhold_percent: 20
+    lower_capacity_threshhold_percent: 5
     scale_down_min_grace_period_seconds: 120

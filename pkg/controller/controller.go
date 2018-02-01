@@ -21,6 +21,9 @@ type Controller struct {
 	*Client
 	*Opts
 	stopChan <-chan struct{}
+
+	// used for tracking which nodes are tainted. testing when in dry mode
+	taintTracker map[string][]string
 }
 
 // Opts provide the Controller with config for runtime
@@ -42,6 +45,8 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 		Client:   client,
 		Opts:     opts,
 		stopChan: stopChan,
+
+		taintTracker: make(map[string][]string),
 	}
 }
 
@@ -54,6 +59,9 @@ func (c Controller) GetOpts(customerName string) (*NodeGroup, error) {
 }
 
 func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
+	if cpuA.MilliValue() == 0 || memA.MilliValue() == 0 {
+		return 0, 0, errors.New("Cannot divide by zero in percent calculation")
+	}
 	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
 	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
 	return cpuPercent, memPercent, nil
@@ -86,22 +94,29 @@ func (n nodesByCreationTime) Swap(i, j int) {
 	n[i], n[j] = n[j], n[i]
 }
 
-func (c Controller) taintOldest(nodes []*v1.Node, nodeGroup *NodeGroup) {
+func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) {
 	sorted := make(nodesByCreationTime, 0, len(nodes))
 	for _, node := range nodes {
 		sorted = append(sorted, node)
 	}
 	sort.Sort(sorted)
 
-	for _, node := range sorted {
+	for i, node := range sorted {
+		// stop at N (or when array is fully iterated)
+		if i >= n {
+			break
+		}
+
+		// only actually taint in dry mode
 		if !nodeGroup.DryMode {
-			log.WithField("drymode", "off").Infoln("Tainting node", node)
+			log.WithField("drymode", "off").Infoln("Tainting node", node.Name)
 			updatedNode, err := k8s.AddToBeRemovedTaint(node, c.Client)
 			if err != nil {
 				node = updatedNode
 			}
 		} else {
-			log.WithField("drymode", "on").Infoln("Tainting node", node)
+			c.taintTracker[nodeGroup.Name] = append(c.taintTracker[nodeGroup.Name], node.Name)
+			log.WithField("drymode", "on").Infoln("Tainting node", node.Name)
 		}
 	}
 }
@@ -112,11 +127,36 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 		log.Errorf("Failed to local customer: %v", err)
 		return
 	}
-
 	pods, err := lister.Pods.List()
-	nodes, _ := lister.Nodes.List()
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Failed to list pods: %v", err)
+		return
+	}
+	nodes, err := lister.Nodes.List()
+	if err != nil {
+		log.Errorf("Failed to list nodes: %v", err)
+		return
+	}
+
+	// Filter out tainted nodes
+	nodesFilter := make([]*v1.Node, 0, len(nodes))
+	for _, node := range nodes {
+		var contains bool
+		for _, name := range c.taintTracker[customer] {
+			if node.Name == name {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			nodesFilter = append(nodesFilter, node)
+		}
+	}
+	nodes = nodesFilter
+	log.WithField("customer", customer).Infoln("nodes remaining not tainted:", len(nodesFilter))
+
+	if len(nodes) == 0 {
+		log.WithField("customer", customer).Infoln("no nodes remaining")
 		return
 	}
 
@@ -126,7 +166,15 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 
 	// Calc
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
+	if err != nil {
+		log.Errorf("Failed to calculate requests: %v", err)
+		return
+	}
 	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
+	if err != nil {
+		log.Errorf("Failed to calculate capacity: %v", err)
+		return
+	}
 
 	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(customer).Set(float64(cpuRequest.MilliValue()))
@@ -138,6 +186,10 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 
 	// Calc %
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
+	if err != nil {
+		log.Errorf("Failed to calculate percentages: %v", err)
+		return
+	}
 
 	// Metrics
 	log.WithField("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
@@ -145,15 +197,15 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
 	// Scale Down?
-	if math.Max(cpuPercent, memPercent) < float64(opts.UpperCapacityThreshholdPercent) {
+	if math.Max(cpuPercent, memPercent) < float64(opts.UpperCapacityThreshholdPercent) && len(nodes) > opts.MinNodes {
 		log.Warningln("Upper threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-		c.taintOldest(nodes, opts)
+		c.taintOldestN(nodes, opts, 1)
 	}
-	if math.Max(cpuPercent, memPercent) < float64(opts.LowerCapacityThreshholdPercent) {
+	if math.Max(cpuPercent, memPercent) < float64(opts.LowerCapacityThreshholdPercent) && len(nodes)-1 > opts.MinNodes {
 		log.Warningln("Lower threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-		c.taintOldest(nodes, opts)
+		c.taintOldestN(nodes, opts, 1)
 	}
 }
 
