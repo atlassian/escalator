@@ -6,17 +6,21 @@ import (
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
+	"github.com/atlassian/escalator/pkg/metrics"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
 
 	log "github.com/sirupsen/logrus"
 )
 
+var smoothingCoefficients = [...]float64{1, -8, 0, 8, -1}
+
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
 	*Client
 	*Opts
-	stopChan <-chan struct{}
+	stopChan               <-chan struct{}
+	customersMemoryHistory map[string][]float64
 }
 
 // Opts provide the Controller with config for runtime
@@ -35,9 +39,10 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 		return nil
 	}
 	return &Controller{
-		Client:   client,
-		Opts:     opts,
-		stopChan: stopChan,
+		Client:                 client,
+		Opts:                   opts,
+		stopChan:               stopChan,
+		customersMemoryHistory: make(map[string][]float64),
 	}
 }
 
@@ -69,11 +74,41 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister, wai
 		return
 	}
 
+	// Metrics
+	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(nodes)))
+	metrics.NodeGroupPods.WithLabelValues(customer).Set(float64(len(pods)))
+
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
 	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
 
+	metrics.NodeGroupCPURequest.WithLabelValues(customer).Set(float64(cpuRequest.MilliValue()))
+	bytesMemReq, _ := memRequest.AsInt64()
+	metrics.NodeGroupMemRequest.WithLabelValues(customer).Set(float64(bytesMemReq))
+	metrics.NodeGroupCPUCapacity.WithLabelValues(customer).Set(float64(cpuCapacity.MilliValue()))
+	bytesMemCap, _ := memCapacity.AsInt64()
+	metrics.NodeGroupMemCapacity.WithLabelValues(customer).Set(float64(bytesMemCap))
+
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
+
 	log.WithField("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
+	metrics.NodeGroupsCPUPercent.WithLabelValues(customer).Set(cpuPercent)
+	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
+
+	// TODO: Remove me. leaving in for metrics for now
+	c.customersMemoryHistory[customer] = append(c.customersMemoryHistory[customer], memPercent)
+	log.Infof("[%v] history: %#v", len(c.customersMemoryHistory[customer]), c.customersMemoryHistory[customer])
+	if len(c.customersMemoryHistory[customer]) >= len(smoothingCoefficients) {
+		log.Infoln("calcuating")
+		var deriv float64
+		for i := range smoothingCoefficients {
+			deriv += c.customersMemoryHistory[customer][i] * smoothingCoefficients[i]
+		}
+		deriv /= 12
+		log.WithField("customer", customer).Infof("Deriv: %v", deriv)
+		metrics.NodeGroupsMemPercentDeriv.WithLabelValues(customer).Set(deriv)
+
+		c.customersMemoryHistory[customer] = c.customersMemoryHistory[customer][1:]
+	}
 
 	if math.Max(cpuPercent, memPercent) < 50.0 {
 		log.Warningln("Scale down??")
