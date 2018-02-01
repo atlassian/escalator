@@ -1,11 +1,15 @@
 package controller
 
 import (
+	"errors"
+	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
 
@@ -41,6 +45,14 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 	}
 }
 
+// GetOpts is a helper to return the options for a customerName
+func (c Controller) GetOpts(customerName string) (*NodeGroup, error) {
+	if opts, ok := c.Opts.Customers[customerName]; ok {
+		return opts, nil
+	}
+	return nil, errors.New(fmt.Sprintln("Failed to get node group for customer ", customerName))
+}
+
 func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
 	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
 	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
@@ -59,7 +71,48 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
+// Sort functions for sorting by creation time
+type nodesByCreationTime []*v1.Node
+
+func (n nodesByCreationTime) Len() int {
+	return len(n)
+}
+
+func (n nodesByCreationTime) Less(i, j int) bool {
+	return n[i].CreationTimestamp.Before(&n[i].CreationTimestamp)
+}
+
+func (n nodesByCreationTime) Swap(i, j int) {
+	n[i], n[j] = n[j], n[i]
+}
+
+func (c Controller) taintOldest(nodes []*v1.Node, nodeGroup *NodeGroup) {
+	sorted := make(nodesByCreationTime, 0, len(nodes))
+	for _, node := range nodes {
+		sorted = append(sorted, node)
+	}
+	sort.Sort(sorted)
+
+	for _, node := range sorted {
+		if !nodeGroup.DryMode {
+			log.WithField("drymode", "off").Infoln("Tainting node", node)
+			updatedNode, err := k8s.AddToBeRemovedTaint(node, c.Client)
+			if err != nil {
+				node = updatedNode
+			}
+		} else {
+			log.WithField("drymode", "on").Infoln("Tainting node", node)
+		}
+	}
+}
+
 func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
+	opts, err := c.GetOpts(customer)
+	if err != nil {
+		log.Errorf("Failed to local customer: %v", err)
+		return
+	}
+
 	pods, err := lister.Pods.List()
 	nodes, _ := lister.Nodes.List()
 	if err != nil {
@@ -92,13 +145,15 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
 	// Scale Down?
-	if math.Max(cpuPercent, memPercent) < float64(c.Opts.Customers[customer].UpperCapacityThreshholdPercent) {
+	if math.Max(cpuPercent, memPercent) < float64(opts.UpperCapacityThreshholdPercent) {
 		log.Warningln("Upper threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
+		c.taintOldest(nodes, opts)
 	}
-	if math.Max(cpuPercent, memPercent) < float64(c.Opts.Customers[customer].LowerCapacityThreshholdPercent) {
+	if math.Max(cpuPercent, memPercent) < float64(opts.LowerCapacityThreshholdPercent) {
 		log.Warningln("Lower threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
+		c.taintOldest(nodes, opts)
 	}
 }
 
