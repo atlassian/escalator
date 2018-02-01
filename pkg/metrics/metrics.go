@@ -45,15 +45,6 @@ var (
 		},
 		[]string{"node_group"},
 	)
-	// NodeGroupsMemPercentDeriv smoothed deriv of node group mem usage percent
-	NodeGroupsMemPercentDeriv = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "node_groups_mem_percent_deriv",
-			Help: "smoothed deriv of node group mem usage percent",
-		},
-		[]string{"node_group"},
-	)
-
 	// NodeGroupMemRequest milli value of node request mem
 	NodeGroupMemRequest = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -102,7 +93,6 @@ func init() {
 	prometheus.MustRegister(NodeGroupPods)
 	prometheus.MustRegister(NodeGroupsMemPercent)
 	prometheus.MustRegister(NodeGroupsCPUPercent)
-	prometheus.MustRegister(NodeGroupsMemPercentDeriv)
 	prometheus.MustRegister(NodeGroupCPURequest)
 	prometheus.MustRegister(NodeGroupMemRequest)
 	prometheus.MustRegister(NodeGroupCPUCapacity)
