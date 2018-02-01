@@ -12,14 +12,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var smoothingCoefficients = [...]float64{1, -8, 0, 8, -1}
-
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
 	*Client
 	*Opts
-	stopChan               <-chan struct{}
-	customersMemoryHistory map[string][]float64
+	stopChan <-chan struct{}
 }
 
 // Opts provide the Controller with config for runtime
@@ -38,10 +35,9 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 		return nil
 	}
 	return &Controller{
-		Client:                 client,
-		Opts:                   opts,
-		stopChan:               stopChan,
-		customersMemoryHistory: make(map[string][]float64),
+		Client:   client,
+		Opts:     opts,
+		stopChan: stopChan,
 	}
 }
 
@@ -75,9 +71,11 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(nodes)))
 	metrics.NodeGroupPods.WithLabelValues(customer).Set(float64(len(pods)))
 
+	// Calc
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
 	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
 
+	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(customer).Set(float64(cpuRequest.MilliValue()))
 	bytesMemReq, _ := memRequest.AsInt64()
 	metrics.NodeGroupMemRequest.WithLabelValues(customer).Set(float64(bytesMemReq))
@@ -85,31 +83,21 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	bytesMemCap, _ := memCapacity.AsInt64()
 	metrics.NodeGroupMemCapacity.WithLabelValues(customer).Set(float64(bytesMemCap))
 
+	// Calc %
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
 
+	// Metrics
 	log.WithField("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
 	metrics.NodeGroupsCPUPercent.WithLabelValues(customer).Set(cpuPercent)
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
-	// TODO: Remove me. leaving in for metrics for now
-	c.customersMemoryHistory[customer] = append(c.customersMemoryHistory[customer], memPercent)
-	if len(c.customersMemoryHistory[customer]) >= len(smoothingCoefficients) {
-		var deriv float64
-		for i := range smoothingCoefficients {
-			deriv += c.customersMemoryHistory[customer][i] * smoothingCoefficients[i]
-		}
-		deriv /= 12
-		metrics.NodeGroupsMemPercentDeriv.WithLabelValues(customer).Set(deriv)
-		c.customersMemoryHistory[customer] = c.customersMemoryHistory[customer][1:]
-	}
-
-	log.WithField("customer", customer).Infoln("upper", c.Opts.Customers[customer].UpperCapacityThreshholdPercent)
+	// Scale Down?
 	if math.Max(cpuPercent, memPercent) < float64(c.Opts.Customers[customer].UpperCapacityThreshholdPercent) {
-		log.Warningln("Scale down 1 node")
+		log.Warningln("Upper threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
 	}
 	if math.Max(cpuPercent, memPercent) < float64(c.Opts.Customers[customer].LowerCapacityThreshholdPercent) {
-		log.Warningln("Scale down 1 node")
+		log.Warningln("Lower threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
 	}
 }
