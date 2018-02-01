@@ -2,7 +2,6 @@ package controller
 
 import (
 	"math"
-	"sync"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -26,7 +25,7 @@ type Controller struct {
 // Opts provide the Controller with config for runtime
 type Opts struct {
 	K8SClient kubernetes.Interface
-	Customers []*NodeGroup
+	Customers map[string]*NodeGroup
 
 	ScanInterval time.Duration
 }
@@ -64,9 +63,7 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
-func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister, wait *sync.WaitGroup) {
-	defer wait.Done()
-
+func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	pods, err := lister.Pods.List()
 	nodes, _ := lister.Nodes.List()
 	if err != nil {
@@ -96,22 +93,24 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister, wai
 
 	// TODO: Remove me. leaving in for metrics for now
 	c.customersMemoryHistory[customer] = append(c.customersMemoryHistory[customer], memPercent)
-	log.Infof("[%v] history: %#v", len(c.customersMemoryHistory[customer]), c.customersMemoryHistory[customer])
 	if len(c.customersMemoryHistory[customer]) >= len(smoothingCoefficients) {
-		log.Infoln("calcuating")
 		var deriv float64
 		for i := range smoothingCoefficients {
 			deriv += c.customersMemoryHistory[customer][i] * smoothingCoefficients[i]
 		}
 		deriv /= 12
-		log.WithField("customer", customer).Infof("Deriv: %v", deriv)
 		metrics.NodeGroupsMemPercentDeriv.WithLabelValues(customer).Set(deriv)
-
 		c.customersMemoryHistory[customer] = c.customersMemoryHistory[customer][1:]
 	}
 
-	if math.Max(cpuPercent, memPercent) < 50.0 {
-		log.Warningln("Scale down??")
+	log.WithField("customer", customer).Infoln("upper", c.Opts.Customers[customer].UpperCapacityThreshholdPercent)
+	if math.Max(cpuPercent, memPercent) < float64(c.Opts.Customers[customer].UpperCapacityThreshholdPercent) {
+		log.Warningln("Scale down 1 node")
+		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
+	}
+	if math.Max(cpuPercent, memPercent) < float64(c.Opts.Customers[customer].LowerCapacityThreshholdPercent) {
+		log.Warningln("Scale down 1 node")
+		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
 	}
 }
 
@@ -119,19 +118,13 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister, wai
 func (c Controller) RunOnce() {
 	startTime := time.Now()
 
-	// TODO(jgonzalez/dangot): REAPER GOES HERE
+	// TODO(jgonzalez/dangot):
+	// REAPER GOES HERE
 
 	// Perform the ScaleUp/Taint logic
-	// can perform scale logic for each customer in paralell
-	// not a big deal with few customers, but for scalability if there are many
-	var wait sync.WaitGroup
-	wait.Add(len(c.Client.Listers))
-
 	for customer, lister := range c.Client.Listers {
-		go c.scaleNodeGroup(customer, lister, &wait)
+		c.scaleNodeGroup(customer, lister)
 	}
-
-	wait.Wait()
 
 	endTime := time.Now()
 	log.Infof("Scaling took a total of %v", endTime.Sub(startTime))

@@ -1,6 +1,11 @@
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"net/http"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
 
 var (
 	// RunCount is number of times the controller has checked for cluster state
@@ -81,6 +86,14 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupTaintEvent indicates a scale event
+	NodeGroupTaintEvent = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_taint_event",
+			Help: "indicates a scale event",
+		},
+		[]string{"customer"},
+	)
 )
 
 func init() {
@@ -94,4 +107,11 @@ func init() {
 	prometheus.MustRegister(NodeGroupMemRequest)
 	prometheus.MustRegister(NodeGroupCPUCapacity)
 	prometheus.MustRegister(NodeGroupMemCapacity)
+	prometheus.MustRegister(NodeGroupTaintEvent)
+}
+
+// Start starts the metrics endpoint on a new thread
+func Start(addr string) {
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(addr, nil)
 }
