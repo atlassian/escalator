@@ -1,16 +1,15 @@
 package main
 
 import (
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/k8s"
+	"github.com/atlassian/escalator/pkg/metrics"
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	log "github.com/sirupsen/logrus"
@@ -47,14 +46,16 @@ func main() {
 		log.Fatalf("Failed to decode configFile: %v", err)
 	}
 
-	// endpoints
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(*addr, nil)
+	// turn it into a map of name and nodegroup for O(1) lookup
+	customerMap := make(map[string]*controller.NodeGroup)
+	for _, nodeGroup := range customers {
+		customerMap[nodeGroup.Name] = nodeGroup
+	}
 
 	opts := &controller.Opts{
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
-		Customers:    customers,
+		Customers:    customerMap,
 	}
 
 	// signal channel waits for interrupt
@@ -70,6 +71,8 @@ func main() {
 		log.Infoln("Stopping autoscaler gracefully")
 		close(stopChan)
 	}()
+
+	metrics.Start(*addr)
 
 	c := controller.NewController(opts, stopChan)
 	c.RunForever(true)
