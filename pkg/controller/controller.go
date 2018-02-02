@@ -79,12 +79,13 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
+// nodeIndexBundle bundles an original index to a node so that it can be tracked during sorting
 type nodeIndexBundle struct {
 	node  *v1.Node
 	index int
 }
 
-// Sort functions for sorting by creation time
+// nodesByCreationTime Sort functions for sorting by creation time
 type nodesByCreationTime []nodeIndexBundle
 
 func (n nodesByCreationTime) Len() int {
@@ -99,6 +100,8 @@ func (n nodesByCreationTime) Swap(i, j int) {
 	n[i], n[j] = n[j], n[i]
 }
 
+// taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indecies of the nodes it tainted
+// indices are from the parameter nodes indexes, not the sorted index
 func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) []int {
 	sorted := make(nodesByCreationTime, 0, len(nodes))
 	for i, node := range nodes {
@@ -212,13 +215,26 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	metrics.NodeGroupsCPUPercent.WithLabelValues(customer).Set(cpuPercent)
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
-	// Scale Down?
+	// Scale down upper percentage threshhold
 	if math.Max(cpuPercent, memPercent) < float64(opts.UpperCapacityThreshholdPercent) && len(nodes) > opts.MinNodes {
 		log.Warningln("Upper threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-		c.taintOldestN(nodes, opts, 1)
+		nodesTainted := c.taintOldestN(nodes, opts, 1)
+
+		// remove all the nodes we just tainted from further calculations
+		filtered := make([]*v1.Node, 0, len(nodes)-1)
+		for i, node := range nodes {
+			for _, j := range nodesTainted {
+				if i != j {
+					filtered = append(filtered, node)
+				}
+			}
+		}
+		nodes = filtered
 	}
-	if math.Max(cpuPercent, memPercent) < float64(opts.LowerCapacityThreshholdPercent) && len(nodes)-1 > opts.MinNodes {
+
+	// Scale down lower percentage threshhold
+	if math.Max(cpuPercent, memPercent) < float64(opts.LowerCapacityThreshholdPercent) && len(nodes) > opts.MinNodes {
 		log.Warningln("Lower threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
 		c.taintOldestN(nodes, opts, 1)
