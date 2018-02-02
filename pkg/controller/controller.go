@@ -141,15 +141,21 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	// Filter out tainted nodes
 	nodesFilter := make([]*v1.Node, 0, len(nodes))
 	for _, node := range nodes {
-		var contains bool
-		for _, name := range c.taintTracker[customer] {
-			if node.Name == name {
-				contains = true
-				break
+		if opts.DryMode {
+			var contains bool
+			for _, name := range c.taintTracker[customer] {
+				if node.Name == name {
+					contains = true
+					break
+				}
 			}
-		}
-		if !contains {
-			nodesFilter = append(nodesFilter, node)
+			if !contains {
+				nodesFilter = append(nodesFilter, node)
+			}
+		} else {
+			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
+				nodesFilter = append(nodesFilter, node)
+			}
 		}
 	}
 	nodes = nodesFilter
