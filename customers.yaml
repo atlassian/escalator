@@ -2,26 +2,20 @@ customers:
   - name: "buildeng"
     label_key: "customer"
     label_value: "buildeng"
-    daemon_set_usage_percent: 5
-    min_slack_space_percent: 5
     min_nodes: 5
     max_nodes: 300
     dry_mode: true
-    soft_taint_effect_percent: 30
-    dampening_strength: 0.3
-    upper_capacity_threshhold_percent: 70
-    lower_capacity_threshhold_percent: 50
-    scale_down_min_grace_period_seconds: 120
+    taint_upper_capacity_threshhold_percent: 70
+    taint_lower_capacity_threshhold_percent: 50
+    untaint_upper_capacity_threshhold_percent: 95
+    untaint_lower_capacity_threshhold_percent: 90
   - name: "default"
     label_key: "customer"
     label_value: "shared"
-    daemon_set_usage_percent: 5
-    min_slack_space_percent: 5
     min_nodes: 1
-    max_nodes: 300
+    max_nodes: 10
     dry_mode: true
-    soft_taint_effect_percent: 30
-    dampening_strength: 0.3
-    upper_capacity_threshhold_percent: 20
-    lower_capacity_threshhold_percent: 5
-    scale_down_min_grace_period_seconds: 120
+    taint_upper_capacity_threshhold_percent: 25
+    taint_lower_capacity_threshhold_percent: 20
+    untaint_upper_capacity_threshhold_percent: 45
+    untaint_lower_capacity_threshhold_percent: 30

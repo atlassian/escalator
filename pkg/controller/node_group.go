@@ -29,9 +29,13 @@ type NodeGroup struct {
 
 	SoftTaintEffectPercent int `json:"soft_taint_effect_percent,omitempty" yaml:"soft_taint_effect_percent,omitempty"`
 
-	DampeningStrength              float64 `json:"dampening_strength,omitempty" yaml:"dampening_strength,omitempty"`
-	UpperCapacityThreshholdPercent int     `json:"upper_capacity_threshhold_percent,omitempty" yaml:"upper_capacity_threshhold_percent,omitempty"`
-	LowerCapacityThreshholdPercent int     `json:"lower_capacity_threshhold_percent,omitempty" yaml:"lower_capacity_threshhold_percent,omitempty"`
+	DampeningStrength float64 `json:"dampening_strength,omitempty" yaml:"dampening_strength,omitempty"`
+
+	TaintUpperCapacityThreshholdPercent int `json:"taint_upper_capacity_threshhold_percent,omitempty" yaml:"taint_upper_capacity_threshhold_percent,omitempty"`
+	TaintLowerCapacityThreshholdPercent int `json:"taint_lower_capacity_threshhold_percent,omitempty" yaml:"taint_lower_capacity_threshhold_percent,omitempty"`
+
+	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
+	UntaintLowerCapacityThreshholdPercent int `json:"untaint_lower_capacity_threshhold_percent,omitempty" yaml:"untaint_lower_capacity_threshhold_percent,omitempty"`
 
 	ScaleDownMinGracePeriodSeconds int `json:"scale_down_min_grace_period_seconds,omitempty" yaml:"scale_down_min_grace_period_seconds,omitempty"`
 }

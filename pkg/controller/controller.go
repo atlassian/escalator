@@ -79,40 +79,19 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
-// nodeIndexBundle bundles an original index to a node so that it can be tracked during sorting
-type nodeIndexBundle struct {
-	node  *v1.Node
-	index int
-}
-
-// nodesByCreationTime Sort functions for sorting by creation time
-type nodesByCreationTime []nodeIndexBundle
-
-func (n nodesByCreationTime) Len() int {
-	return len(n)
-}
-
-func (n nodesByCreationTime) Less(i, j int) bool {
-	return n[i].node.CreationTimestamp.Before(&n[i].node.CreationTimestamp)
-}
-
-func (n nodesByCreationTime) Swap(i, j int) {
-	n[i], n[j] = n[j], n[i]
-}
-
 // taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indecies of the nodes it tainted
 // indices are from the parameter nodes indexes, not the sorted index
 func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) []int {
-	sorted := make(nodesByCreationTime, 0, len(nodes))
+	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
 	for i, node := range nodes {
 		sorted = append(sorted, nodeIndexBundle{node, i})
 	}
 	sort.Sort(sorted)
 
 	taintedIndices := make([]int, 0, n)
-	for i, bundle := range sorted {
+	for _, bundle := range sorted {
 		// stop at N (or when array is fully iterated)
-		if i >= n {
+		if len(taintedIndices) >= n {
 			break
 		}
 
@@ -134,26 +113,73 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) 
 	return taintedIndices
 }
 
+func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) []int {
+	sorted := make(nodesByNewestCreationTime, 0, len(nodes))
+	for i, node := range nodes {
+		sorted = append(sorted, nodeIndexBundle{node, i})
+	}
+	sort.Sort(sorted)
+
+	untaintedIndices := make([]int, 0, n)
+	for _, bundle := range sorted {
+		// stop at N (or when array is fully iterated)
+		if len(untaintedIndices) >= n {
+			break
+		}
+		// only actually taint in dry mode
+		if !nodeGroup.DryMode {
+			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
+				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
+				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
+				if err != nil {
+					bundle.node = updatedNode
+					untaintedIndices = append(untaintedIndices, bundle.index)
+				}
+			}
+		} else {
+			deleteIndex := -1
+			for i, name := range c.taintTracker[nodeGroup.Name] {
+				if bundle.node.Name == name {
+					deleteIndex = i
+					break
+				}
+			}
+			if deleteIndex != -1 {
+				// Delete from tracker
+				c.taintTracker[nodeGroup.Name] = append(c.taintTracker[nodeGroup.Name][:deleteIndex], c.taintTracker[nodeGroup.Name][deleteIndex+1:]...)
+				untaintedIndices = append(untaintedIndices, bundle.index)
+				log.WithField("drymode", "on").Infoln("Untainting node", bundle.node.Name)
+			}
+		}
+	}
+
+	return untaintedIndices
+}
+
 func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	opts, err := c.GetOpts(customer)
 	if err != nil {
 		log.Errorf("Failed to local customer: %v", err)
 		return
 	}
+
+	// list all pods
 	pods, err := lister.Pods.List()
 	if err != nil {
 		log.Errorf("Failed to list pods: %v", err)
 		return
 	}
-	nodes, err := lister.Nodes.List()
+
+	// List all nodes
+	allNodes, err := lister.Nodes.List()
 	if err != nil {
 		log.Errorf("Failed to list nodes: %v", err)
 		return
 	}
 
 	// Filter out tainted nodes
-	nodesFilter := make([]*v1.Node, 0, len(nodes))
-	for _, node := range nodes {
+	untaintedNodes := make([]*v1.Node, 0, len(allNodes))
+	for _, node := range allNodes {
 		if opts.DryMode {
 			var contains bool
 			for _, name := range c.taintTracker[customer] {
@@ -163,33 +189,33 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 				}
 			}
 			if !contains {
-				nodesFilter = append(nodesFilter, node)
+				untaintedNodes = append(untaintedNodes, node)
 			}
 		} else {
 			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
-				nodesFilter = append(nodesFilter, node)
+				untaintedNodes = append(untaintedNodes, node)
 			}
 		}
 	}
-	nodes = nodesFilter
-	log.WithField("customer", customer).Infoln("nodes remaining not tainted:", len(nodesFilter))
+	log.WithField("customer", customer).Infoln("total nodes remaining:", len(allNodes))
+	log.WithField("customer", customer).Infoln("nodes remaining not tainted:", len(untaintedNodes))
 
-	if len(nodes) == 0 {
+	if len(allNodes) == 0 {
 		log.WithField("customer", customer).Infoln("no nodes remaining")
 		return
 	}
 
 	// Metrics
-	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(nodes)))
+	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(untaintedNodes)))
 	metrics.NodeGroupPods.WithLabelValues(customer).Set(float64(len(pods)))
 
-	// Calc
+	// Calc capacity for untainted nodes
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
 	if err != nil {
 		log.Errorf("Failed to calculate requests: %v", err)
 		return
 	}
-	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(nodes)
+	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(untaintedNodes)
 	if err != nil {
 		log.Errorf("Failed to calculate capacity: %v", err)
 		return
@@ -216,28 +242,52 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
 	// Scale down upper percentage threshhold
-	if math.Max(cpuPercent, memPercent) < float64(opts.UpperCapacityThreshholdPercent) && len(nodes) > opts.MinNodes {
+	if math.Max(cpuPercent, memPercent) < float64(opts.TaintUpperCapacityThreshholdPercent) && len(untaintedNodes) > opts.MinNodes {
 		log.Warningln("Upper threshhold reached. Scale down 1 node")
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-		nodesTainted := c.taintOldestN(nodes, opts, 1)
+		nodesTainted := c.taintOldestN(untaintedNodes, opts, 1)
 
 		// remove all the nodes we just tainted from further calculations
-		filtered := make([]*v1.Node, 0, len(nodes)-1)
-		for i, node := range nodes {
+		filtered := make([]*v1.Node, 0, len(untaintedNodes)-1)
+		for i, node := range untaintedNodes {
 			for _, j := range nodesTainted {
 				if i != j {
 					filtered = append(filtered, node)
 				}
 			}
 		}
-		nodes = filtered
+
+		// Scale down lower percentage threshhold
+		if math.Max(cpuPercent, memPercent) < float64(opts.TaintLowerCapacityThreshholdPercent) && len(filtered)-2 > opts.MinNodes {
+			log.Warningln("Lower threshhold reached. Scale down 1 node")
+			metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
+			c.taintOldestN(filtered, opts, 2)
+		}
 	}
 
-	// Scale down lower percentage threshhold
-	if math.Max(cpuPercent, memPercent) < float64(opts.LowerCapacityThreshholdPercent) && len(nodes) > opts.MinNodes {
-		log.Warningln("Lower threshhold reached. Scale down 1 node")
-		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-		c.taintOldestN(nodes, opts, 1)
+	// Scale up by upper threshhold
+	if math.Max(cpuPercent, memPercent) > float64(opts.UntaintLowerCapacityThreshholdPercent) && len(untaintedNodes)+1 < opts.MaxNodes {
+		log.Warningln("Slack space reached. Trying to untaint a tainted node")
+		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Dec()
+		// push in allNodes here to include tainted ones. Otherwise it will untaint nothing
+		nodesUntainted := c.untaintNewestN(allNodes, opts, 1)
+
+		// remove all the nodes we just untainted from further calculations
+		filtered := make([]*v1.Node, 0, len(allNodes)-1)
+		for i, node := range untaintedNodes {
+			for _, j := range nodesUntainted {
+				if i != j {
+					filtered = append(filtered, node)
+				}
+			}
+		}
+
+		// Scale down lower percentage threshhold
+		if math.Max(cpuPercent, memPercent) > float64(opts.UntaintUpperCapacityThreshholdPercent) && len(filtered)+2 > opts.MinNodes {
+			log.Warningln("Agressive Slack space reached. Trying to untaint tainted nodes")
+			metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
+			c.untaintNewestN(filtered, opts, 2)
+		}
 	}
 }
 
