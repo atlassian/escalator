@@ -79,29 +79,35 @@ func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
 	return true, nil
 }
 
+type nodeIndexBundle struct {
+	node  *v1.Node
+	index int
+}
+
 // Sort functions for sorting by creation time
-type nodesByCreationTime []*v1.Node
+type nodesByCreationTime []nodeIndexBundle
 
 func (n nodesByCreationTime) Len() int {
 	return len(n)
 }
 
 func (n nodesByCreationTime) Less(i, j int) bool {
-	return n[i].CreationTimestamp.Before(&n[i].CreationTimestamp)
+	return n[i].node.CreationTimestamp.Before(&n[i].node.CreationTimestamp)
 }
 
 func (n nodesByCreationTime) Swap(i, j int) {
 	n[i], n[j] = n[j], n[i]
 }
 
-func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) {
+func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) []int {
 	sorted := make(nodesByCreationTime, 0, len(nodes))
-	for _, node := range nodes {
-		sorted = append(sorted, node)
+	for i, node := range nodes {
+		sorted = append(sorted, nodeIndexBundle{node, i})
 	}
 	sort.Sort(sorted)
 
-	for i, node := range sorted {
+	taintedIndices := make([]int, 0, n)
+	for i, bundle := range sorted {
 		// stop at N (or when array is fully iterated)
 		if i >= n {
 			break
@@ -109,16 +115,20 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroup, n int) 
 
 		// only actually taint in dry mode
 		if !nodeGroup.DryMode {
-			log.WithField("drymode", "off").Infoln("Tainting node", node.Name)
-			updatedNode, err := k8s.AddToBeRemovedTaint(node, c.Client)
+			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
+			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
 			if err != nil {
-				node = updatedNode
+				bundle.node = updatedNode
+				taintedIndices = append(taintedIndices, bundle.index)
 			}
 		} else {
-			c.taintTracker[nodeGroup.Name] = append(c.taintTracker[nodeGroup.Name], node.Name)
-			log.WithField("drymode", "on").Infoln("Tainting node", node.Name)
+			c.taintTracker[nodeGroup.Name] = append(c.taintTracker[nodeGroup.Name], bundle.node.Name)
+			taintedIndices = append(taintedIndices, bundle.index)
+			log.WithField("drymode", "on").Infoln("Tainting node", bundle.node.Name)
 		}
 	}
+
+	return taintedIndices
 }
 
 func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
@@ -141,15 +151,21 @@ func (c Controller) scaleNodeGroup(customer string, lister *NodeGroupLister) {
 	// Filter out tainted nodes
 	nodesFilter := make([]*v1.Node, 0, len(nodes))
 	for _, node := range nodes {
-		var contains bool
-		for _, name := range c.taintTracker[customer] {
-			if node.Name == name {
-				contains = true
-				break
+		if opts.DryMode {
+			var contains bool
+			for _, name := range c.taintTracker[customer] {
+				if node.Name == name {
+					contains = true
+					break
+				}
 			}
-		}
-		if !contains {
-			nodesFilter = append(nodesFilter, node)
+			if !contains {
+				nodesFilter = append(nodesFilter, node)
+			}
+		} else {
+			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
+				nodesFilter = append(nodesFilter, node)
+			}
 		}
 	}
 	nodes = nodesFilter
