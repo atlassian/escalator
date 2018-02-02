@@ -45,10 +45,10 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Nod
 	// don't need to re-add the taint
 	if taintExists {
 		log.Debugf("%v already present on node %v", ToBeRemovedByAutoscalerKey, updatedNode.Name)
-		return node, nil
+		return updatedNode, nil
 	}
 
-	node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
+	updatedNode.Spec.Taints = append(updatedNode.Spec.Taints, apiv1.Taint{
 		Key:    ToBeRemovedByAutoscalerKey,
 		Value:  fmt.Sprint(time.Now().Unix()),
 		Effect: v1.TaintEffectNoSchedule,
