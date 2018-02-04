@@ -9,6 +9,10 @@ customers:
     taint_lower_capacity_threshhold_percent: 50
     untaint_upper_capacity_threshhold_percent: 95
     untaint_lower_capacity_threshhold_percent: 90
+    slow_node_removal_rate: 2
+	  fast_node_removal_rate: 3
+    slow_node_revival_rate: 2
+    fast_node_revival_rate: 3
   - name: "default"
     label_key: "customer"
     label_value: "shared"
@@ -19,3 +23,7 @@ customers:
     taint_lower_capacity_threshhold_percent: 20
     untaint_upper_capacity_threshhold_percent: 45
     untaint_lower_capacity_threshhold_percent: 30
+    slow_node_removal_rate: 2
+	  fast_node_removal_rate: 3
+    slow_node_revival_rate: 2
+    fast_node_revival_rate: 3

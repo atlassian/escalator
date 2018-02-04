@@ -15,21 +15,14 @@ const DefaultCustomer = "default"
 // NodeGroup represents a customer running on our cluster
 // We differentiate customers by their node label
 type NodeGroup struct {
-	Name       string `json:"name" yaml:"name"`
-	LabelKey   string `json:"label_key" yaml:"label_key"`
-	LabelValue string `json:"label_value" yaml:"label_value"`
-
-	DaemonSetUsagePercent int `json:"daemon_set_usage_percent,omitempty" yaml:"daemon_set_usage_percent,omitempty"`
-	MinSlackSpacePercent  int `json:"min_slack_space_percent,omitempty" yaml:"min_slack_space_percent,omitempty"`
+	Name       string `json:"name,omitempty" yaml:"name,omitempty"`
+	LabelKey   string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
+	LabelValue string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
 
 	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
 	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`
 
 	DryMode bool `json:"dry_mode,omitempty" yaml:"dry_mode,omitempty"`
-
-	SoftTaintEffectPercent int `json:"soft_taint_effect_percent,omitempty" yaml:"soft_taint_effect_percent,omitempty"`
-
-	DampeningStrength float64 `json:"dampening_strength,omitempty" yaml:"dampening_strength,omitempty"`
 
 	TaintUpperCapacityThreshholdPercent int `json:"taint_upper_capacity_threshhold_percent,omitempty" yaml:"taint_upper_capacity_threshhold_percent,omitempty"`
 	TaintLowerCapacityThreshholdPercent int `json:"taint_lower_capacity_threshhold_percent,omitempty" yaml:"taint_lower_capacity_threshhold_percent,omitempty"`
@@ -37,7 +30,18 @@ type NodeGroup struct {
 	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
 	UntaintLowerCapacityThreshholdPercent int `json:"untaint_lower_capacity_threshhold_percent,omitempty" yaml:"untaint_lower_capacity_threshhold_percent,omitempty"`
 
-	ScaleDownMinGracePeriodSeconds int `json:"scale_down_min_grace_period_seconds,omitempty" yaml:"scale_down_min_grace_period_seconds,omitempty"`
+	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
+	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
+
+	SlowNodeRevivalRate int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
+	FastNodeRevivalRate int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
+
+	// UNUSED
+	SoftTaintEffectPercent         int     `json:"soft_taint_effect_percent,omitempty" yaml:"soft_taint_effect_percent,omitempty"`
+	DampeningStrength              float64 `json:"dampening_strength,omitempty" yaml:"dampening_strength,omitempty"`
+	DaemonSetUsagePercent          int     `json:"daemon_set_usage_percent,omitempty" yaml:"daemon_set_usage_percent,omitempty"`
+	MinSlackSpacePercent           int     `json:"min_slack_space_percent,omitempty" yaml:"min_slack_space_percent,omitempty"`
+	ScaleDownMinGracePeriodSeconds int     `json:"scale_down_min_grace_period_seconds,omitempty" yaml:"scale_down_min_grace_period_seconds,omitempty"`
 }
 
 // UnmarshalNodeGroupsConfig decodes the yaml or json reader into a struct
