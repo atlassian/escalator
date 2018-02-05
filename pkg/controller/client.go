@@ -22,7 +22,7 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, customers map[string]*NodeGroup, stopCache <-chan struct{}) *Client {
+func NewClient(k8sClient kubernetes.Interface, customers []*NodeGroupOptions, stopCache <-chan struct{}) *Client {
 	// Backing store lister for all pods and nodes
 	podStopChan := make(chan struct{})
 	nodeStopChan := make(chan struct{})
@@ -53,11 +53,11 @@ func NewClient(k8sClient kubernetes.Interface, customers map[string]*NodeGroup, 
 	// load in all our node group listers from our customers
 	customerMap := make(map[string]*NodeGroupLister)
 
-	for customer, nodeGroup := range customers {
-		if customer == DefaultCustomer {
-			customerMap[customer] = NewDefaultNodeGroupLister(allPodLister, allNodeLister, nodeGroup)
+	for _, opts := range customers {
+		if opts.Name == DefaultCustomer {
+			customerMap[opts.Name] = NewDefaultNodeGroupLister(allPodLister, allNodeLister, opts)
 		} else {
-			customerMap[customer] = NewNodeGroupLister(allPodLister, allNodeLister, nodeGroup)
+			customerMap[opts.Name] = NewNodeGroupLister(allPodLister, allNodeLister, opts)
 		}
 	}
 	client := Client{

@@ -41,21 +41,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open configFile: %v", err)
 	}
-	customers, err := controller.UnmarshalNodeGroupsConfig(configFile)
+	customers, err := controller.UnmarshalNodeGroupOptions(configFile)
 	if err != nil {
 		log.Fatalf("Failed to decode configFile: %v", err)
-	}
-
-	// turn it into a map of name and nodegroup for O(1) lookup
-	customerMap := make(map[string]*controller.NodeGroup)
-	for _, nodeGroup := range customers {
-		customerMap[nodeGroup.Name] = nodeGroup
 	}
 
 	opts := &controller.Opts{
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
-		Customers:    customerMap,
+		Customers:    customers,
 	}
 
 	// signal channel waits for interrupt
