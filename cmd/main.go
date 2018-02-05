@@ -28,6 +28,9 @@ var (
 func main() {
 	kingpin.Parse()
 
+	if *loglevel < 0 || *loglevel > 5 {
+		log.Fatalf("Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)", *loglevel)
+	}
 	log.SetLevel(log.Level(*loglevel))
 	log.Infoln("Starting with log level", log.GetLevel())
 
