@@ -253,7 +253,7 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	maxPercent := int(math.Max(cpuPercent, memPercent))
 	nodesDelta := 0
 
-	// Determine if we want to scale up for down
+	// Determine if we want to scale up for down. Selects the first condition that is true
 	switch {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes
@@ -263,12 +263,12 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
 		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
 	// --- Scale Up conditions ---
-	// reached medium high %. slowy add nodes back
-	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
-		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
 	// reached very high %. aggressively add nodes back
 	case maxPercent > nodeGroup.Opts.UntaintUpperCapacityThreshholdPercent:
 		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
+	// reached medium high %. slowy add nodes back
+	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
+		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
 	}
 
 	log.WithField("customer", customer).Debugln("Delta=", nodesDelta)
@@ -277,7 +277,7 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	switch {
 	case nodesDelta < 0:
 		if len(untaintedNodes)+nodesDelta < nodeGroup.Opts.MinNodes {
-			nodesDelta = -(len(untaintedNodes) - nodeGroup.Opts.MinNodes)
+			nodesDelta = nodeGroup.Opts.MinNodes - len(untaintedNodes)
 			if nodesDelta > 0 {
 				log.Warningf(
 					"The cluster is under utilised, but the number of nodes(%v) is less than specified minimum of %v. Switching to a scale up.",
@@ -287,9 +287,9 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 			}
 		}
 	case nodesDelta > 0:
-		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MaxNodes {
-			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MaxNodes
-			if nodesDelta > 0 {
+		if len(untaintedNodes)+nodesDelta > nodeGroup.Opts.MaxNodes {
+			nodesDelta = nodeGroup.Opts.MaxNodes - len(untaintedNodes)
+			if nodesDelta < 0 {
 				log.Warningf(
 					"The cluster is over utilised, but the number of nodes(%v) is more than specified maximum of %v. Switching to a scale down.",
 					len(untaintedNodes),
@@ -310,6 +310,10 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
 	case nodesDelta > 0:
 		nodesToAdd := nodesDelta
+		if len(taintedNodes) == 0 {
+			log.WithField("customer", customer).Warningln("There are no tainted nodes to untaint")
+			break
+		}
 		log.WithField("customer", customer).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
 		metrics.NodeGroupUntaintEvent.WithLabelValues(customer).Add(float64(nodesToAdd))
 		c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
