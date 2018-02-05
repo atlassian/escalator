@@ -17,12 +17,12 @@ import (
 )
 
 var (
-	loglevel           = kingpin.Flag("loglevel", "Logging level passed into logrus. 4 for info, 5 for debug.").Short('v').Default(fmt.Sprintf("%d", log.InfoLevel)).Int()
-	addr               = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
-	scanInterval       = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
-	kubeConfigFile     = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
-	customerConfigFile = kingpin.Flag("nodegroups", "Config file for customers nodegroups").Required().String()
-	drymode            = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
+	loglevel            = kingpin.Flag("loglevel", "Logging level passed into logrus. 4 for info, 5 for debug.").Short('v').Default(fmt.Sprintf("%d", log.InfoLevel)).Int()
+	addr                = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
+	scanInterval        = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
+	kubeConfigFile      = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
+	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups nodegroups").Required().String()
+	drymode             = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
 )
 
 func main() {
@@ -44,25 +44,25 @@ func main() {
 		k8sClient = k8s.NewInClusterClient()
 	}
 
-	// customerConfigFile is required by kingpin. Won't get to here if it's not defined
-	configFile, err := os.Open(*customerConfigFile)
+	// nodegroupConfigFile is required by kingpin. Won't get to here if it's not defined
+	configFile, err := os.Open(*nodegroupConfigFile)
 	if err != nil {
 		log.Fatalf("Failed to open configFile: %v", err)
 	}
-	customers, err := controller.UnmarshalNodeGroupOptions(configFile)
+	nodegroups, err := controller.UnmarshalNodeGroupOptions(configFile)
 	if err != nil {
 		log.Fatalf("Failed to decode configFile: %v", err)
 	}
 
-	// Print out the drymode results for each customer
-	for _, customer := range customers {
-		log.Infof("Registered customer \"%v\" with drymode %v", customer.Name, customer.DryMode || *drymode)
+	// Print out the drymode results for each nodegroup
+	for _, nodegroup := range nodegroups {
+		log.Infof("Registered nodegroup \"%v\" with drymode %v", nodegroup.Name, nodegroup.DryMode || *drymode)
 	}
 
 	opts := &controller.Opts{
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
-		Customers:    customers,
+		NodeGroups:   nodegroups,
 		DryMode:      *drymode,
 	}
 

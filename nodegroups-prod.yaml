@@ -1,0 +1,15 @@
+node_groups:
+  - name: "buildeng"
+    label_key: "customer"
+    label_value: "buildeng"
+    min_nodes: 6
+    max_nodes: 300
+    dry_mode: true
+    taint_upper_capacity_threshhold_percent: 70
+    taint_lower_capacity_threshhold_percent: 45
+    untaint_lower_capacity_threshhold_percent: 90
+    untaint_upper_capacity_threshhold_percent: 98
+    slow_node_removal_rate: 2
+    fast_node_removal_rate: 5
+    slow_node_revival_rate: 2
+    fast_node_revival_rate: 5

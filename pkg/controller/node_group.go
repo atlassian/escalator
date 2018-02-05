@@ -9,11 +9,11 @@ import (
 	v1lister "k8s.io/client-go/listers/core/v1"
 )
 
-// DefaultCustomer is used for any pods that don't have a node selector defined
-const DefaultCustomer = "default"
+// DefaultNodeGroup is used for any pods that don't have a node selector defined
+const DefaultNodeGroup = "default"
 
-// NodeGroupOptions represents a customer running on our cluster
-// We differentiate customers by their node label
+// NodeGroupOptions represents a nodegroup running on our cluster
+// We differentiate nodegroups by their node label
 type NodeGroupOptions struct {
 	Name       string `json:"name,omitempty" yaml:"name,omitempty"`
 	LabelKey   string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
@@ -47,16 +47,16 @@ type NodeGroupOptions struct {
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct
 func UnmarshalNodeGroupOptions(reader io.Reader) ([]*NodeGroupOptions, error) {
 	var wrapper struct {
-		Customers []*NodeGroupOptions `json:"customers" yaml:"customers"`
+		NodeGroups []*NodeGroupOptions `json:"node_groups" yaml:"node_groups"`
 	}
 	if err := yaml.NewYAMLOrJSONDecoder(reader, 4096).Decode(&wrapper); err != nil {
 		return []*NodeGroupOptions{}, err
 	}
-	return wrapper.Customers, nil
+	return wrapper.NodeGroups, nil
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
-// Used for grouping a customer and their listers
+// Used for grouping a nodegroup and their listers
 type NodeGroupLister struct {
 	// Pod lister
 	Pods k8s.PodLister
@@ -127,7 +127,7 @@ func NewNodeLabelFilterFunc(labelKey, labelValue string) k8s.NodeFilterFunc {
 	}
 }
 
-// NewNodeGroupLister creates a new group from the backing lister and customer filter
+// NewNodeGroupLister creates a new group from the backing lister and nodegroup filter
 func NewNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroupOptions) *NodeGroupLister {
 	return &NodeGroupLister{
 		k8s.NewFilteredPodsLister(allPodsLister, NewPodAffinityFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
@@ -135,7 +135,7 @@ func NewNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1liste
 	}
 }
 
-// NewDefaultNodeGroupLister creates a new group from the backing lister and customer filter with the default filter
+// NewDefaultNodeGroupLister creates a new group from the backing lister and nodegroup filter with the default filter
 func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroupOptions) *NodeGroupLister {
 	return &NodeGroupLister{
 		k8s.NewFilteredPodsLister(allPodsLister, NewPodDefaultFilterFunc()),

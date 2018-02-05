@@ -1,4 +1,4 @@
-customers:
+node_groups:
   - name: "buildeng"
     label_key: "customer"
     label_value: "buildeng"

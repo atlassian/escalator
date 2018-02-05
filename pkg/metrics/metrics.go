@@ -99,7 +99,7 @@ var (
 			Name: "node_group_taint_event",
 			Help: "indicates a scale down event",
 		},
-		[]string{"customer"},
+		[]string{"nodegroup"},
 	)
 	// NodeGroupUntaintEvent indicates a scale up event
 	NodeGroupUntaintEvent = prometheus.NewGaugeVec(
@@ -107,7 +107,7 @@ var (
 			Name: "node_group_untaint_event",
 			Help: "indicates a scale up event",
 		},
-		[]string{"customer"},
+		[]string{"nodegroup"},
 	)
 )
 

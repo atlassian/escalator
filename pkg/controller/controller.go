@@ -35,8 +35,8 @@ type NodeGroupState struct {
 
 // Opts provide the Controller with config for runtime
 type Opts struct {
-	K8SClient kubernetes.Interface
-	Customers []*NodeGroupOptions
+	K8SClient  kubernetes.Interface
+	NodeGroups []*NodeGroupOptions
 
 	ScanInterval time.Duration
 	DryMode      bool
@@ -44,16 +44,16 @@ type Opts struct {
 
 // NewController creates a new controller with the specified options
 func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
-	client := NewClient(opts.K8SClient, opts.Customers, stopChan)
+	client := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
 	if client == nil {
 		log.Fatalln("Failed to create controller client")
 		return nil
 	}
 
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
-	customerMap := make(map[string]*NodeGroupState)
-	for _, nodeGroupOpts := range opts.Customers {
-		customerMap[nodeGroupOpts.Name] = &NodeGroupState{
+	nodegroupMap := make(map[string]*NodeGroupState)
+	for _, nodeGroupOpts := range opts.NodeGroups {
+		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
 		}
@@ -63,7 +63,7 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 		Client:     client,
 		Opts:       opts,
 		stopChan:   stopChan,
-		nodeGroups: customerMap,
+		nodeGroups: nodegroupMap,
 	}
 }
 
@@ -162,7 +162,7 @@ func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, 
 }
 
 // scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
-func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
+func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) {
 	// list all pods
 	pods, err := nodeGroup.Pods.List()
 	if err != nil {
@@ -204,16 +204,16 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	}
 
 	// Metrics and Logs
-	log.WithField("customer", customer).Infoln("nodes remaining total:", len(allNodes))
-	log.WithField("customer", customer).Infoln("nodes remaining untainted:", len(untaintedNodes))
-	log.WithField("customer", customer).Infoln("nodes remaining tainted:", len(taintedNodes))
-	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(allNodes)))
-	metrics.NodeGroupNodesUntainted.WithLabelValues(customer).Set(float64(len(untaintedNodes)))
-	metrics.NodeGroupNodesTainted.WithLabelValues(customer).Set(float64(len(taintedNodes)))
-	metrics.NodeGroupPods.WithLabelValues(customer).Set(float64(len(pods)))
+	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
+	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining untainted:", len(untaintedNodes))
+	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining tainted:", len(taintedNodes))
+	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
+	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
+	metrics.NodeGroupNodesTainted.WithLabelValues(nodegroup).Set(float64(len(taintedNodes)))
+	metrics.NodeGroupPods.WithLabelValues(nodegroup).Set(float64(len(pods)))
 
 	if len(allNodes) == 0 {
-		log.WithField("customer", customer).Infoln("no nodes remaining")
+		log.WithField("nodegroup", nodegroup).Infoln("no nodes remaining")
 		return
 	}
 
@@ -230,12 +230,12 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	}
 
 	// Metrics
-	metrics.NodeGroupCPURequest.WithLabelValues(customer).Set(float64(cpuRequest.MilliValue()))
+	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
 	bytesMemReq, _ := memRequest.AsInt64()
-	metrics.NodeGroupMemRequest.WithLabelValues(customer).Set(float64(bytesMemReq))
-	metrics.NodeGroupCPUCapacity.WithLabelValues(customer).Set(float64(cpuCapacity.MilliValue()))
+	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(bytesMemReq))
+	metrics.NodeGroupCPUCapacity.WithLabelValues(nodegroup).Set(float64(cpuCapacity.MilliValue()))
 	bytesMemCap, _ := memCapacity.AsInt64()
-	metrics.NodeGroupMemCapacity.WithLabelValues(customer).Set(float64(bytesMemCap))
+	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(bytesMemCap))
 
 	// Calc %
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
@@ -245,9 +245,9 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	}
 
 	// Metrics
-	log.WithField("customer", customer).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
-	metrics.NodeGroupsCPUPercent.WithLabelValues(customer).Set(cpuPercent)
-	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
+	log.WithField("nodegroup", nodegroup).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
+	metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(cpuPercent)
+	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
 
 	// Perform the scaling decision
 	maxPercent := int(math.Max(cpuPercent, memPercent))
@@ -271,7 +271,7 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
 	}
 
-	log.WithField("customer", customer).Debugln("Delta=", nodesDelta)
+	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
 
 	// Clamp the nodes inside the min and max node count
 	switch {
@@ -299,27 +299,27 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		}
 	}
 
-	log.WithField("customer", customer).Debugln("DeltaScaled=", nodesDelta)
+	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDelta)
 
 	// Perform the scaling action
 	switch {
 	case nodesDelta < 0:
 		nodesToRemove := -nodesDelta
-		log.WithField("customer", customer).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
-		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Add(float64(nodesToRemove))
+		log.WithField("nodegroup", nodegroup).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
+		metrics.NodeGroupTaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToRemove))
 		c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
 	case nodesDelta > 0:
 		nodesToAdd := nodesDelta
 		if len(taintedNodes) == 0 {
-			log.WithField("customer", customer).Warningln("There are no tainted nodes to untaint")
+			log.WithField("nodegroup", nodegroup).Warningln("There are no tainted nodes to untaint")
 			break
 		}
-		log.WithField("customer", customer).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
-		metrics.NodeGroupUntaintEvent.WithLabelValues(customer).Add(float64(nodesToAdd))
+		log.WithField("nodegroup", nodegroup).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
+		metrics.NodeGroupUntaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToAdd))
 		c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
 		// increase asg by remaining need
 	default:
-		log.WithField("customer", customer).Infoln("No need to scale")
+		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
 	}
 }
 
@@ -331,9 +331,9 @@ func (c Controller) RunOnce() {
 	// REAPER GOES HERE
 
 	// Perform the ScaleUp/Taint logic
-	for customer, state := range c.nodeGroups {
+	for nodegroup, state := range c.nodeGroups {
 		log.Debugln("**********[START NODEGROUP]**********")
-		c.scaleNodeGroup(customer, state)
+		c.scaleNodeGroup(nodegroup, state)
 	}
 
 	endTime := time.Now()
