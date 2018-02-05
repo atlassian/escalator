@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	// loglevel = kingpin.Flag("loglevel", "Verbose mode.").Short('v').Default("INFO").String()
+	loglevel           = kingpin.Flag("loglevel", "Logging level passed into logrus. 4 for info, 5 for debug.").Short('v').Default(fmt.Sprintf("%d", log.InfoLevel)).Int()
 	addr               = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
 	scanInterval       = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
 	kubeConfigFile     = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
@@ -26,6 +27,9 @@ var (
 
 func main() {
 	kingpin.Parse()
+
+	log.SetLevel(log.Level(*loglevel))
+	log.Infoln("Starting with log level", log.GetLevel())
 
 	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
 	var k8sClient kubernetes.Interface

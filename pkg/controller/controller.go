@@ -271,32 +271,46 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
 	}
 
-	log.WithField("customer", customer).Infoln("Delta=", nodesDelta)
+	log.WithField("customer", customer).Debugln("Delta=", nodesDelta)
 
 	// Clamp the nodes inside the min and max node count
 	switch {
 	case nodesDelta < 0:
 		if len(untaintedNodes)+nodesDelta < nodeGroup.Opts.MinNodes {
 			nodesDelta = -(len(untaintedNodes) - nodeGroup.Opts.MinNodes)
+			if nodesDelta > 0 {
+				log.Warningf(
+					"The cluster is under utilised, but the number of nodes(%v) is less than specified minimum of %v. Switching to a scale up.",
+					len(untaintedNodes),
+					nodeGroup.Opts.MinNodes,
+				)
+			}
 		}
 	case nodesDelta > 0:
 		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MaxNodes {
 			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MaxNodes
+			if nodesDelta > 0 {
+				log.Warningf(
+					"The cluster is over utilised, but the number of nodes(%v) is more than specified maximum of %v. Switching to a scale down.",
+					len(untaintedNodes),
+					nodeGroup.Opts.MaxNodes,
+				)
+			}
 		}
 	}
 
-	log.WithField("customer", customer).Infoln("DeltaScaled=", nodesDelta)
+	log.WithField("customer", customer).Debugln("DeltaScaled=", nodesDelta)
 
 	// Perform the scaling action
 	switch {
 	case nodesDelta < 0:
 		nodesToRemove := -nodesDelta
-		log.WithField("customer", customer).Warningf("--Scaling Down--: tainting %v nodes", nodesToRemove)
+		log.WithField("customer", customer).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Add(float64(nodesToRemove))
 		c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
 	case nodesDelta > 0:
 		nodesToAdd := nodesDelta
-		log.WithField("customer", customer).Warningf("--Scaling Up--: Trying to untaint %v tainted nodes", nodesToAdd)
+		log.WithField("customer", customer).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
 		metrics.NodeGroupUntaintEvent.WithLabelValues(customer).Add(float64(nodesToAdd))
 		c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
 		// increase asg by remaining need
@@ -314,17 +328,18 @@ func (c Controller) RunOnce() {
 
 	// Perform the ScaleUp/Taint logic
 	for customer, state := range c.nodeGroups {
+		log.Debugln("**********[START NODEGROUP]**********")
 		c.scaleNodeGroup(customer, state)
 	}
 
 	endTime := time.Now()
-	log.Infof("Scaling took a total of %v", endTime.Sub(startTime))
+	log.Debugf("Scaling took a total of %v", endTime.Sub(startTime))
 }
 
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
 func (c Controller) RunForever(runImmediately bool) {
 	if runImmediately {
-		log.Infoln("---[FIRSTRUN LOOP]---")
+		log.Debugln("**********[AUTOSCALER FIRST LOOP]**********")
 		c.RunOnce()
 	}
 
@@ -333,7 +348,7 @@ func (c Controller) RunForever(runImmediately bool) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Infoln("---[AUTOSCALER LOOP]---")
+			log.Debugln("**********[AUTOSCALER MAIN LOOP]**********")
 			c.RunOnce()
 		case <-c.stopChan:
 			log.Debugf("Stopping main loop")
