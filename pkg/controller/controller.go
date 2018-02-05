@@ -39,6 +39,7 @@ type Opts struct {
 	Customers []*NodeGroupOptions
 
 	ScanInterval time.Duration
+	DryMode      bool
 }
 
 // NewController creates a new controller with the specified options
@@ -64,6 +65,11 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 		stopChan:   stopChan,
 		nodeGroups: customerMap,
 	}
+}
+
+// DryMode is a helper that returns the overall drymode result of the controller and nodegroup
+func (c Controller) DryMode(nodeGroup *NodeGroupState) bool {
+	return c.Opts.DryMode || nodeGroup.Opts.DryMode
 }
 
 func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
@@ -104,7 +110,7 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n 
 		}
 
 		// only actually taint in dry mode
-		if !nodeGroup.Opts.DryMode {
+		if !c.DryMode(nodeGroup) {
 			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
 			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
 			if err != nil {
@@ -135,7 +141,7 @@ func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, 
 			break
 		}
 		// only actually taint in dry mode
-		if !nodeGroup.Opts.DryMode {
+		if !c.DryMode(nodeGroup) {
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
 				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
@@ -182,7 +188,7 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	// Filter out tainted nodes
 	untaintedNodes := make([]*v1.Node, 0, len(allNodes))
 	for _, node := range allNodes {
-		if nodeGroup.Opts.DryMode {
+		if c.DryMode(nodeGroup) {
 			var contains bool
 			for _, name := range nodeGroup.taintTracker {
 				if node.Name == name {
@@ -302,7 +308,6 @@ func (c Controller) RunOnce() {
 
 	// Perform the ScaleUp/Taint logic
 	for customer, state := range c.nodeGroups {
-		log.Infoln("scaling customer:", customer)
 		c.scaleNodeGroup(customer, state)
 	}
 

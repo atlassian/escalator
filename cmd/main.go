@@ -21,6 +21,7 @@ var (
 	scanInterval       = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
 	kubeConfigFile     = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
 	customerConfigFile = kingpin.Flag("nodegroups", "Config file for customers nodegroups").Required().String()
+	drymode            = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
 )
 
 func main() {
@@ -46,10 +47,16 @@ func main() {
 		log.Fatalf("Failed to decode configFile: %v", err)
 	}
 
+	// Print out the drymode results for each customer
+	for _, customer := range customers {
+		log.Infof("Registered customer \"%v\" with drymode %v", customer.Name, customer.DryMode || *drymode)
+	}
+
 	opts := &controller.Opts{
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
 		Customers:    customers,
+		DryMode:      *drymode,
 	}
 
 	// signal channel waits for interrupt
