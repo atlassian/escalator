@@ -249,53 +249,49 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	metrics.NodeGroupsCPUPercent.WithLabelValues(customer).Set(cpuPercent)
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
-	// Scale down upper percentage threshhold
-	if math.Max(cpuPercent, memPercent) < float64(nodeGroup.Opts.TaintUpperCapacityThreshholdPercent) && len(untaintedNodes) > nodeGroup.Opts.MinNodes {
-		log.Warningln("Upper threshhold reached. Scale down 1 node")
-		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-		nodesTainted := c.taintOldestN(untaintedNodes, nodeGroup, 1)
+	// Perform the scaling decision
 
-		// remove all the nodes we just tainted from further calculations
-		filtered := make([]*v1.Node, 0, len(untaintedNodes)-1)
-		for i, node := range untaintedNodes {
-			for _, j := range nodesTainted {
-				if i != j {
-					filtered = append(filtered, node)
-				}
-			}
+	maxPercent := int(math.Max(cpuPercent, memPercent))
+	nodesDelta := 0
+
+	// Determine if we want to scale up for down
+	switch {
+	// Scale Down conditions
+	case maxPercent < nodeGroup.Opts.TaintLowerCapacityThreshholdPercent:
+		nodesDelta = nodeGroup.Opts.FastNodeRemovalRate
+	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
+		nodesDelta = nodeGroup.Opts.SlowNodeRemovalRate
+	// Scale Up conditions
+	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
+		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
+	case maxPercent > nodeGroup.Opts.UntaintUpperCapacityThreshholdPercent:
+		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
+	}
+
+	// Clamp the nodes inside the min and max node count
+	switch {
+	case nodesDelta < 0:
+		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MinNodes {
+			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MinNodes
 		}
-
-		// Scale down lower percentage threshhold
-		if math.Max(cpuPercent, memPercent) < float64(nodeGroup.Opts.TaintLowerCapacityThreshholdPercent) && len(filtered)-2 > nodeGroup.Opts.MinNodes {
-			log.Warningln("Lower threshhold reached. Scale down 1 node")
-			metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-			c.taintOldestN(filtered, nodeGroup, 2)
+	case nodesDelta > 0:
+		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MinNodes {
+			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MinNodes
 		}
 	}
 
-	// Scale up by upper threshhold
-	if math.Max(cpuPercent, memPercent) > float64(nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent) && len(untaintedNodes)+1 < nodeGroup.Opts.MaxNodes {
-		log.Warningln("Slack space reached. Trying to untaint a tainted node")
+	// Perform the scaling action
+	switch {
+	case nodesDelta < 0:
+		log.Warningln("--Scaling Down--: tainting %v nodes", nodesDelta)
+		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Add(float64(nodesDelta))
+		c.taintOldestN(untaintedNodes, nodeGroup, nodesDelta)
+	case nodesDelta > 0:
+		log.Warningln("--Scaling Up--: Trying to untaint %v tainted nodes", nodesDelta)
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Dec()
-		// push in allNodes here to include tainted ones. Otherwise it will untaint nothing
-		nodesUntainted := c.untaintNewestN(allNodes, nodeGroup, 1)
-
-		// remove all the nodes we just untainted from further calculations
-		filtered := make([]*v1.Node, 0, len(allNodes)-1)
-		for i, node := range untaintedNodes {
-			for _, j := range nodesUntainted {
-				if i != j {
-					filtered = append(filtered, node)
-				}
-			}
-		}
-
-		// Scale down lower percentage threshhold
-		if math.Max(cpuPercent, memPercent) > float64(nodeGroup.Opts.UntaintUpperCapacityThreshholdPercent) && len(filtered)+2 > nodeGroup.Opts.MinNodes {
-			log.Warningln("Agressive Slack space reached. Trying to untaint tainted nodes")
-			metrics.NodeGroupTaintEvent.WithLabelValues(customer).Inc()
-			c.untaintNewestN(filtered, nodeGroup, 2)
-		}
+		c.untaintNewestN(allNodes, nodeGroup, nodesDelta)
+	default:
+		log.WithField("customer", customer).Infoln("No need to scale")
 	}
 }
 
