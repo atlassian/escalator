@@ -258,10 +258,10 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes
 	case maxPercent < nodeGroup.Opts.TaintLowerCapacityThreshholdPercent:
-		nodesDelta = nodeGroup.Opts.FastNodeRemovalRate
+		nodesDelta = -nodeGroup.Opts.FastNodeRemovalRate
 	// reached medium low %. slowly remove nodes
 	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
-		nodesDelta = nodeGroup.Opts.SlowNodeRemovalRate
+		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
 	// --- Scale Up conditions ---
 	// reached medium high %. slowy add nodes back
 	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
@@ -271,11 +271,13 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
 	}
 
+	log.WithField("customer", customer).Infoln("Delta=", nodesDelta)
+
 	// Clamp the nodes inside the min and max node count
 	switch {
 	case nodesDelta < 0:
-		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MinNodes {
-			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MinNodes
+		if len(untaintedNodes)+nodesDelta < nodeGroup.Opts.MinNodes {
+			nodesDelta = -(len(untaintedNodes) - nodeGroup.Opts.MinNodes)
 		}
 	case nodesDelta > 0:
 		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MaxNodes {
@@ -283,16 +285,21 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		}
 	}
 
+	log.WithField("customer", customer).Infoln("DeltaScaled=", nodesDelta)
+
 	// Perform the scaling action
 	switch {
 	case nodesDelta < 0:
-		log.WithField("customer", customer).Warningln("--Scaling Down--: tainting %v nodes", nodesDelta)
-		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Add(float64(nodesDelta))
-		c.taintOldestN(untaintedNodes, nodeGroup, nodesDelta)
+		nodesToRemove := -nodesDelta
+		log.WithField("customer", customer).Warningf("--Scaling Down--: tainting %v nodes", nodesToRemove)
+		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Add(float64(nodesToRemove))
+		c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
 	case nodesDelta > 0:
-		log.WithField("customer", customer).Warningln("--Scaling Up--: Trying to untaint %v tainted nodes", nodesDelta)
-		metrics.NodeGroupUntaintEvent.WithLabelValues(customer).Add(float64(nodesDelta))
-		c.untaintNewestN(taintedNodes, nodeGroup, nodesDelta)
+		nodesToAdd := nodesDelta
+		log.WithField("customer", customer).Warningf("--Scaling Up--: Trying to untaint %v tainted nodes", nodesToAdd)
+		metrics.NodeGroupUntaintEvent.WithLabelValues(customer).Add(float64(nodesToAdd))
+		c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
+		// increase asg by remaining need
 	default:
 		log.WithField("customer", customer).Infoln("No need to scale")
 	}
