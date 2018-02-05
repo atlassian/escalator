@@ -13,6 +13,22 @@ var (
 		Name: "run_count",
 		Help: "Number of times the controller has checked for cluster state",
 	})
+	// NodeGroupNodesUntainted nodes considered by specific node groups that are untainted
+	NodeGroupNodesUntainted = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_untainted_nodes",
+			Help: "nodes considered by specific node groups that are untainted",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupNodesTainted nodes considered by specific node groups that are tainted
+	NodeGroupNodesTainted = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_tainted_nodes",
+			Help: "nodes considered by specific node groups that are tainted",
+		},
+		[]string{"node_group"},
+	)
 	// NodeGroupNodes nodes considered by specific node groups
 	NodeGroupNodes = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -32,7 +48,7 @@ var (
 	// NodeGroupsMemPercent percentage of util of memory
 	NodeGroupsMemPercent = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "node_groups_mem_percent",
+			Name: "node_group_mem_percent",
 			Help: "percentage of util of memory",
 		},
 		[]string{"node_group"},
@@ -40,7 +56,7 @@ var (
 	// NodeGroupsCPUPercent percentage of util of cpu
 	NodeGroupsCPUPercent = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "node_groups_cpu_percent",
+			Name: "node_group_cpu_percent",
 			Help: "percentage of util of cpu",
 		},
 		[]string{"node_group"},
@@ -77,11 +93,19 @@ var (
 		},
 		[]string{"node_group"},
 	)
-	// NodeGroupTaintEvent indicates a scale event
+	// NodeGroupTaintEvent indicates a scale down event
 	NodeGroupTaintEvent = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_group_taint_event",
-			Help: "indicates a scale event",
+			Help: "indicates a scale down event",
+		},
+		[]string{"customer"},
+	)
+	// NodeGroupUntaintEvent indicates a scale up event
+	NodeGroupUntaintEvent = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_untaint_event",
+			Help: "indicates a scale up event",
 		},
 		[]string{"customer"},
 	)
@@ -90,6 +114,8 @@ var (
 func init() {
 	prometheus.MustRegister(RunCount)
 	prometheus.MustRegister(NodeGroupNodes)
+	prometheus.MustRegister(NodeGroupNodesUntainted)
+	prometheus.MustRegister(NodeGroupNodesTainted)
 	prometheus.MustRegister(NodeGroupPods)
 	prometheus.MustRegister(NodeGroupsMemPercent)
 	prometheus.MustRegister(NodeGroupsCPUPercent)
@@ -98,6 +124,7 @@ func init() {
 	prometheus.MustRegister(NodeGroupCPUCapacity)
 	prometheus.MustRegister(NodeGroupMemCapacity)
 	prometheus.MustRegister(NodeGroupTaintEvent)
+	prometheus.MustRegister(NodeGroupUntaintEvent)
 }
 
 // Start starts the metrics endpoint on a new thread

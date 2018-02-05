@@ -67,11 +67,12 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 	}
 }
 
-// DryMode is a helper that returns the overall drymode result of the controller and nodegroup
-func (c Controller) DryMode(nodeGroup *NodeGroupState) bool {
+// dryMode is a helper that returns the overall drymode result of the controller and nodegroup
+func (c Controller) dryMode(nodeGroup *NodeGroupState) bool {
 	return c.Opts.DryMode || nodeGroup.Opts.DryMode
 }
 
+// calcPercentUsage helper works out the percentage of cpu and mem for request/capacity
 func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
 	if cpuA.MilliValue() == 0 || memA.MilliValue() == 0 {
 		return 0, 0, errors.New("Cannot divide by zero in percent calculation")
@@ -81,19 +82,7 @@ func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float6
 	return cpuPercent, memPercent, nil
 }
 
-func doesItFit(cpuR, memR, cpuA, memA resource.Quantity) (bool, error) {
-	if cpuR.Cmp(cpuA) == -1 {
-		log.Infof("There is enough CPU")
-	}
-
-	if memR.Cmp(memA) == -1 {
-		log.Infof("There is enough Memory")
-	}
-
-	return true, nil
-}
-
-// taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indecies of the nodes it tainted
+// taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indices of the nodes it tainted
 // indices are from the parameter nodes indexes, not the sorted index
 func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
@@ -110,7 +99,7 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n 
 		}
 
 		// only actually taint in dry mode
-		if !c.DryMode(nodeGroup) {
+		if !c.dryMode(nodeGroup) {
 			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
 			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
 			if err != nil {
@@ -127,6 +116,8 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n 
 	return taintedIndices
 }
 
+// untaintNewestN sorts nodes by creation time and untaints the newest N. It will return an array of indices of the nodes it untainted
+// indices are from the parameter nodes indexes, not the sorted index
 func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByNewestCreationTime, 0, len(nodes))
 	for i, node := range nodes {
@@ -141,7 +132,7 @@ func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, 
 			break
 		}
 		// only actually taint in dry mode
-		if !c.DryMode(nodeGroup) {
+		if !c.dryMode(nodeGroup) {
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
 				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
@@ -170,6 +161,7 @@ func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, 
 	return untaintedIndices
 }
 
+// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
 func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	// list all pods
 	pods, err := nodeGroup.Pods.List()
@@ -185,10 +177,11 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 		return
 	}
 
-	// Filter out tainted nodes
+	// Filter into untainted and tainted nodes
 	untaintedNodes := make([]*v1.Node, 0, len(allNodes))
+	taintedNodes := make([]*v1.Node, 0, len(allNodes))
 	for _, node := range allNodes {
-		if c.DryMode(nodeGroup) {
+		if c.dryMode(nodeGroup) {
 			var contains bool
 			for _, name := range nodeGroup.taintTracker {
 				if node.Name == name {
@@ -198,24 +191,31 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 			}
 			if !contains {
 				untaintedNodes = append(untaintedNodes, node)
+			} else {
+				taintedNodes = append(taintedNodes, node)
 			}
 		} else {
 			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
 				untaintedNodes = append(untaintedNodes, node)
+			} else {
+				taintedNodes = append(taintedNodes, node)
 			}
 		}
 	}
-	log.WithField("customer", customer).Infoln("total nodes remaining:", len(allNodes))
-	log.WithField("customer", customer).Infoln("nodes remaining not tainted:", len(untaintedNodes))
+
+	// Metrics and Logs
+	log.WithField("customer", customer).Infoln("nodes remaining total:", len(allNodes))
+	log.WithField("customer", customer).Infoln("nodes remaining untainted:", len(untaintedNodes))
+	log.WithField("customer", customer).Infoln("nodes remaining tainted:", len(taintedNodes))
+	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(allNodes)))
+	metrics.NodeGroupNodesUntainted.WithLabelValues(customer).Set(float64(len(untaintedNodes)))
+	metrics.NodeGroupNodesTainted.WithLabelValues(customer).Set(float64(len(taintedNodes)))
+	metrics.NodeGroupPods.WithLabelValues(customer).Set(float64(len(pods)))
 
 	if len(allNodes) == 0 {
 		log.WithField("customer", customer).Infoln("no nodes remaining")
 		return
 	}
-
-	// Metrics
-	metrics.NodeGroupNodes.WithLabelValues(customer).Set(float64(len(untaintedNodes)))
-	metrics.NodeGroupPods.WithLabelValues(customer).Set(float64(len(pods)))
 
 	// Calc capacity for untainted nodes
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
@@ -250,20 +250,23 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 	metrics.NodeGroupsMemPercent.WithLabelValues(customer).Set(memPercent)
 
 	// Perform the scaling decision
-
 	maxPercent := int(math.Max(cpuPercent, memPercent))
 	nodesDelta := 0
 
 	// Determine if we want to scale up for down
 	switch {
-	// Scale Down conditions
+	// --- Scale Down conditions ---
+	// reached very low %. aggressively remove nodes
 	case maxPercent < nodeGroup.Opts.TaintLowerCapacityThreshholdPercent:
 		nodesDelta = nodeGroup.Opts.FastNodeRemovalRate
+	// reached medium low %. slowly remove nodes
 	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
 		nodesDelta = nodeGroup.Opts.SlowNodeRemovalRate
-	// Scale Up conditions
+	// --- Scale Up conditions ---
+	// reached medium high %. slowy add nodes back
 	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
 		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
+	// reached very high %. aggressively add nodes back
 	case maxPercent > nodeGroup.Opts.UntaintUpperCapacityThreshholdPercent:
 		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
 	}
@@ -275,21 +278,21 @@ func (c Controller) scaleNodeGroup(customer string, nodeGroup *NodeGroupState) {
 			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MinNodes
 		}
 	case nodesDelta > 0:
-		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MinNodes {
-			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MinNodes
+		if len(untaintedNodes)-nodesDelta < nodeGroup.Opts.MaxNodes {
+			nodesDelta = len(untaintedNodes) - nodeGroup.Opts.MaxNodes
 		}
 	}
 
 	// Perform the scaling action
 	switch {
 	case nodesDelta < 0:
-		log.Warningln("--Scaling Down--: tainting %v nodes", nodesDelta)
+		log.WithField("customer", customer).Warningln("--Scaling Down--: tainting %v nodes", nodesDelta)
 		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Add(float64(nodesDelta))
 		c.taintOldestN(untaintedNodes, nodeGroup, nodesDelta)
 	case nodesDelta > 0:
-		log.Warningln("--Scaling Up--: Trying to untaint %v tainted nodes", nodesDelta)
-		metrics.NodeGroupTaintEvent.WithLabelValues(customer).Dec()
-		c.untaintNewestN(allNodes, nodeGroup, nodesDelta)
+		log.WithField("customer", customer).Warningln("--Scaling Up--: Trying to untaint %v tainted nodes", nodesDelta)
+		metrics.NodeGroupUntaintEvent.WithLabelValues(customer).Add(float64(nodesDelta))
+		c.untaintNewestN(taintedNodes, nodeGroup, nodesDelta)
 	default:
 		log.WithField("customer", customer).Infoln("No need to scale")
 	}
