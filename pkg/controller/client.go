@@ -10,7 +10,7 @@ import (
 )
 
 // Client provides a wrapper around a k8s client that includes
-// anything needed by the controller for listing customer pods and nodes based on a filter
+// anything needed by the controller for listing nodegroup pods and nodes based on a filter
 type Client struct {
 	kubernetes.Interface
 	Listers map[string]*NodeGroupLister
@@ -22,7 +22,7 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, customers map[string]*NodeGroup, stopCache <-chan struct{}) *Client {
+func NewClient(k8sClient kubernetes.Interface, nodegroups []*NodeGroupOptions, stopCache <-chan struct{}) *Client {
 	// Backing store lister for all pods and nodes
 	podStopChan := make(chan struct{})
 	nodeStopChan := make(chan struct{})
@@ -50,19 +50,19 @@ func NewClient(k8sClient kubernetes.Interface, customers map[string]*NodeGroup, 
 	endTime := time.Now()
 	log.Infof("Cache took %v to sync", endTime.Sub(startTime))
 
-	// load in all our node group listers from our customers
-	customerMap := make(map[string]*NodeGroupLister)
+	// load in all our node group listers from our nodegroups
+	nodegroupMap := make(map[string]*NodeGroupLister)
 
-	for customer, nodeGroup := range customers {
-		if customer == DefaultCustomer {
-			customerMap[customer] = NewDefaultNodeGroupLister(allPodLister, allNodeLister, nodeGroup)
+	for _, opts := range nodegroups {
+		if opts.Name == DefaultNodeGroup {
+			nodegroupMap[opts.Name] = NewDefaultNodeGroupLister(allPodLister, allNodeLister, opts)
 		} else {
-			customerMap[customer] = NewNodeGroupLister(allPodLister, allNodeLister, nodeGroup)
+			nodegroupMap[opts.Name] = NewNodeGroupLister(allPodLister, allNodeLister, opts)
 		}
 	}
 	client := Client{
 		k8sClient,
-		customerMap,
+		nodegroupMap,
 		allPodLister,
 		allNodeLister,
 	}

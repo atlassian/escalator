@@ -21,7 +21,7 @@ type FilteredNodesLister struct {
 	filterFunc NodeFilterFunc
 }
 
-// NewFilteredNodesLister creates a new lister and informerSynced for all nodes filter by customer (nodeLabels)
+// NewFilteredNodesLister creates a new lister and informerSynced for all nodes filter by nodegroup (nodeLabels)
 func NewFilteredNodesLister(nodeLister v1lister.NodeLister, filterFunc NodeFilterFunc) NodeLister {
 	return &FilteredNodesLister{
 		nodeLister,
