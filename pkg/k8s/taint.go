@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -22,11 +23,53 @@ import (
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
 	ToBeRemovedByAutoscalerKey = "ToBeRemovedByAutoscaler"
+	// MaximumTaints we can taint at one time
+	MaximumTaints = 10
 )
+
+var (
+	taints        = 0
+	maximumTaints = 0
+	targetTaints  = 0
+)
+
+// BeginTaintFailSafe locks the tainting function to taint a max of maximum nodes
+func BeginTaintFailSafe(target, maximum int) error {
+	if taints != 0 {
+		str := "failed to ensure taint lifecycle is valid"
+		log.Errorf(str)
+		return errors.New(str)
+	}
+
+	targetTaints = target
+	maximumTaints = maximum
+
+	return nil
+}
+
+// BeginTaintFailSafe unlocks the tainting function and ensures proper use by programmer
+func EndTaintFailSafe(actualTainted int) error {
+	if actualTainted > targetTaints {
+		log.Warningf("Actual taints %v exceeded target of %v", actualTainted, targetTaints)
+	}
+	if actualTainted > maximumTaints {
+		str := fmt.Sprintf("Actual taints %v exceeded maximum of %v", actualTainted, maximumTaints)
+		log.Errorf(str)
+		return errors.New(str)
+	}
+
+	taints = 0
+	return nil
+}
 
 // AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
 func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
+	if taints > maximumTaints {
+		log.Errorf("Attempted to taint more than maximum. Not tainting")
+		return node, fmt.Errorf("Actual taints %v exceeded maximum of %v", taints, maximumTaints)
+	}
+
 	// fetch the latest version of the node to avoid conflict
 	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
@@ -59,6 +102,7 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Nod
 		return updatedNode, fmt.Errorf("failed to update node %v after adding taint: %v", updatedNode.Name, err)
 	}
 
+	taints++
 	log.Infof("Successfully added taint on node %v", updatedNodeWithTaint.Name)
 	return updatedNodeWithTaint, nil
 }

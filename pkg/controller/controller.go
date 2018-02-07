@@ -92,9 +92,9 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n 
 	sort.Sort(sorted)
 
 	taintedIndices := make([]int, 0, n)
-	for _, bundle := range sorted {
+	for i, bundle := range sorted {
 		// stop at N (or when array is fully iterated)
-		if len(taintedIndices) >= n {
+		if len(taintedIndices) >= n || i >= k8s.MaximumTaints {
 			break
 		}
 
@@ -307,7 +307,12 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 		nodesToRemove := -nodesDelta
 		log.WithField("nodegroup", nodegroup).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
 		metrics.NodeGroupTaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToRemove))
-		c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
+
+		// Lock the taintinf to a maximum on 10 nodes
+		k8s.BeginTaintFailSafe(nodesToRemove, k8s.MaximumTaints)
+		tainted := c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
+		k8s.EndTaintFailSafe(len(tainted))
+
 	case nodesDelta > 0:
 		nodesToAdd := nodesDelta
 		if len(taintedNodes) == 0 {
