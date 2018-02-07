@@ -28,46 +28,41 @@ const (
 )
 
 var (
-	taints        = 0
-	maximumTaints = 0
-	targetTaints  = 0
+	tainted = 0
 )
 
 // BeginTaintFailSafe locks the tainting function to taint a max of maximum nodes
 func BeginTaintFailSafe(target, maximum int) error {
-	if taints != 0 {
-		str := "failed to ensure taint lifecycle is valid"
-		log.Errorf(str)
-		return errors.New(str)
+	if tainted != 0 {
+		return errors.New("failed to ensure taint lifecycle is valid")
 	}
-
-	targetTaints = target
-	maximumTaints = maximum
-
 	return nil
 }
 
-// BeginTaintFailSafe unlocks the tainting function and ensures proper use by programmer
+// IncrementTaintCount is used to increase the taint count. Exposed to use in dry mode testing
+func IncrementTaintCount() {
+	tainted++
+}
+
+// EndTaintFailSafe unlocks the tainting function and ensures proper use by programmer
 func EndTaintFailSafe(actualTainted int) error {
-	if actualTainted > targetTaints {
-		log.Warningf("Actual taints %v exceeded target of %v", actualTainted, targetTaints)
+	if tainted > MaximumTaints {
+		return fmt.Errorf("tainted nodes %v exceeded maximum of %v", tainted, MaximumTaints)
 	}
-	if actualTainted > maximumTaints {
-		str := fmt.Sprintf("Actual taints %v exceeded maximum of %v", actualTainted, maximumTaints)
-		log.Errorf(str)
-		return errors.New(str)
+	if tainted > actualTainted {
+		return fmt.Errorf("tainted nodes %v exceeded recorded of %v", tainted, actualTainted)
 	}
 
-	taints = 0
+	tainted = 0
 	return nil
 }
 
 // AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
 func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
-	if taints > maximumTaints {
-		log.Errorf("Attempted to taint more than maximum. Not tainting")
-		return node, fmt.Errorf("Actual taints %v exceeded maximum of %v", taints, maximumTaints)
+	if tainted > MaximumTaints {
+		IncrementTaintCount()
+		return node, fmt.Errorf("Actual taints %v exceeded maximum of %v", tainted, MaximumTaints)
 	}
 
 	// fetch the latest version of the node to avoid conflict
@@ -102,8 +97,8 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Nod
 		return updatedNode, fmt.Errorf("failed to update node %v after adding taint: %v", updatedNode.Name, err)
 	}
 
-	taints++
 	log.Infof("Successfully added taint on node %v", updatedNodeWithTaint.Name)
+	IncrementTaintCount()
 	return updatedNodeWithTaint, nil
 }
 

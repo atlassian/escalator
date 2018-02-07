@@ -101,13 +101,18 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n 
 		// only actually taint in dry mode
 		if !c.dryMode(nodeGroup) {
 			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
+
+			// Taint the node
 			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
-			if err == nil {
+			if err != nil {
+				log.Errorf("While tainting %v: %v", bundle.node.Name, err)
+			} else {
 				bundle.node = updatedNode
 				taintedIndices = append(taintedIndices, bundle.index)
 			}
 		} else {
 			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
+			k8s.IncrementTaintCount()
 			taintedIndices = append(taintedIndices, bundle.index)
 			log.WithField("drymode", "on").Infoln("Tainting node", bundle.node.Name)
 		}
@@ -135,8 +140,12 @@ func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, 
 		if !c.dryMode(nodeGroup) {
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
 				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
+
+				// Remove the taint from the node
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
-				if err == nil {
+				if err != nil {
+					log.Errorf("Failed to untaint node %v: %v", bundle.node.Name, err)
+				} else {
 					bundle.node = updatedNode
 					untaintedIndices = append(untaintedIndices, bundle.index)
 				}
@@ -309,9 +318,20 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 		metrics.NodeGroupTaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToRemove))
 
 		// Lock the taintinf to a maximum on 10 nodes
-		k8s.BeginTaintFailSafe(nodesToRemove, k8s.MaximumTaints)
+		if err := k8s.BeginTaintFailSafe(nodesToRemove, k8s.MaximumTaints); err != nil {
+			// Don't taint if there was an error on the lock
+			log.Errorf("Failed to get safetly lock on tainter: %v", err)
+			break
+		}
+		// Perform the tainting loop with the fail safe around it
 		tainted := c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
-		k8s.EndTaintFailSafe(len(tainted))
+		// Validate the Failsafe worked
+		if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
+			log.Errorf("Failed to validate safetly lock on tainter: %v", err)
+			break
+		}
+
+		log.Infof("Tainted a total of %v nodes", len(tainted))
 
 	case nodesDelta > 0:
 		nodesToAdd := nodesDelta
@@ -319,10 +339,13 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 			log.WithField("nodegroup", nodegroup).Warningln("There are no tainted nodes to untaint")
 			break
 		}
+
+		// Metrics & Logs
 		log.WithField("nodegroup", nodegroup).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
 		metrics.NodeGroupUntaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToAdd))
-		c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
-		// increase asg by remaining need
+
+		untainted := c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
+		log.Infof("Tainted a total of %v nodes", len(untainted))
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
 	}
