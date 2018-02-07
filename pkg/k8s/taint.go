@@ -28,14 +28,16 @@ const (
 )
 
 var (
-	tainted = 0
+	tainted      = 0
+	targetTaints = 0
 )
 
 // BeginTaintFailSafe locks the tainting function to taint a max of maximum nodes
-func BeginTaintFailSafe(target, maximum int) error {
+func BeginTaintFailSafe(target int) error {
 	if tainted != 0 {
 		return errors.New("failed to ensure taint lifecycle is valid")
 	}
+	targetTaints = target
 	return nil
 }
 
@@ -52,6 +54,9 @@ func EndTaintFailSafe(actualTainted int) error {
 	if tainted > actualTainted {
 		return fmt.Errorf("tainted nodes %v exceeded recorded of %v", tainted, actualTainted)
 	}
+	if tainted != targetTaints {
+		log.Warningf("tainted nodes %v differs from target of %v", tainted, targetTaints)
+	}
 
 	tainted = 0
 	return nil
@@ -60,6 +65,9 @@ func EndTaintFailSafe(actualTainted int) error {
 // AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
 func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
+	if tainted > targetTaints {
+		log.Warningf("Taint count exceeds the target set by the lock")
+	}
 	if tainted > MaximumTaints {
 		IncrementTaintCount()
 		return node, fmt.Errorf("Actual taints %v exceeded maximum of %v", tainted, MaximumTaints)

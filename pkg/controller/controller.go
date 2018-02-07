@@ -318,7 +318,7 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 		metrics.NodeGroupTaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToRemove))
 
 		// Lock the taintinf to a maximum on 10 nodes
-		if err := k8s.BeginTaintFailSafe(nodesToRemove, k8s.MaximumTaints); err != nil {
+		if err := k8s.BeginTaintFailSafe(nodesToRemove); err != nil {
 			// Don't taint if there was an error on the lock
 			log.Errorf("Failed to get safetly lock on tainter: %v", err)
 			break
