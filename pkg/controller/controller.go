@@ -102,7 +102,7 @@ func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n 
 		if !c.dryMode(nodeGroup) {
 			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
 			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
-			if err != nil {
+			if err == nil {
 				bundle.node = updatedNode
 				taintedIndices = append(taintedIndices, bundle.index)
 			}
@@ -136,7 +136,7 @@ func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, 
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
 				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
-				if err != nil {
+				if err == nil {
 					bundle.node = updatedNode
 					untaintedIndices = append(untaintedIndices, bundle.index)
 				}
