@@ -54,3 +54,50 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 
 	return node
 }
+
+// PodOpts are options for a pod
+type PodOpts struct {
+	Name              string
+	Namespace         string
+	CPU               []int64
+	Mem               []int64
+	NodeSelectorKey   string
+	NodeSelectorValue string
+}
+
+// BuildTestPod builds a pod for testing
+func BuildTestPod(opts PodOpts) *apiv1.Pod {
+	containers := make([]apiv1.Container, 0, len(opts.CPU))
+	for range opts.CPU {
+		containers = append(containers, apiv1.Container{
+			Resources: apiv1.ResourceRequirements{
+				Requests: apiv1.ResourceList{},
+			},
+		})
+	}
+
+	pod := &apiv1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: opts.Namespace,
+			Name:      opts.Name,
+			SelfLink:  fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", opts.Namespace, opts.Name),
+		},
+		Spec: apiv1.PodSpec{
+			Containers: containers,
+			NodeSelector: map[string]string{
+				opts.NodeSelectorKey: opts.NodeSelectorValue,
+			},
+		},
+	}
+
+	for i := range containers {
+		if opts.CPU[i] >= 0 {
+			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPU[i], resource.DecimalSI)
+		}
+		if opts.Mem[i] >= 0 {
+			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceMemory] = *resource.NewQuantity(opts.Mem[i], resource.DecimalSI)
+		}
+	}
+
+	return pod
+}
