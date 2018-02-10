@@ -16,27 +16,21 @@ func TestSortOldestNode(t *testing.T) {
 	// Ordered nodes for testing
 	nodesOrdered := []*v1.Node{
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n1",
 			Creation: time.Date(1996, time.May, 12, 9, 0, 0, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n2",
 			Creation: time.Date(2018, time.January, 1, 1, 0, 0, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n3",
 			Creation: time.Date(2018, time.January, 1, 1, 1, 0, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n4",
 			Creation: time.Date(2018, time.January, 1, 1, 1, 1, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n5",
 			Creation: time.Date(2018, time.January, 1, 1, 1, 1, 1, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n6",
 			Creation: time.Date(2020, time.December, 2, 2, 2, 2, 2, time.UTC),
 		}),
 	}
@@ -66,27 +60,21 @@ func TestSortNewestNode(t *testing.T) {
 	// Ordered nodes for testing
 	nodesOrdered := []*v1.Node{
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n6",
 			Creation: time.Date(2020, time.December, 2, 2, 2, 2, 2, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n5",
 			Creation: time.Date(2018, time.January, 1, 1, 1, 1, 1, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n4",
 			Creation: time.Date(2018, time.January, 1, 1, 1, 1, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n3",
 			Creation: time.Date(2018, time.January, 1, 1, 1, 0, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n2",
 			Creation: time.Date(2018, time.January, 1, 1, 0, 0, 0, time.UTC),
 		}),
 		test.BuildTestNode(test.NodeOpts{
-			Name:     "n1",
 			Creation: time.Date(1996, time.May, 12, 9, 0, 0, 0, time.UTC),
 		}),
 	}
