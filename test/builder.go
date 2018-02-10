@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -15,6 +16,7 @@ type NodeOpts struct {
 	Mem        int64
 	LabelKey   string
 	LabelValue string
+	Creation   time.Time
 }
 
 // BuildTestNode creates a node with specified capacity.
@@ -26,6 +28,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 			Labels: map[string]string{
 				opts.LabelKey: opts.LabelValue,
 			},
+			CreationTimestamp: metav1.NewTime(opts.Creation),
 		},
 		Spec: apiv1.NodeSpec{
 			ProviderID: opts.Name,

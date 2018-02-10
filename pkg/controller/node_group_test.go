@@ -3,6 +3,8 @@ package controller_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/test"
 	"k8s.io/api/core/v1"
@@ -95,12 +97,8 @@ func TestNewNodeLabelFilterFunc(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f := controller.NewNodeLabelFilterFunc(tt.args.labelKey, tt.args.labelValue)
-			got := f(tt.args.node)
-			if got != tt.want {
-				t.Errorf("NewNodeLabelFilterFunc() = %v, want %v", got, tt.want)
-			}
-		})
+		f := controller.NewNodeLabelFilterFunc(tt.args.labelKey, tt.args.labelValue)
+		got := f(tt.args.node)
+		assert.Equal(t, tt.want, got)
 	}
 }
