@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/atlassian/escalator/pkg/controller"
-	"github.com/atlassian/escalator/test"
+	"github.com/atlassian/escalator/pkg/test"
 	"k8s.io/api/core/v1"
 )
 

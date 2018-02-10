@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
-	"github.com/atlassian/escalator/test"
+	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
 )
 

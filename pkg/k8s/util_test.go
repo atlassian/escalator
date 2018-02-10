@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/atlassian/escalator/pkg/k8s"
-	"github.com/atlassian/escalator/test"
+	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
@@ -12,7 +12,6 @@ import (
 )
 
 func TestCalculatePodsRequestTotal(t *testing.T) {
-
 	p1 := test.BuildTestPod(test.PodOpts{
 		CPU: []int64{1000},
 		Mem: []int64{1000},
