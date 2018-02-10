@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
+	"github.com/atlassian/escalator/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +45,11 @@ func getStringFromChan(c chan string) string {
 }
 
 func TestAddToBeRemovedTaint(t *testing.T) {
-	node := BuildTestNode("node", 1000, 1000)
+	node := test.BuildTestNode(test.NodeOpts{
+		Name: "node",
+		CPU:  1000,
+		Mem:  1000,
+	})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 	updated, err := AddToBeRemovedTaint(node, fakeClient)
 
@@ -55,7 +60,11 @@ func TestAddToBeRemovedTaint(t *testing.T) {
 }
 
 func TestGetToBeRemovedTaint(t *testing.T) {
-	node := BuildTestNode("node", 1000, 1000)
+	node := test.BuildTestNode(test.NodeOpts{
+		Name: "node",
+		CPU:  1000,
+		Mem:  1000,
+	})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 	updated, err := AddToBeRemovedTaint(node, fakeClient)
 
@@ -68,7 +77,11 @@ func TestGetToBeRemovedTaint(t *testing.T) {
 }
 
 func TestGetToBeRemovedTime(t *testing.T) {
-	node := BuildTestNode("node", 1000, 1000)
+	node := test.BuildTestNode(test.NodeOpts{
+		Name: "node",
+		CPU:  1000,
+		Mem:  1000,
+	})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 	updated, err := AddToBeRemovedTaint(node, fakeClient)
 
@@ -83,7 +96,11 @@ func TestGetToBeRemovedTime(t *testing.T) {
 }
 
 func TestDeleteToBeRemovedTaint(t *testing.T) {
-	node := BuildTestNode("node", 1000, 1000)
+	node := test.BuildTestNode(test.NodeOpts{
+		Name: "node",
+		CPU:  1000,
+		Mem:  1000,
+	})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 
 	updated, err := AddToBeRemovedTaint(node, fakeClient)
