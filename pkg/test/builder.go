@@ -7,6 +7,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 )
 
 // NodeOpts minimal options for configuring a node object in testing
@@ -17,6 +20,81 @@ type NodeOpts struct {
 	LabelKey   string
 	LabelValue string
 	Creation   time.Time
+}
+
+// BuildFakeClient creates a fake client
+func BuildFakeClient(nodes []*apiv1.Node, pods []*apiv1.Pod) (*fake.Clientset, <-chan string) {
+	fakeClient := &fake.Clientset{}
+	updateChan := make(chan string, 2*(len(nodes)+len(pods)))
+	// nodes
+	fakeClient.Fake.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		getAction := action.(core.GetAction)
+		for _, node := range nodes {
+			if node.Name == getAction.GetName() {
+				return true, node, nil
+			}
+		}
+		return true, nil, fmt.Errorf("No node named: %v", getAction.GetName())
+	})
+	fakeClient.Fake.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		updateAction := action.(core.UpdateAction)
+		node := updateAction.GetObject().(*apiv1.Node)
+		for _, n := range nodes {
+			if node.Name == n.Name {
+				updateChan <- node.Name
+				return true, node, nil
+			}
+		}
+		return false, nil, fmt.Errorf("No node named: %v", node.Name)
+	})
+	fakeClient.Fake.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		nodesCopy := make([]apiv1.Node, 0, len(nodes))
+		for _, n := range nodes {
+			nodesCopy = append(nodesCopy, *n)
+		}
+		return true, &apiv1.NodeList{Items: nodesCopy}, nil
+	})
+
+	// pods
+	fakeClient.Fake.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		getAction := action.(core.GetAction)
+		for _, pod := range pods {
+			if pod.Name == getAction.GetName() && pod.Namespace == getAction.GetNamespace() {
+				return true, pod, nil
+			}
+		}
+		return true, nil, fmt.Errorf("No pod named: %v", getAction.GetName())
+	})
+	fakeClient.Fake.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		updateAction := action.(core.UpdateAction)
+		pod := updateAction.GetObject().(*apiv1.Pod)
+		for _, p := range pods {
+			if pod.Name == p.Name {
+				updateChan <- pod.Name
+				return true, pod, nil
+			}
+		}
+		return false, nil, fmt.Errorf("No pod named: %v", pod.Name)
+	})
+	fakeClient.Fake.AddReactor("list", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		podsCopy := make([]apiv1.Pod, 0, len(pods))
+		for _, p := range pods {
+			podsCopy = append(podsCopy, *p)
+		}
+		return true, &apiv1.PodList{Items: podsCopy}, nil
+	})
+	return fakeClient, updateChan
+}
+
+// NameFromChan returns a name from a channel update
+// fails if timeout
+func NameFromChan(c <-chan string, timeout time.Duration) string {
+	select {
+	case val := <-c:
+		return val
+	case <-time.After(timeout):
+		return "Nothing returned"
+	}
 }
 
 // BuildTestNode creates a node with specified capacity.
