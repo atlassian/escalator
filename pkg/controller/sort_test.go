@@ -51,8 +51,10 @@ func TestSortOldestNode(t *testing.T) {
 	// sort and test
 	sort.Sort(shuffled)
 	for i, bundle := range shuffled {
-		assert.Equal(t, nodesOrdered[i], bundle.node)
-		assert.Equal(t, i, shuffledOrder[i])
+		t.Run("sort oldest", func(t *testing.T) {
+			assert.Equal(t, nodesOrdered[i], bundle.node)
+			assert.Equal(t, i, shuffledOrder[i])
+		})
 	}
 }
 
@@ -95,8 +97,10 @@ func TestSortNewestNode(t *testing.T) {
 	// sort and test
 	sort.Sort(shuffled)
 	for i, bundle := range shuffled {
-		assert.Equal(t, nodesOrdered[i], bundle.node)
-		assert.Equal(t, i, shuffledOrder[i])
+		t.Run("sort newest", func(t *testing.T) {
+			assert.Equal(t, nodesOrdered[i], bundle.node)
+			assert.Equal(t, i, shuffledOrder[i])
+		})
 	}
 }
 

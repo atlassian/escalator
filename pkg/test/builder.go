@@ -63,6 +63,9 @@ type PodOpts struct {
 	Mem               []int64
 	NodeSelectorKey   string
 	NodeSelectorValue string
+	Owner             string
+	NodeAffinityKey   string
+	NodeAffinityValue string
 }
 
 // BuildTestPod builds a pod for testing
@@ -76,17 +79,53 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		})
 	}
 
+	var owners []metav1.OwnerReference
+	if len(opts.Owner) > 0 {
+		owners = append(owners, metav1.OwnerReference{
+			Kind: opts.Owner,
+		})
+	}
+
+	var nodeSelector map[string]string
+	if len(opts.NodeSelectorKey) > 0 || len(opts.NodeSelectorValue) > 0 {
+		nodeSelector = map[string]string{
+			opts.NodeSelectorKey: opts.NodeSelectorValue,
+		}
+	}
+
+	var affinty *apiv1.Affinity
+	if len(opts.NodeAffinityKey) > 0 || len(opts.NodeAffinityValue) > 0 {
+		affinty = &apiv1.Affinity{
+			NodeAffinity: &apiv1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{
+					NodeSelectorTerms: []apiv1.NodeSelectorTerm{
+						0: apiv1.NodeSelectorTerm{
+							MatchExpressions: []apiv1.NodeSelectorRequirement{
+								apiv1.NodeSelectorRequirement{
+									Key: opts.NodeAffinityKey,
+									Values: []string{
+										0: opts.NodeAffinityValue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
 	pod := &apiv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: opts.Namespace,
-			Name:      opts.Name,
-			SelfLink:  fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", opts.Namespace, opts.Name),
+			Namespace:       opts.Namespace,
+			Name:            opts.Name,
+			SelfLink:        fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", opts.Namespace, opts.Name),
+			OwnerReferences: owners,
 		},
 		Spec: apiv1.PodSpec{
-			Containers: containers,
-			NodeSelector: map[string]string{
-				opts.NodeSelectorKey: opts.NodeSelectorValue,
-			},
+			Containers:   containers,
+			NodeSelector: nodeSelector,
+			Affinity:     affinty,
 		},
 	}
 

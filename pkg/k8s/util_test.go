@@ -116,10 +116,12 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		mem, cpu, err := k8s.CalculatePodsRequestsTotal(tt.args.pods)
-		assert.Equal(t, tt.mem, mem)
-		assert.Equal(t, tt.cpu, cpu)
-		assert.NoError(t, err)
+		t.Run(tt.name, func(t *testing.T) {
+			mem, cpu, err := k8s.CalculatePodsRequestsTotal(tt.args.pods)
+			assert.Equal(t, tt.mem, mem)
+			assert.Equal(t, tt.cpu, cpu)
+			assert.NoError(t, err)
+		})
 	}
 }
 
@@ -212,9 +214,11 @@ func TestCalculateNodesCapacityTotal(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		mem, cpu, err := k8s.CalculateNodesCapacityTotal(tt.args.nodes)
-		assert.Equal(t, tt.mem, mem)
-		assert.Equal(t, tt.cpu, cpu)
-		assert.NoError(t, err)
+		t.Run(tt.name, func(t *testing.T) {
+			mem, cpu, err := k8s.CalculateNodesCapacityTotal(tt.args.nodes)
+			assert.Equal(t, tt.mem, mem)
+			assert.Equal(t, tt.cpu, cpu)
+			assert.NoError(t, err)
+		})
 	}
 }
