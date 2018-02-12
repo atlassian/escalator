@@ -1,6 +1,13 @@
 # Documentation
 General system documentation
-*Design is very early and subject to change at anytime*
+
+# How to use the stash remote
+The SOX remote stash repo named stash is used to pin a specific version of escalator down in compliance with peer review and CI/CD standards
+To remote a branch to master of stash:
+- PR branch on github and merge
+- Create branch username/stash-release-description
+- `git push -u stash username/stash-release-description`
+- Create PR on stash and merge
 
 # Dependencies
 We used `godep` for dependency managment
