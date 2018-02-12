@@ -334,6 +334,21 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.Error(t, err)
 		assert.Empty(t, opts)
 	})
+
+	t.Run("test yaml unmarshal Buildeng good", func(t *testing.T) {
+		yamlReader := strings.NewReader(yamlBE)
+		opts, err := controller.UnmarshalNodeGroupOptions(yamlReader)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(opts))
+		assert.NotNil(t, opts[0])
+		assert.Equal(t, "buildeng", opts[0].Name)
+		assert.Equal(t, "customer", opts[0].LabelKey)
+		assert.Equal(t, "buildeng", opts[0].LabelValue)
+		assert.Equal(t, 10, opts[0].MinNodes)
+		assert.Equal(t, 300, opts[0].MaxNodes)
+		assert.Equal(t, false, opts[0].DryMode)
+	})
 }
 
 var yamlErr = `
@@ -372,3 +387,19 @@ node_groups:
     slow_node_revival_rate: 2
     fast_node_revival_rate: 3
 `
+
+var yamlBE = `node_groups:
+  - name: "buildeng"
+    label_key: "customer"
+    label_value: "buildeng"
+    min_nodes: 10
+    max_nodes: 300
+    dry_mode: false
+    taint_upper_capacity_threshhold_percent: 70
+    taint_lower_capacity_threshhold_percent: 45
+    untaint_upper_capacity_threshhold_percent: 95
+    untaint_lower_capacity_threshhold_percent: 90
+    slow_node_removal_rate: 2
+    fast_node_removal_rate: 5
+    slow_node_revival_rate: 2
+    fast_node_revival_rate: 10`
