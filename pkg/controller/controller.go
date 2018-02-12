@@ -17,8 +17,8 @@ import (
 
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
-	*Client
-	*Opts
+	Client   *Client
+	Opts     *Opts
 	stopChan <-chan struct{}
 
 	nodeGroups map[string]*NodeGroupState
