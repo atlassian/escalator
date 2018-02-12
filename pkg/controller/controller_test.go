@@ -313,7 +313,11 @@ func TestControllerTaintOldestN(t *testing.T) {
 				for _, i := range got {
 					updated := test.NameFromChan(updateChan, 1*time.Second)
 					t.Run(fmt.Sprintf("checking %v returned node drymode off", i), func(t *testing.T) {
-						assert.Equal(t, tt.args.nodes[i].Name, updated)
+						// test that the node was actually tainted
+						if eq := assert.Equal(t, tt.args.nodes[i].Name, updated); eq {
+							_, tainted := k8s.GetToBeRemovedTaint(tt.args.nodes[i])
+							assert.True(t, tainted)
+						}
 					})
 				}
 			}
@@ -506,6 +510,11 @@ func TestControllerUntaintNewestN(t *testing.T) {
 					updated := test.NameFromChan(updateChan, 1*time.Second)
 					t.Run(fmt.Sprintf("checking %v returned node drymode off", i), func(t *testing.T) {
 						assert.Equal(t, tt.args.nodes[i].Name, updated)
+						// test that the node is actually untainted
+						if eq := assert.Equal(t, tt.args.nodes[i].Name, updated); eq {
+							_, tainted := k8s.GetToBeRemovedTaint(tt.args.nodes[i])
+							assert.False(t, tainted)
+						}
 					})
 				}
 			}
