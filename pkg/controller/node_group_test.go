@@ -403,3 +403,72 @@ var yamlBE = `node_groups:
     fast_node_removal_rate: 5
     slow_node_revival_rate: 2
     fast_node_revival_rate: 10`
+
+func TestValidateNodeGroup(t *testing.T) {
+	type args struct {
+		nodegroup *controller.NodeGroupOptions
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			"valid nodegroup",
+			args{
+				&controller.NodeGroupOptions{
+					Name:                                  "test",
+					LabelKey:                              "customer",
+					LabelValue:                            "buileng",
+					TaintUpperCapacityThreshholdPercent:   70,
+					TaintLowerCapacityThreshholdPercent:   60,
+					UntaintUpperCapacityThreshholdPercent: 90,
+					UntaintLowerCapacityThreshholdPercent: 80,
+					MinNodes:            1,
+					MaxNodes:            3,
+					SlowNodeRemovalRate: 1,
+					FastNodeRemovalRate: 2,
+					SlowNodeRevivalRate: 1,
+					FastNodeRevivalRate: 2,
+				},
+			},
+			nil,
+		},
+		{
+			"invalid nodegroup",
+			args{
+				&controller.NodeGroupOptions{
+					Name:                                  "",
+					LabelKey:                              "customer",
+					LabelValue:                            "buileng",
+					TaintUpperCapacityThreshholdPercent:   70,
+					TaintLowerCapacityThreshholdPercent:   90,
+					UntaintUpperCapacityThreshholdPercent: 90,
+					UntaintLowerCapacityThreshholdPercent: 80,
+					MinNodes:            1,
+					MaxNodes:            0,
+					SlowNodeRemovalRate: 1,
+					FastNodeRemovalRate: 2,
+					SlowNodeRevivalRate: 1,
+					FastNodeRevivalRate: 2,
+				},
+			},
+			[]string{
+				"name cannot be empty",
+				"lower taint threshhold must be lower than upper taint threshold",
+				"min nodes must be smaller than max nodes",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := controller.ValidateNodeGroup(tt.args.nodegroup)
+			eq := assert.Equal(t, len(tt.want), len(errs))
+			if eq && errs != nil {
+				for i, err := range errs {
+					assert.Equal(t, tt.want[i], err.Error())
+				}
+			}
+		})
+	}
+}
