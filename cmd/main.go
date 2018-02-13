@@ -54,9 +54,18 @@ func main() {
 		log.Fatalf("Failed to decode configFile: %v", err)
 	}
 
-	// Print out the drymode results for each nodegroup
+	// Validate each nodegroup options
 	for _, nodegroup := range nodegroups {
-		log.Infof("Registered nodegroup \"%v\" with drymode %v", nodegroup.Name, nodegroup.DryMode || *drymode)
+		errs := controller.ValidateNodeGroup(nodegroup)
+		if len(errs) > 0 {
+			log.WithField("nodegroup", nodegroup.Name).Errorln("Validating options: [FAIL]")
+			for _, err := range errs {
+				log.WithError(err).Errorln("failed check")
+			}
+			log.WithField("nodegroup", nodegroup.Name).Fatalf("There are %v problems when validating the options. Please check %v", len(errs), *nodegroupConfigFile)
+		}
+		log.WithField("nodegroup", nodegroup.Name).Infoln("Validating options: [PASS]")
+		log.WithField("nodegroup", nodegroup.Name).Infof("Registered with drymode %v", nodegroup.DryMode || *drymode)
 	}
 
 	opts := &controller.Opts{
