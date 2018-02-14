@@ -17,8 +17,8 @@ import (
 
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
-	*Client
-	*Opts
+	Client   *Client
+	Opts     *Opts
 	stopChan <-chan struct{}
 
 	nodeGroups map[string]*NodeGroupState
@@ -345,7 +345,7 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 		metrics.NodeGroupUntaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToAdd))
 
 		untainted := c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
-		log.Infof("Tainted a total of %v nodes", len(untainted))
+		log.Infof("Untainted a total of %v nodes", len(untainted))
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
 	}

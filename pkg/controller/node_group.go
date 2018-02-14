@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -53,6 +54,40 @@ func UnmarshalNodeGroupOptions(reader io.Reader) ([]*NodeGroupOptions, error) {
 		return []*NodeGroupOptions{}, err
 	}
 	return wrapper.NodeGroups, nil
+}
+
+// ValidateNodeGroup is a safety check to validate that a nodegroup has valid options
+func ValidateNodeGroup(nodegroup *NodeGroupOptions) []error {
+	var problems []error
+
+	checkThat := func(cond bool, format string, output ...interface{}) {
+		if !cond {
+			problems = append(problems, fmt.Errorf(format, output...))
+		}
+	}
+
+	checkThat(len(nodegroup.Name) > 0, "name cannot be empty")
+	checkThat(len(nodegroup.LabelKey) > 0, "labelkey cannot be empty")
+	checkThat(len(nodegroup.LabelValue) > 0, "labelvalue cannot be empty")
+
+	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent >= 0, "taint upper capacity must be larger than 0")
+	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent >= 0, "taint lower capacity must be larger than 0")
+	checkThat(nodegroup.UntaintUpperCapacityThreshholdPercent >= 0, "untaint upper capacity must be larger than 0")
+	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent >= 0, "untaint lower capacity must be larger than 0")
+
+	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent < nodegroup.UntaintLowerCapacityThreshholdPercent,
+		"taint upper capacity threshold should be lower than untaint lower threshhold")
+	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent < nodegroup.TaintUpperCapacityThreshholdPercent,
+		"lower taint threshhold must be lower than upper taint threshold")
+	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent < nodegroup.UntaintUpperCapacityThreshholdPercent,
+		"untaint lower threshhold must be lower than untaint upper threshold")
+
+	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
+	checkThat(nodegroup.MaxNodes >= 0, "max nodes must be larger than 0")
+	checkThat(nodegroup.SlowNodeRemovalRate < nodegroup.FastNodeRemovalRate, "slow removal rate must be smaller than fast removal rate")
+	checkThat(nodegroup.SlowNodeRevivalRate < nodegroup.FastNodeRevivalRate, "slow revival rate must be smaller than fast revival rate")
+
+	return problems
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
