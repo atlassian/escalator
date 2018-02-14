@@ -218,6 +218,10 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 		// TODO(jgonzalez): calculate nodes needed
 		// For now (dev) set it to the config revival rate
 		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
+
+		// if ScaleUpThreshholdPercent is our "max target" or  "slack capacity"
+		// we want to add enough nodes such that the maxPercentage cluster util
+		// drops back below ScaleUpThreshholdPercent
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
