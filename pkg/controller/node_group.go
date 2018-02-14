@@ -79,11 +79,14 @@ func ValidateNodeGroup(nodegroup *NodeGroupOptions) []error {
 	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent < nodegroup.TaintUpperCapacityThreshholdPercent,
 		"lower taint threshhold must be lower than upper taint threshold")
 	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent < nodegroup.ScaleUpThreshholdPercent,
-		"taint upper capacity threshold should be lower than untaint lower threshhold")
+		"taint upper capacity threshold should be lower than scale up threshold")
 
 	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
 	checkThat(nodegroup.MaxNodes >= 0, "max nodes must be larger than 0")
 	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow removal rate must be smaller than fast removal rate")
+
+	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent == 0, "UntaintLowerCapacityThreshholdPercent is deprecated. please use ScaleUpThreshholdPercent")
+	checkThat(nodegroup.UntaintUpperCapacityThreshholdPercent == 0, "UntaintUpperCapacityThreshholdPercent is deprecated. please use ScaleUpThreshholdPercent")
 
 	return problems
 }
