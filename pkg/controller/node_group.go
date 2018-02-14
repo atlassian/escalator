@@ -28,14 +28,16 @@ type NodeGroupOptions struct {
 	TaintUpperCapacityThreshholdPercent int `json:"taint_upper_capacity_threshhold_percent,omitempty" yaml:"taint_upper_capacity_threshhold_percent,omitempty"`
 	TaintLowerCapacityThreshholdPercent int `json:"taint_lower_capacity_threshhold_percent,omitempty" yaml:"taint_lower_capacity_threshhold_percent,omitempty"`
 
-	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
-	UntaintLowerCapacityThreshholdPercent int `json:"untaint_lower_capacity_threshhold_percent,omitempty" yaml:"untaint_lower_capacity_threshhold_percent,omitempty"`
+	ScaleUpThreshholdPercent int `json:"scale_up_threshhold_percent,omitempty" yaml:"scale_up_threshhold_percent,omitempty"`
 
 	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
 	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
 
-	SlowNodeRevivalRate int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
-	FastNodeRevivalRate int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
+	// DEPRECATED
+	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
+	UntaintLowerCapacityThreshholdPercent int `json:"untaint_lower_capacity_threshhold_percent,omitempty" yaml:"untaint_lower_capacity_threshhold_percent,omitempty"`
+	SlowNodeRevivalRate                   int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
+	FastNodeRevivalRate                   int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
 
 	// UNUSED
 	SoftTaintEffectPercent         int     `json:"soft_taint_effect_percent,omitempty" yaml:"soft_taint_effect_percent,omitempty"`
@@ -72,20 +74,16 @@ func ValidateNodeGroup(nodegroup *NodeGroupOptions) []error {
 
 	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent >= 0, "taint upper capacity must be larger than 0")
 	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent >= 0, "taint lower capacity must be larger than 0")
-	checkThat(nodegroup.UntaintUpperCapacityThreshholdPercent >= 0, "untaint upper capacity must be larger than 0")
-	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent >= 0, "untaint lower capacity must be larger than 0")
+	checkThat(nodegroup.ScaleUpThreshholdPercent >= 0, "scale up threshhold should be larger than 0")
 
-	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent < nodegroup.UntaintLowerCapacityThreshholdPercent,
-		"taint upper capacity threshold should be lower than untaint lower threshhold")
 	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent < nodegroup.TaintUpperCapacityThreshholdPercent,
 		"lower taint threshhold must be lower than upper taint threshold")
-	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent < nodegroup.UntaintUpperCapacityThreshholdPercent,
-		"untaint lower threshhold must be lower than untaint upper threshold")
+	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent < nodegroup.ScaleUpThreshholdPercent,
+		"taint upper capacity threshold should be lower than untaint lower threshhold")
 
 	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
 	checkThat(nodegroup.MaxNodes >= 0, "max nodes must be larger than 0")
-	checkThat(nodegroup.SlowNodeRemovalRate < nodegroup.FastNodeRemovalRate, "slow removal rate must be smaller than fast removal rate")
-	checkThat(nodegroup.SlowNodeRevivalRate < nodegroup.FastNodeRevivalRate, "slow revival rate must be smaller than fast revival rate")
+	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow removal rate must be smaller than fast removal rate")
 
 	return problems
 }

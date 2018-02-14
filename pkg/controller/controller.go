@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -40,6 +39,18 @@ type Opts struct {
 
 	ScanInterval time.Duration
 	DryMode      bool
+}
+
+// scaleOpts provides options for a scale function
+// wraps options that would be passed as args
+type scaleOpts struct {
+	nodes               []*v1.Node
+	taintedNodes        []*v1.Node
+	untaintedNodes      []*v1.Node
+	pods                []*v1.Pod
+	nodeGroup           *NodeGroupState
+	clusterUsagePercent int
+	nodesDelta          int
 }
 
 // NewController creates a new controller with the specified options
@@ -80,94 +91,6 @@ func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float6
 	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
 	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
 	return cpuPercent, memPercent, nil
-}
-
-// taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indices of the nodes it tainted
-// indices are from the parameter nodes indexes, not the sorted index
-func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
-	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
-	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i})
-	}
-	sort.Sort(sorted)
-
-	taintedIndices := make([]int, 0, n)
-	for i, bundle := range sorted {
-		// stop at N (or when array is fully iterated)
-		if len(taintedIndices) >= n || i >= k8s.MaximumTaints {
-			break
-		}
-
-		// only actually taint in dry mode
-		if !c.dryMode(nodeGroup) {
-			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
-
-			// Taint the node
-			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
-			if err != nil {
-				log.Errorf("While tainting %v: %v", bundle.node.Name, err)
-			} else {
-				bundle.node = updatedNode
-				taintedIndices = append(taintedIndices, bundle.index)
-			}
-		} else {
-			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
-			k8s.IncrementTaintCount()
-			taintedIndices = append(taintedIndices, bundle.index)
-			log.WithField("drymode", "on").Infoln("Tainting node", bundle.node.Name)
-		}
-	}
-
-	return taintedIndices
-}
-
-// untaintNewestN sorts nodes by creation time and untaints the newest N. It will return an array of indices of the nodes it untainted
-// indices are from the parameter nodes indexes, not the sorted index
-func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
-	sorted := make(nodesByNewestCreationTime, 0, len(nodes))
-	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i})
-	}
-	sort.Sort(sorted)
-
-	untaintedIndices := make([]int, 0, n)
-	for _, bundle := range sorted {
-		// stop at N (or when array is fully iterated)
-		if len(untaintedIndices) >= n {
-			break
-		}
-		// only actually taint in dry mode
-		if !c.dryMode(nodeGroup) {
-			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
-				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
-
-				// Remove the taint from the node
-				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
-				if err != nil {
-					log.Errorf("Failed to untaint node %v: %v", bundle.node.Name, err)
-				} else {
-					bundle.node = updatedNode
-					untaintedIndices = append(untaintedIndices, bundle.index)
-				}
-			}
-		} else {
-			deleteIndex := -1
-			for i, name := range nodeGroup.taintTracker {
-				if bundle.node.Name == name {
-					deleteIndex = i
-					break
-				}
-			}
-			if deleteIndex != -1 {
-				// Delete from tracker
-				nodeGroup.taintTracker = append(nodeGroup.taintTracker[:deleteIndex], nodeGroup.taintTracker[deleteIndex+1:]...)
-				untaintedIndices = append(untaintedIndices, bundle.index)
-				log.WithField("drymode", "on").Infoln("Untainting node", bundle.node.Name)
-			}
-		}
-	}
-
-	return untaintedIndices
 }
 
 // scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
@@ -221,8 +144,26 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 	metrics.NodeGroupNodesTainted.WithLabelValues(nodegroup).Set(float64(len(taintedNodes)))
 	metrics.NodeGroupPods.WithLabelValues(nodegroup).Set(float64(len(pods)))
 
+	// We want to be really simple right now so we don't do anything if we are outside the range of allowed nodes
+	// We assume it is a config error or something bad has gone wrong in the cluster
 	if len(allNodes) == 0 {
-		log.WithField("nodegroup", nodegroup).Infoln("no nodes remaining")
+		log.WithField("nodegroup", nodegroup).Warningln("no nodes remaining")
+		return
+	}
+	if len(allNodes) < nodeGroup.Opts.MinNodes {
+		log.WithField("nodegroup", nodegroup).Warningf(
+			"Node count of %v less than minimum of %v",
+			len(allNodes),
+			nodeGroup.Opts.MinNodes,
+		)
+		return
+	}
+	if len(allNodes) > nodeGroup.Opts.MaxNodes {
+		log.WithField("nodegroup", nodegroup).Warningf(
+			"Node count of %v larger than maximum of %v",
+			len(allNodes),
+			nodeGroup.Opts.MaxNodes,
+		)
 		return
 	}
 
@@ -272,83 +213,63 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
 		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
 	// --- Scale Up conditions ---
-	// reached very high %. aggressively add nodes back
-	case maxPercent > nodeGroup.Opts.UntaintUpperCapacityThreshholdPercent:
+	// Need to scale up so capacity can handle requests
+	case maxPercent > nodeGroup.Opts.ScaleUpThreshholdPercent:
+		// TODO(jgonzalez): calculate nodes needed
+		// For now (dev) set it to the config revival rate
 		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
-	// reached medium high %. slowy add nodes back
-	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
-		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
 
 	// Clamp the nodes inside the min and max node count
+	var nodesDeltaResult int
 	switch {
 	case nodesDelta < 0:
-		if len(untaintedNodes)+nodesDelta < nodeGroup.Opts.MinNodes {
-			nodesDelta = nodeGroup.Opts.MinNodes - len(untaintedNodes)
-			if nodesDelta > 0 {
-				log.Warningf(
-					"The cluster is under utilised, but the number of nodes(%v) is less than specified minimum of %v. Switching to a scale up.",
-					len(untaintedNodes),
-					nodeGroup.Opts.MinNodes,
-				)
-			}
+		// Try to scale down
+		nodesDeltaResult, err = c.ScaleDown(scaleOpts{
+			nodes:               allNodes,
+			taintedNodes:        taintedNodes,
+			untaintedNodes:      untaintedNodes,
+			pods:                pods,
+			nodeGroup:           nodeGroup,
+			clusterUsagePercent: maxPercent,
+			nodesDelta:          -nodesDelta,
+		})
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	case nodesDelta > 0:
-		if len(untaintedNodes)+nodesDelta > nodeGroup.Opts.MaxNodes {
-			nodesDelta = nodeGroup.Opts.MaxNodes - len(untaintedNodes)
-			if nodesDelta < 0 {
-				log.Warningf(
-					"The cluster is over utilised, but the number of nodes(%v) is more than specified maximum of %v. Switching to a scale down.",
-					len(untaintedNodes),
-					nodeGroup.Opts.MaxNodes,
-				)
-			}
+		// Try to scale up
+		nodesDeltaResult, err = c.ScaleUp(scaleOpts{
+			nodes:               allNodes,
+			taintedNodes:        taintedNodes,
+			untaintedNodes:      untaintedNodes,
+			pods:                pods,
+			nodeGroup:           nodeGroup,
+			clusterUsagePercent: maxPercent,
+			nodesDelta:          nodesDelta,
+		})
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-	}
-
-	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDelta)
-
-	// Perform the scaling action
-	switch {
-	case nodesDelta < 0:
-		nodesToRemove := -nodesDelta
-		log.WithField("nodegroup", nodegroup).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
-		metrics.NodeGroupTaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToRemove))
-
-		// Lock the taintinf to a maximum on 10 nodes
-		if err := k8s.BeginTaintFailSafe(nodesToRemove); err != nil {
-			// Don't taint if there was an error on the lock
-			log.Errorf("Failed to get safetly lock on tainter: %v", err)
-			break
-		}
-		// Perform the tainting loop with the fail safe around it
-		tainted := c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
-		// Validate the Failsafe worked
-		if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
-			log.Errorf("Failed to validate safetly lock on tainter: %v", err)
-			break
-		}
-
-		log.Infof("Tainted a total of %v nodes", len(tainted))
-
-	case nodesDelta > 0:
-		nodesToAdd := nodesDelta
-		if len(taintedNodes) == 0 {
-			log.WithField("nodegroup", nodegroup).Warningln("There are no tainted nodes to untaint")
-			break
-		}
-
-		// Metrics & Logs
-		log.WithField("nodegroup", nodegroup).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
-		metrics.NodeGroupUntaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToAdd))
-
-		untainted := c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
-		log.Infof("Untainted a total of %v nodes", len(untainted))
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
+		removed, err := c.TryRemoveTaintedNodes(scaleOpts{
+			nodes:               allNodes,
+			taintedNodes:        taintedNodes,
+			untaintedNodes:      untaintedNodes,
+			pods:                pods,
+			nodeGroup:           nodeGroup,
+			clusterUsagePercent: maxPercent,
+		})
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
+		}
+		log.WithField("nodegroup", nodegroup).Infoln("There were", removed, "nodes removed this round")
 	}
+
+	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
 }
 
 // RunOnce performs the main autoscaler logic once
