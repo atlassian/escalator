@@ -32,7 +32,7 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := opts.nodesDelta
-	log.WithField("nodegroup", nodegroupName).Infoln("Increasing ASG by %v", nodesToAdd)
+	log.WithField("nodegroup", nodegroupName).Infoln("Increasing ASG by", nodesToAdd)
 	return 0, nil
 }
 
