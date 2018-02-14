@@ -17,7 +17,7 @@ import (
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
 	Client   *Client
-	Opts     *Opts
+	Opts     Opts
 	stopChan <-chan struct{}
 
 	nodeGroups map[string]*NodeGroupState
@@ -25,7 +25,7 @@ type Controller struct {
 
 // NodeGroupState contains everything about a node group in the current state of the application
 type NodeGroupState struct {
-	Opts *NodeGroupOptions
+	Opts NodeGroupOptions
 	*NodeGroupLister
 
 	// used for tracking which nodes are tainted. testing when in dry mode
@@ -35,7 +35,7 @@ type NodeGroupState struct {
 // Opts provide the Controller with config for runtime
 type Opts struct {
 	K8SClient  kubernetes.Interface
-	NodeGroups []*NodeGroupOptions
+	NodeGroups []NodeGroupOptions
 
 	ScanInterval time.Duration
 	DryMode      bool
@@ -54,7 +54,7 @@ type scaleOpts struct {
 }
 
 // NewController creates a new controller with the specified options
-func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
+func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	client := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
 	if client == nil {
 		log.Fatalln("Failed to create controller client")
@@ -79,7 +79,7 @@ func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
 }
 
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
-func (c Controller) dryMode(nodeGroup *NodeGroupState) bool {
+func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 	return c.Opts.DryMode || nodeGroup.Opts.DryMode
 }
 
@@ -94,7 +94,7 @@ func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float6
 }
 
 // scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
-func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) {
+func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) {
 	// list all pods
 	pods, err := nodeGroup.Pods.List()
 	if err != nil {
@@ -277,7 +277,7 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 }
 
 // RunOnce performs the main autoscaler logic once
-func (c Controller) RunOnce() {
+func (c *Controller) RunOnce() {
 	startTime := time.Now()
 
 	// TODO(jgonzalez/dangot):
@@ -294,7 +294,7 @@ func (c Controller) RunOnce() {
 }
 
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
-func (c Controller) RunForever(runImmediately bool) {
+func (c *Controller) RunForever(runImmediately bool) {
 	if runImmediately {
 		log.Debugln("**********[AUTOSCALER FIRST LOOP]**********")
 		c.RunOnce()

@@ -11,7 +11,7 @@ import (
 )
 
 // ScaleUp performs the untaint and incrase asg logic
-func (c Controller) ScaleUp(opts scaleOpts) (int, error) {
+func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	untainted, err := c.scaleUpUntaint(opts)
 	// No nodes were untainted, so we need to scale up asg
 	if err != nil {
@@ -29,14 +29,14 @@ func (c Controller) ScaleUp(opts scaleOpts) (int, error) {
 	return untainted, err
 }
 
-func (c Controller) scaleUpASG(opts scaleOpts) (int, error) {
+func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := opts.nodesDelta
 	log.WithField("nodegroup", nodegroupName).Infoln("Increasing ASG by %v", nodesToAdd)
 	return 0, nil
 }
 
-func (c Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
+func (c *Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := opts.nodesDelta
 
@@ -71,7 +71,7 @@ func (c Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
 
 // untaintNewestN sorts nodes by creation time and untaints the newest N. It will return an array of indices of the nodes it untainted
 // indices are from the parameter nodes indexes, not the sorted index
-func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
+func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByNewestCreationTime, 0, len(nodes))
 	for i, node := range nodes {
 		sorted = append(sorted, nodeIndexBundle{node, i})

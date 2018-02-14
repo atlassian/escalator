@@ -11,7 +11,7 @@ import (
 )
 
 // ScaleDown performs the taint and remove node logic
-func (c Controller) ScaleDown(opts scaleOpts) (int, error) {
+func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	removed, err := c.TryRemoveTaintedNodes(opts)
 	if err != nil {
 		// TODO(jgonzalez): elaborate
@@ -25,11 +25,11 @@ func (c Controller) ScaleDown(opts scaleOpts) (int, error) {
 }
 
 // TryRemoveTaintedNodes attempts to remove nodes are tainted and empty or have passed their grace period
-func (c Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
+func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	return 0, nil
 }
 
-func (c Controller) scaleDownTaint(opts scaleOpts) (int, error) {
+func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToRemove := opts.nodesDelta
 
@@ -72,7 +72,7 @@ func (c Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 
 // taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indices of the nodes it tainted
 // indices are from the parameter nodes indexes, not the sorted index
-func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
+func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
 	for i, node := range nodes {
 		sorted = append(sorted, nodeIndexBundle{node, i})

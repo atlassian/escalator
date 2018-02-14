@@ -406,7 +406,7 @@ var yamlBE = `node_groups:
 
 func TestValidateNodeGroup(t *testing.T) {
 	type args struct {
-		nodegroup *controller.NodeGroupOptions
+		nodegroup controller.NodeGroupOptions
 	}
 	tests := []struct {
 		name string
@@ -416,7 +416,7 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"valid nodegroup",
 			args{
-				&controller.NodeGroupOptions{
+				controller.NodeGroupOptions{
 					Name:                                "test",
 					LabelKey:                            "customer",
 					LabelValue:                          "buileng",
@@ -436,7 +436,7 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"invalid nodegroup",
 			args{
-				&controller.NodeGroupOptions{
+				controller.NodeGroupOptions{
 					Name:                                "",
 					LabelKey:                            "customer",
 					LabelValue:                          "buileng",

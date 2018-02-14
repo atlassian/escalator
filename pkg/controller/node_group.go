@@ -48,18 +48,18 @@ type NodeGroupOptions struct {
 }
 
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct
-func UnmarshalNodeGroupOptions(reader io.Reader) ([]*NodeGroupOptions, error) {
+func UnmarshalNodeGroupOptions(reader io.Reader) ([]NodeGroupOptions, error) {
 	var wrapper struct {
-		NodeGroups []*NodeGroupOptions `json:"node_groups" yaml:"node_groups"`
+		NodeGroups []NodeGroupOptions `json:"node_groups" yaml:"node_groups"`
 	}
 	if err := yaml.NewYAMLOrJSONDecoder(reader, 4096).Decode(&wrapper); err != nil {
-		return []*NodeGroupOptions{}, err
+		return []NodeGroupOptions{}, err
 	}
 	return wrapper.NodeGroups, nil
 }
 
 // ValidateNodeGroup is a safety check to validate that a nodegroup has valid options
-func ValidateNodeGroup(nodegroup *NodeGroupOptions) []error {
+func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	var problems []error
 
 	checkThat := func(cond bool, format string, output ...interface{}) {
@@ -164,7 +164,7 @@ func NewNodeLabelFilterFunc(labelKey, labelValue string) k8s.NodeFilterFunc {
 }
 
 // NewNodeGroupLister creates a new group from the backing lister and nodegroup filter
-func NewNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroupOptions) *NodeGroupLister {
+func NewNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup NodeGroupOptions) *NodeGroupLister {
 	return &NodeGroupLister{
 		k8s.NewFilteredPodsLister(allPodsLister, NewPodAffinityFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
 		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
@@ -172,7 +172,7 @@ func NewNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1liste
 }
 
 // NewDefaultNodeGroupLister creates a new group from the backing lister and nodegroup filter with the default filter
-func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup *NodeGroupOptions) *NodeGroupLister {
+func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister v1lister.NodeLister, nodeGroup NodeGroupOptions) *NodeGroupLister {
 	return &NodeGroupLister{
 		k8s.NewFilteredPodsLister(allPodsLister, NewPodDefaultFilterFunc()),
 		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),

@@ -68,7 +68,7 @@ func main() {
 		log.WithField("nodegroup", nodegroup.Name).Infof("Registered with drymode %v", nodegroup.DryMode || *drymode)
 	}
 
-	opts := &controller.Opts{
+	opts := controller.Opts{
 		ScanInterval: *scanInterval,
 		K8SClient:    k8sClient,
 		NodeGroups:   nodegroups,

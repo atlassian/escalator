@@ -27,7 +27,7 @@ func TestControllerDryMode(t *testing.T) {
 			"both true. dry mode returns true",
 			args{
 				&NodeGroupState{
-					Opts: &NodeGroupOptions{
+					Opts: NodeGroupOptions{
 						DryMode: true,
 					},
 				},
@@ -39,7 +39,7 @@ func TestControllerDryMode(t *testing.T) {
 			"master true config false. dry mode returns true",
 			args{
 				&NodeGroupState{
-					Opts: &NodeGroupOptions{
+					Opts: NodeGroupOptions{
 						DryMode: false,
 					},
 				},
@@ -51,7 +51,7 @@ func TestControllerDryMode(t *testing.T) {
 			"master false config true. dry mode returns true",
 			args{
 				&NodeGroupState{
-					Opts: &NodeGroupOptions{
+					Opts: NodeGroupOptions{
 						DryMode: true,
 					},
 				},
@@ -63,7 +63,7 @@ func TestControllerDryMode(t *testing.T) {
 			"both false. dry mode returns false",
 			args{
 				&NodeGroupState{
-					Opts: &NodeGroupOptions{
+					Opts: NodeGroupOptions{
 						DryMode: false,
 					},
 				},
@@ -74,8 +74,8 @@ func TestControllerDryMode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := Controller{
-				Opts: &Opts{
+			c := &Controller{
+				Opts: Opts{
 					DryMode: tt.args.master,
 				},
 			}
@@ -186,8 +186,8 @@ func TestControllerTaintOldestN(t *testing.T) {
 		}),
 	}
 
-	nodeGroups := []*NodeGroupOptions{
-		&NodeGroupOptions{
+	nodeGroups := []NodeGroupOptions{
+		NodeGroupOptions{
 			Name:     "buildeng",
 			MinNodes: 1,
 			MaxNodes: 5,
@@ -202,7 +202,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 	}
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
-	opts := &Opts{
+	opts := Opts{
 		K8SClient:    fakeClient,
 		NodeGroups:   nodeGroups,
 		ScanInterval: 1 * time.Minute,
@@ -297,7 +297,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := Controller{
+			c := &Controller{
 				Client:     client,
 				Opts:       opts,
 				stopChan:   nil,
@@ -370,8 +370,8 @@ func TestControllerUntaintNewestN(t *testing.T) {
 		}),
 	}
 
-	nodeGroups := []*NodeGroupOptions{
-		&NodeGroupOptions{
+	nodeGroups := []NodeGroupOptions{
+		NodeGroupOptions{
 			Name:     "buildeng",
 			MinNodes: 1,
 			MaxNodes: 5,
@@ -386,7 +386,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 	}
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
-	opts := &Opts{
+	opts := Opts{
 		K8SClient:    fakeClient,
 		NodeGroups:   nodeGroups,
 		ScanInterval: 1 * time.Minute,
@@ -481,7 +481,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := Controller{
+			c := &Controller{
 				Client:     client,
 				Opts:       opts,
 				stopChan:   nil,
