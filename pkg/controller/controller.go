@@ -227,6 +227,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThreshholdPercent
 
+		// we assume that all nodes have the same capacity
 		nodeWorth := 1.0 / float64(len(allNodes)) * 100.0
 
 		percentageNeededCPU := cpuPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
