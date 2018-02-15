@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/atlassian/escalator/pkg/k8s"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,7 +104,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 	var taints []apiv1.Taint
 	if opts.Tainted {
 		taints = append(taints, apiv1.Taint{
-			Key:    k8s.ToBeRemovedByAutoscalerKey,
+			Key:    "ToBeRemovedByAutoscaler",
 			Value:  fmt.Sprint(time.Now().Unix()),
 			Effect: apiv1.TaintEffectNoSchedule,
 		})
