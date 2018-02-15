@@ -406,7 +406,7 @@ var yamlBE = `node_groups:
 
 func TestValidateNodeGroup(t *testing.T) {
 	type args struct {
-		nodegroup *controller.NodeGroupOptions
+		nodegroup controller.NodeGroupOptions
 	}
 	tests := []struct {
 		name string
@@ -416,20 +416,19 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"valid nodegroup",
 			args{
-				&controller.NodeGroupOptions{
-					Name:                                  "test",
-					LabelKey:                              "customer",
-					LabelValue:                            "buileng",
-					TaintUpperCapacityThreshholdPercent:   70,
-					TaintLowerCapacityThreshholdPercent:   60,
-					UntaintUpperCapacityThreshholdPercent: 90,
-					UntaintLowerCapacityThreshholdPercent: 80,
-					MinNodes:            1,
-					MaxNodes:            3,
-					SlowNodeRemovalRate: 1,
-					FastNodeRemovalRate: 2,
-					SlowNodeRevivalRate: 1,
-					FastNodeRevivalRate: 2,
+				controller.NodeGroupOptions{
+					Name:                                "test",
+					LabelKey:                            "customer",
+					LabelValue:                          "buileng",
+					TaintUpperCapacityThreshholdPercent: 70,
+					TaintLowerCapacityThreshholdPercent: 60,
+					ScaleUpThreshholdPercent:            100,
+					MinNodes:                            1,
+					MaxNodes:                            3,
+					SlowNodeRemovalRate:                 1,
+					FastNodeRemovalRate:                 2,
+					SlowNodeRevivalRate:                 1,
+					FastNodeRevivalRate:                 2,
 				},
 			},
 			nil,
@@ -437,20 +436,19 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"invalid nodegroup",
 			args{
-				&controller.NodeGroupOptions{
-					Name:                                  "",
-					LabelKey:                              "customer",
-					LabelValue:                            "buileng",
-					TaintUpperCapacityThreshholdPercent:   70,
-					TaintLowerCapacityThreshholdPercent:   90,
-					UntaintUpperCapacityThreshholdPercent: 90,
-					UntaintLowerCapacityThreshholdPercent: 80,
-					MinNodes:            1,
-					MaxNodes:            0,
-					SlowNodeRemovalRate: 1,
-					FastNodeRemovalRate: 2,
-					SlowNodeRevivalRate: 1,
-					FastNodeRevivalRate: 2,
+				controller.NodeGroupOptions{
+					Name:                                "",
+					LabelKey:                            "customer",
+					LabelValue:                          "buileng",
+					TaintUpperCapacityThreshholdPercent: 70,
+					TaintLowerCapacityThreshholdPercent: 90,
+					ScaleUpThreshholdPercent:            100,
+					MinNodes:                            1,
+					MaxNodes:                            0,
+					SlowNodeRemovalRate:                 1,
+					FastNodeRemovalRate:                 2,
+					SlowNodeRevivalRate:                 1,
+					FastNodeRevivalRate:                 2,
 				},
 			},
 			[]string{

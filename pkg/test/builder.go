@@ -20,6 +20,7 @@ type NodeOpts struct {
 	LabelKey   string
 	LabelValue string
 	Creation   time.Time
+	Tainted    bool
 }
 
 // BuildFakeClient creates a fake client
@@ -99,6 +100,16 @@ func NameFromChan(c <-chan string, timeout time.Duration) string {
 
 // BuildTestNode creates a node with specified capacity.
 func BuildTestNode(opts NodeOpts) *apiv1.Node {
+
+	var taints []apiv1.Taint
+	if opts.Tainted {
+		taints = append(taints, apiv1.Taint{
+			Key:    "ToBeRemovedByAutoscaler",
+			Value:  fmt.Sprint(time.Now().Unix()),
+			Effect: apiv1.TaintEffectNoSchedule,
+		})
+	}
+
 	node := &apiv1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:     opts.Name,
@@ -110,6 +121,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 		},
 		Spec: apiv1.NodeSpec{
 			ProviderID: opts.Name,
+			Taints:     taints,
 		},
 		Status: apiv1.NodeStatus{
 			Capacity: apiv1.ResourceList{

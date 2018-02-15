@@ -22,7 +22,7 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, nodegroups []*NodeGroupOptions, stopCache <-chan struct{}) *Client {
+func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, stopCache <-chan struct{}) *Client {
 	// Backing store lister for all pods and nodes
 	podStopChan := make(chan struct{})
 	nodeStopChan := make(chan struct{})
