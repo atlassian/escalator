@@ -93,25 +93,11 @@ func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float6
 	return cpuPercent, memPercent, nil
 }
 
-// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
-func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) {
-	// list all pods
-	pods, err := nodeGroup.Pods.List()
-	if err != nil {
-		log.Errorf("Failed to list pods: %v", err)
-		return
-	}
+// filterNodes separates nodes between tainted and untainted nodes
+func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node) (untaintedNodes []*v1.Node, taintedNodes []*v1.Node) {
+	untaintedNodes = make([]*v1.Node, 0, len(allNodes))
+	taintedNodes = make([]*v1.Node, 0, len(allNodes))
 
-	// List all nodes
-	allNodes, err := nodeGroup.Nodes.List()
-	if err != nil {
-		log.Errorf("Failed to list nodes: %v", err)
-		return
-	}
-
-	// Filter into untainted and tainted nodes
-	untaintedNodes := make([]*v1.Node, 0, len(allNodes))
-	taintedNodes := make([]*v1.Node, 0, len(allNodes))
 	for _, node := range allNodes {
 		if c.dryMode(nodeGroup) {
 			var contains bool
@@ -134,6 +120,28 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 			}
 		}
 	}
+
+	return
+}
+
+// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
+func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) {
+	// list all pods
+	pods, err := nodeGroup.Pods.List()
+	if err != nil {
+		log.Errorf("Failed to list pods: %v", err)
+		return
+	}
+
+	// List all nodes
+	allNodes, err := nodeGroup.Nodes.List()
+	if err != nil {
+		log.Errorf("Failed to list nodes: %v", err)
+		return
+	}
+
+	// Filter into untainted and tainted nodes
+	untaintedNodes, taintedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
