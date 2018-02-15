@@ -44,6 +44,7 @@ func (c *Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
 	if len(opts.untaintedNodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
 		// Clamp it to the max we can untaint
 		nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.untaintedNodes)
+		log.Infof("untainted nodes close to maximum (%v). Adjusting untaint amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
 		if nodesToAdd < 0 {
 			err := fmt.Errorf(
 				"the number of nodes(%v) is more than specified maximum of %v. Taking no action",

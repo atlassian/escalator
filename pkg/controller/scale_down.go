@@ -37,8 +37,9 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	if len(opts.untaintedNodes)-nodesToRemove < opts.nodeGroup.Opts.MinNodes {
 		// Set the delta to maximum amount we can remove without going over
 		nodesToRemove = len(opts.untaintedNodes) - opts.nodeGroup.Opts.MinNodes
+		log.Infof("untainted nodes close to minimum (%v). Adjusting taint amount to (%v)", opts.nodeGroup.Opts.MinNodes, nodesToRemove)
 		// If have less node than the minimum, abort!
-		if nodesToRemove > 0 {
+		if nodesToRemove < 0 {
 			err := fmt.Errorf(
 				"the number of nodes(%v) is less than specified minimum of %v. Taking no action",
 				len(opts.untaintedNodes),

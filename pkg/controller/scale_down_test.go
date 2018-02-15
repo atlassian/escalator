@@ -44,7 +44,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 	nodeGroups := []NodeGroupOptions{
 		NodeGroupOptions{
 			Name:     "buildeng",
-			MinNodes: 1,
+			MinNodes: 3,
 			MaxNodes: 6,
 			DryMode:  false,
 		},
@@ -95,6 +95,23 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			false,
 			"",
 		},
+		{
+			"test try taint 4, min nodes = 3",
+			args{
+				scaleOpts{
+					nodes,
+					[]*v1.Node{},
+					nodes,
+					[]*v1.Pod{},
+					nodeGroupsState["buildeng"],
+					50,
+					4,
+				},
+			},
+			3,
+			false,
+			"",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -113,6 +130,14 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			for i := 0; i < tainted; i++ {
 				<-updateChan
 			}
+			// untaint all
+			for _, node := range nodes {
+				if _, tainted := k8s.GetToBeRemovedTaint(node); tainted {
+					k8s.DeleteToBeRemovedTaint(node, client)
+					<-updateChan
+				}
+			}
+			nodeGroupsState["buildeng"].taintTracker = nil
 		})
 	}
 }
