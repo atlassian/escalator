@@ -12,7 +12,7 @@ import (
 )
 
 func TestControllerScaleUpUntaint(t *testing.T) {
-
+	t.Skip("test not implemented")
 }
 
 func TestControllerUntaintNewestN(t *testing.T) {
