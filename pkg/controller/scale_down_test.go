@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 )
 
@@ -111,6 +110,23 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			3,
 			false,
 			"",
+		},
+		{
+			"test try taint 4, min nodes = 3",
+			args{
+				scaleOpts{
+					nodes[:2],
+					[]*v1.Node{},
+					nodes[:2],
+					[]*v1.Pod{},
+					nodeGroupsState["buildeng"],
+					50,
+					4,
+				},
+			},
+			0,
+			true,
+			"the number of nodes(2) is less than specified minimum of 3. Taking no action",
 		},
 	}
 	for _, tt := range tests {
@@ -324,4 +340,8 @@ func TestControllerTaintOldestN(t *testing.T) {
 			nodeGroupsState["buildeng"].taintTracker = nil
 		})
 	}
+}
+
+func TestControllerScaleDown(t *testing.T) {
+	t.Skip("test not implemented")
 }
