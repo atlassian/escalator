@@ -6,9 +6,6 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// NodeGroupIdentifier identifies a nodegroup from a string
-type NodeGroupIdentifier string
-
 // CloudProvider contains configuration info and functions for interacting with
 // cloud provider (GCE, AWS, etc).
 type CloudProvider interface {
@@ -18,7 +15,7 @@ type CloudProvider interface {
 	// NodeGroups returns all node groups configured for this cloud provider.
 	NodeGroups() []NodeGroup
 
-	GetNodeGroup(NodeGroupIdentifier)
+	GetNodeGroup(string) NodeGroup
 
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
