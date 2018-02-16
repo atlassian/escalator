@@ -1,8 +1,8 @@
 package aws
 
-// Do stuff
+import "k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 
-// list ASG
-
-// Scale ASG (aws specfic)
-
+func um() {
+	c := cloudprovider.DefaultOS
+	_ = c
+}
