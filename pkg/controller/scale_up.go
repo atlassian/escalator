@@ -34,7 +34,7 @@ func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
 	nodesToAdd := opts.nodesDelta
 	log.WithField("nodegroup", nodegroupName).Infoln("Increasing ASG by", nodesToAdd)
 
-	c.cloudProvider.GetNodeGroup(nodegroupName).IncreaseSize(nodesToAdd)
+	//c.cloudProvider.GetNodeGroup(nodegroupName).IncreaseSize(nodesToAdd)
 
 	return 0, nil
 }
