@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"k8s.io/api/core/v1"
@@ -20,6 +21,8 @@ type Controller struct {
 	Opts     Opts
 	stopChan <-chan struct{}
 
+	cloudProvider cloudprovider.CloudProvider
+
 	nodeGroups map[string]*NodeGroupState
 }
 
@@ -34,8 +37,9 @@ type NodeGroupState struct {
 
 // Opts provide the Controller with config for runtime
 type Opts struct {
-	K8SClient  kubernetes.Interface
-	NodeGroups []NodeGroupOptions
+	K8SClient            kubernetes.Interface
+	NodeGroups           []NodeGroupOptions
+	CloudProviderBuilder cloudprovider.Builder
 
 	ScanInterval time.Duration
 	DryMode      bool
@@ -70,11 +74,14 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		}
 	}
 
+	cloud := opts.CloudProviderBuilder.Build()
+
 	return &Controller{
-		Client:     client,
-		Opts:       opts,
-		stopChan:   stopChan,
-		nodeGroups: nodegroupMap,
+		Client:        client,
+		Opts:          opts,
+		stopChan:      stopChan,
+		cloudProvider: cloud,
+		nodeGroups:    nodegroupMap,
 	}
 }
 

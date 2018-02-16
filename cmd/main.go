@@ -6,12 +6,13 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s.io/client-go/kubernetes"
-
+	"github.com/atlassian/escalator/pkg/cloudprovider"
+	"github.com/atlassian/escalator/pkg/cloudprovider/aws"
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"k8s.io/client-go/kubernetes"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -23,27 +24,35 @@ var (
 	kubeConfigFile      = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
 	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups nodegroups").Required().String()
 	drymode             = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
+	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Availiable options: aws").Default("aws").String()
 )
 
-func main() {
-	kingpin.Parse()
+// cloudProviderBuilder builds the requested cloud provider. aws, gce, etc
+type cloudProviderBuilder struct {
+	ProviderOpts cloudprovider.BuildOpts
+}
 
-	if *loglevel < 0 || *loglevel > 5 {
-		log.Fatalf("Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)", *loglevel)
+// Build builds the requested CloudProvider
+func (b cloudProviderBuilder) Build() cloudprovider.CloudProvider {
+	switch b.ProviderOpts.ProviderID {
+	case aws.ProviderName:
+		return aws.Builder{ProviderOpts: b.ProviderOpts}.Build()
+	default:
+		log.Fatalln("provider", b.ProviderOpts.ProviderID, "does not exist")
+		return nil
 	}
-	log.SetLevel(log.Level(*loglevel))
-	log.Infoln("Starting with log level", log.GetLevel())
+}
 
-	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
-	var k8sClient kubernetes.Interface
-	if kubeConfigFile != nil && len(*kubeConfigFile) > 0 {
-		log.Infoln("Using out of cluster config")
-		k8sClient = k8s.NewOutOfClusterClient(*kubeConfigFile)
-	} else {
-		log.Infoln("Using in cluster config")
-		k8sClient = k8s.NewInClusterClient()
+func setupCloudProvider() cloudprovider.Builder {
+	cloudBuilder := cloudProviderBuilder{
+		ProviderOpts: cloudprovider.BuildOpts{
+			ProviderID: *cloudProviderID,
+		},
 	}
+	return cloudBuilder
+}
 
+func setupNodeGroups() []controller.NodeGroupOptions {
 	// nodegroupConfigFile is required by kingpin. Won't get to here if it's not defined
 	configFile, err := os.Open(*nodegroupConfigFile)
 	if err != nil {
@@ -68,29 +77,64 @@ func main() {
 		log.WithField("nodegroup", nodegroup.Name).Infof("Registered with drymode %v", nodegroup.DryMode || *drymode)
 	}
 
-	opts := controller.Opts{
-		ScanInterval: *scanInterval,
-		K8SClient:    k8sClient,
-		NodeGroups:   nodegroups,
-		DryMode:      *drymode,
+	return nodegroups
+}
+
+func setupK8SClient() kubernetes.Interface {
+	var k8sClient kubernetes.Interface
+
+	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
+	if kubeConfigFile != nil && len(*kubeConfigFile) > 0 {
+		log.Infoln("Using out of cluster config")
+		k8sClient = k8s.NewOutOfClusterClient(*kubeConfigFile)
+	} else {
+		log.Infoln("Using in cluster config")
+		k8sClient = k8s.NewInClusterClient()
 	}
 
-	// signal channel waits for interrupt
+	return k8sClient
+}
+
+// awaitStopSignal awaits termination signals and shutdown gracefully
+func awaitStopSignal(stopChan chan struct{}) {
 	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-signalChan
+
+	log.Infof("Signal received: %v", sig)
+	log.Infoln("Stopping autoscaler gracefully")
+	close(stopChan)
+}
+
+func main() {
+	kingpin.Parse()
+
+	// setup logging
+	if *loglevel < 0 || *loglevel > 5 {
+		log.Fatalf("Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)", *loglevel)
+	}
+	log.SetLevel(log.Level(*loglevel))
+	log.Infoln("Starting with log level", log.GetLevel())
+
+	nodegroups := setupNodeGroups()
+	k8sClient := setupK8SClient()
+	cloudBuilder := setupCloudProvider()
+
 	// global stop channel. Close signal will be sent to broadvast a shutdown to everything waiting for it to stop
 	stopChan := make(chan struct{}, 1)
+	go awaitStopSignal(stopChan)
 
-	// Handle termination signals and shutdown gracefully
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-signalChan
-		log.Infof("Signal received: %v", sig)
-		log.Infoln("Stopping autoscaler gracefully")
-		close(stopChan)
-	}()
-
+	// start serving metrics endpoint
 	metrics.Start(*addr)
 
+	// create the controller and run in a loop until the stop signal
+	opts := controller.Opts{
+		ScanInterval:         *scanInterval,
+		K8SClient:            k8sClient,
+		NodeGroups:           nodegroups,
+		DryMode:              *drymode,
+		CloudProviderBuilder: cloudBuilder,
+	}
 	c := controller.NewController(opts, stopChan)
 	c.RunForever(true)
 }

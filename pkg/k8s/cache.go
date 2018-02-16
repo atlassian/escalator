@@ -63,7 +63,7 @@ func NewCacheNodeWatcher(client kubernetes.Interface, stop <-chan struct{}) (v1l
 func WaitForSync(tries int, stopChan <-chan struct{}, informers ...cache.InformerSynced) bool {
 	synced := false
 	for i := 0; i < tries && !synced; i++ {
-		log.Debugf("Trying to sync cache: tries = %v", tries)
+		log.Debugf("Trying to sync cache: tries = %v, max = %v", i, tries)
 		synced = cache.WaitForCacheSync(stopChan, informers...)
 	}
 	return synced

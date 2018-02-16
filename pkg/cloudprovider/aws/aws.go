@@ -1,17 +1,26 @@
 package aws
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 )
 
+// ProviderName identifies this module as aws
+const ProviderName = "aws"
+
 func importStub() {
-	sess := session.Must(session.NewSession())
-	_ = sess
-	svc := autoscaling.New(sess, &aws.Config{
-		Region: aws.String(endpoints.UsEast1RegionID),
-	})
-	_ = svc
+	service := autoscaling.New(session.New())
+	_ = service
+}
+
+// Builder builds the aws cloudprivider
+type Builder struct {
+	ProviderOpts cloudprovider.BuildOpts
+}
+
+// Build the cloudprovider
+func (b Builder) Build() cloudprovider.CloudProvider {
+	// TODO(jgonzalez): Not implemented
+	return nil
 }

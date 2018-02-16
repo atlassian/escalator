@@ -1,33 +1,81 @@
 package cloudprovider
 
-import "k8s.io/api/core/v1"
+import (
+	"fmt"
 
+	"k8s.io/api/core/v1"
+)
+
+// NodeGroupIdentifier identifies a nodegroup from a string
+type NodeGroupIdentifier string
+
+// CloudProvider contains configuration info and functions for interacting with
+// cloud provider (GCE, AWS, etc).
 type CloudProvider interface {
+	// Name returns name of the cloud provider.
 	Name() string
 
+	// NodeGroups returns all node groups configured for this cloud provider.
 	NodeGroups() []NodeGroup
 
+	GetNodeGroup(NodeGroupIdentifier)
+
+	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
+	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
 	Refresh() error
 
-	Stop() error
+	// Cleanup cleans up open resources before the cloud provider is destroyed, i.e. go routines etc.
+	Cleanup() error
 }
 
+// NodeGroup contains configuration info and functions to control a set
+// of nodes that have the same capacity and set of labels.
 type NodeGroup interface {
+	// Implements stringer returns a string containing all information regarding this node group.
+	fmt.Stringer
+
+	// Id returns an unique identifier of the node group.
 	ID() string
 
-	Debug() string
-
+	// MinSize returns minimum size of the node group.
 	MinSize() int
 
+	// MaxSize returns maximum size of the node group.
 	MaxSize() int
 
+	// TargetSize returns the current target size of the node group. It is possible that the
+	// number of nodes in Kubernetes is different at the moment but should be equal
+	// to Size() once everything stabilizes (new nodes finish startup and registration or
+	// removed nodes are deleted completely).
 	TargetSize() (int, error)
 
+	// IncreaseSize increases the size of the node group. To delete a node you need
+	// to explicitly name it and use DeleteNode. This function should wait until
+	// node group size is updated.
 	IncreaseSize(delta int) error
 
+	// DeleteNodes deletes nodes from this node group. Error is returned either on
+	// failure or if the given node doesn't belong to this node group. This function
+	// should wait until node group size is updated.
 	DeleteNodes(...*v1.Node) error
 
+	// DecreaseTargetSize decreases the target size of the node group. This function
+	// doesn't permit to delete any existing node and can be used only to reduce the
+	// request for new nodes that have not been yet fulfilled. Delta should be negative.
+	// It is assumed that cloud provider will not delete the existing nodes when there
+	// is an option to just decrease the target.
 	DecreaseTargetSize(delta int) error
 
+	// Nodes returns a list of all nodes that belong to this node group.
 	Nodes() ([]string, error)
+}
+
+// Builder interface provides a method to build a cloudprovider
+type Builder interface {
+	Build() CloudProvider
+}
+
+// BuildOpts providers all options to create your cloud provider
+type BuildOpts struct {
+	ProviderID string
 }
