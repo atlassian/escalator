@@ -138,6 +138,11 @@
 			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/autoscaling",
+			"Comment": "v1.12.67-1-g85827b2b",
+			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/sts",
 			"Comment": "v1.12.67-1-g85827b2b",
 			"Rev": "85827b2b68100949cf995e269f74a151e408fb42"
