@@ -15,7 +15,8 @@ type CloudProvider interface {
 	// NodeGroups returns all node groups configured for this cloud provider.
 	NodeGroups() []NodeGroup
 
-	GetNodeGroup(string) NodeGroup
+	// Get the node group from the coudprovider. Returns if it exists or not
+	GetNodeGroup(string) (NodeGroup, bool)
 
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
