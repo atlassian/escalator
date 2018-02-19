@@ -142,13 +142,23 @@ func (n *NodeGroup) Size() int64 {
 // to explicitly name it and use DeleteNode. This function should wait until
 // node group size is updated.
 func (n *NodeGroup) IncreaseSize(delta int64) error {
-	if n.Size() != n.TargetSize() {
-		return fmt.Errorf("Must wait until size(%v) == target(%v)", n.Size(), n.TargetSize())
+	if delta <= 0 {
+		return fmt.Errorf("size increase must be positive")
+	}
+
+	size := n.Size()
+
+	if size != n.TargetSize() {
+		return fmt.Errorf("Must wait until size(%v) == target(%v)", size, n.TargetSize())
+	}
+
+	if size+delta > n.MaxSize() {
+		return fmt.Errorf("size increase too large - desired:%v max:%v", size+delta, n.MaxSize())
 	}
 
 	input := &autoscaling.SetDesiredCapacityInput{
 		AutoScalingGroupName: awsapi.String(n.id),
-		DesiredCapacity:      awsapi.Int64(n.TargetSize() + delta),
+		DesiredCapacity:      awsapi.Int64(size + delta),
 		HonorCooldown:        awsapi.Bool(true),
 	}
 
