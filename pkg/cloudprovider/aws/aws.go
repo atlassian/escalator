@@ -72,6 +72,7 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 		c.nodeGroups[id] = NewNodeGroup(
 			id,
 			group,
+			c,
 		)
 	}
 
@@ -92,13 +93,16 @@ func (c *CloudProvider) Refresh() error {
 type NodeGroup struct {
 	id  string
 	asg *autoscaling.Group
+
+	provider *CloudProvider
 }
 
 // NewNodeGroup creates a new nodegroup from the aws group backing
-func NewNodeGroup(id string, asg *autoscaling.Group) *NodeGroup {
+func NewNodeGroup(id string, asg *autoscaling.Group, provider *CloudProvider) *NodeGroup {
 	return &NodeGroup{
-		id:  id,
-		asg: asg,
+		id:       id,
+		asg:      asg,
+		provider: provider,
 	}
 }
 
@@ -138,7 +142,27 @@ func (n *NodeGroup) Size() int64 {
 // to explicitly name it and use DeleteNode. This function should wait until
 // node group size is updated.
 func (n *NodeGroup) IncreaseSize(delta int64) error {
-	return ErrorNotImplemented
+	if n.Size() != n.TargetSize() {
+		return fmt.Errorf("Must wait until size(%v) == target(%v)", n.Size(), n.TargetSize())
+	}
+
+	input := &autoscaling.SetDesiredCapacityInput{
+		AutoScalingGroupName: awsapi.String(n.id),
+		DesiredCapacity:      awsapi.Int64(n.TargetSize() + delta),
+		HonorCooldown:        awsapi.Bool(true),
+	}
+
+	result, err := n.provider.service.SetDesiredCapacity(input)
+	if err != nil {
+		if err != nil {
+			log.Errorf("failed to increase asg size: %v", err)
+			return err
+		}
+	}
+
+	log.Debugln("result returned:", result)
+
+	return nil
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
