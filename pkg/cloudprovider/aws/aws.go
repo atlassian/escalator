@@ -18,7 +18,7 @@ var ErrorNotImplemented = fmt.Errorf("method not implemented")
 // CloudProvider providers an aws cloudprovider implementation
 type CloudProvider struct {
 	service    *autoscaling.AutoScaling
-	nodeGroups []*NodeGroup
+	nodeGroups map[string]*NodeGroup
 }
 
 // Name returns name of the cloud provider.
@@ -29,21 +29,23 @@ func (c *CloudProvider) Name() string {
 // NodeGroups returns all node groups configured for this cloud provider.
 func (c *CloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 	// put the nodegroup concrete type into the abstract type
-	ngs := make([]cloudprovider.NodeGroup, len(c.nodeGroups))
-	for i, ng := range c.nodeGroups {
-		ngs[i] = ng
+	ngs := make([]cloudprovider.NodeGroup, 0, len(c.nodeGroups))
+	for _, ng := range c.nodeGroups {
+		ngs = append(ngs, ng)
 	}
 	return ngs
 }
 
 // GetNodeGroup gets the node group from the coudprovider. Returns if it exists or not
 func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) {
+	if ng, ok := c.nodeGroups[id]; ok {
+		return ng, ok
+	}
 	return nil, false
 }
 
 // RegisterNodeGroups adds the nodegroup to the list of nodes groups
 func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
-
 	strs := make([]*string, len(ids))
 	for i, s := range ids {
 		strs[i] = awsapi.String(s)
@@ -59,11 +61,18 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 		return err
 	}
 
-	for i, group := range result.AutoScalingGroups {
-		c.nodeGroups = append(c.nodeGroups, NewNodeGroup(
-			ids[i],
+	for _, group := range result.AutoScalingGroups {
+		id := awsapi.StringValue(group.AutoScalingGroupName)
+		if ng, ok := c.nodeGroups[id]; ok {
+			// just update the group if it already exists
+			ng.asg = group
+			continue
+		}
+
+		c.nodeGroups[id] = NewNodeGroup(
+			id,
 			group,
-		))
+		)
 	}
 
 	return nil
@@ -71,12 +80,12 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 
 // Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 func (c *CloudProvider) Refresh() error {
-	return ErrorNotImplemented
-}
+	ids := make([]string, 0, len(c.nodeGroups))
+	for id := range c.nodeGroups {
+		ids = append(ids, id)
+	}
 
-// Cleanup cleans up open resources before the cloud provider is destroyed, i.e. go routines etc.
-func (c *CloudProvider) Cleanup() error {
-	return ErrorNotImplemented
+	return c.RegisterNodeGroups(ids...)
 }
 
 // NodeGroup implements a aws nodegroup
@@ -104,18 +113,12 @@ func (n *NodeGroup) ID() string {
 
 // MinSize returns minimum size of the node group.
 func (n *NodeGroup) MinSize() int64 {
-	if n.asg.MinSize == nil {
-		return 0
-	}
-	return *n.asg.MinSize
+	return awsapi.Int64Value(n.asg.MinSize)
 }
 
 // MaxSize returns maximum size of the node group.
 func (n *NodeGroup) MaxSize() int64 {
-	if n.asg.MaxSize == nil {
-		return 0
-	}
-	return *n.asg.MaxSize
+	return awsapi.Int64Value(n.asg.MaxSize)
 }
 
 // TargetSize returns the current target size of the node group. It is possible that the
@@ -123,11 +126,12 @@ func (n *NodeGroup) MaxSize() int64 {
 // to Size() once everything stabilizes (new nodes finish startup and registration or
 // removed nodes are deleted completely).
 func (n *NodeGroup) TargetSize() int64 {
-	if n.asg.DesiredCapacity == nil {
-		// TODO(jgonzalez): handle error condition better
-		return 0
-	}
-	return *n.asg.DesiredCapacity
+	return awsapi.Int64Value(n.asg.DesiredCapacity)
+}
+
+// Size is the number of instances in the nodegroup at the current time
+func (n *NodeGroup) Size() int64 {
+	return int64(len(n.asg.Instances))
 }
 
 // IncreaseSize increases the size of the node group. To delete a node you need

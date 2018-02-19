@@ -24,9 +24,6 @@ type CloudProvider interface {
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
 	Refresh() error
-
-	// Cleanup cleans up open resources before the cloud provider is destroyed, i.e. go routines etc.
-	Cleanup() error
 }
 
 // NodeGroup contains configuration info and functions to control a set
@@ -49,6 +46,9 @@ type NodeGroup interface {
 	// to Size() once everything stabilizes (new nodes finish startup and registration or
 	// removed nodes are deleted completely).
 	TargetSize() int64
+
+	// Size is the number of instances in the nodegroup at the current time
+	Size() int64
 
 	// IncreaseSize increases the size of the node group. To delete a node you need
 	// to explicitly name it and use DeleteNode. This function should wait until
@@ -78,5 +78,6 @@ type Builder interface {
 
 // BuildOpts providers all options to create your cloud provider
 type BuildOpts struct {
-	ProviderID string
+	ProviderID   string
+	NodeGroupIDs []string
 }
