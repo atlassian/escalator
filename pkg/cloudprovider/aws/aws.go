@@ -3,7 +3,9 @@ package aws
 import (
 	"fmt"
 	"github.com/atlassian/escalator/pkg/cloudprovider"
+	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 )
 
@@ -15,7 +17,8 @@ var ErrorNotImplemented = fmt.Errorf("method not implemented")
 
 // CloudProvider providers an aws cloudprovider implementation
 type CloudProvider struct {
-	service *autoscaling.AutoScaling
+	service    *autoscaling.AutoScaling
+	nodeGroups []*NodeGroup
 }
 
 // Name returns name of the cloud provider.
@@ -25,12 +28,45 @@ func (c *CloudProvider) Name() string {
 
 // NodeGroups returns all node groups configured for this cloud provider.
 func (c *CloudProvider) NodeGroups() []cloudprovider.NodeGroup {
-	return nil
+	// put the nodegroup concrete type into the abstract type
+	ngs := make([]cloudprovider.NodeGroup, len(c.nodeGroups))
+	for i, ng := range c.nodeGroups {
+		ngs[i] = ng
+	}
+	return ngs
 }
 
 // GetNodeGroup gets the node group from the coudprovider. Returns if it exists or not
 func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) {
 	return nil, false
+}
+
+// RegisterNodeGroups adds the nodegroup to the list of nodes groups
+func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
+
+	strs := make([]*string, len(ids))
+	for i, s := range ids {
+		strs[i] = awsapi.String(s)
+	}
+
+	input := &autoscaling.DescribeAutoScalingGroupsInput{
+		AutoScalingGroupNames: strs,
+	}
+
+	result, err := c.service.DescribeAutoScalingGroups(input)
+	if err != nil {
+		log.Errorf("failed to describe asgs %v. err: %v", ids, err)
+		return err
+	}
+
+	for i, group := range result.AutoScalingGroups {
+		c.nodeGroups = append(c.nodeGroups, NewNodeGroup(
+			ids[i],
+			group,
+		))
+	}
+
+	return nil
 }
 
 // Refresh is called before every main loop and can be used to dynamically update cloud provider state.
@@ -45,39 +81,59 @@ func (c *CloudProvider) Cleanup() error {
 
 // NodeGroup implements a aws nodegroup
 type NodeGroup struct {
+	id  string
+	asg *autoscaling.Group
+}
+
+// NewNodeGroup creates a new nodegroup from the aws group backing
+func NewNodeGroup(id string, asg *autoscaling.Group) *NodeGroup {
+	return &NodeGroup{
+		id:  id,
+		asg: asg,
+	}
 }
 
 func (n *NodeGroup) String() string {
-	return ""
+	return fmt.Sprint(n.asg)
 }
 
 // ID returns an unique identifier of the node group.
 func (n *NodeGroup) ID() string {
-	return ""
+	return n.id
 }
 
 // MinSize returns minimum size of the node group.
-func (n *NodeGroup) MinSize() int {
-	return 0
+func (n *NodeGroup) MinSize() int64 {
+	if n.asg.MinSize == nil {
+		return 0
+	}
+	return *n.asg.MinSize
 }
 
 // MaxSize returns maximum size of the node group.
-func (n *NodeGroup) MaxSize() int {
-	return 0
+func (n *NodeGroup) MaxSize() int64 {
+	if n.asg.MaxSize == nil {
+		return 0
+	}
+	return *n.asg.MaxSize
 }
 
 // TargetSize returns the current target size of the node group. It is possible that the
 // number of nodes in Kubernetes is different at the moment but should be equal
 // to Size() once everything stabilizes (new nodes finish startup and registration or
 // removed nodes are deleted completely).
-func (n *NodeGroup) TargetSize() (int, error) {
-	return 0, ErrorNotImplemented
+func (n *NodeGroup) TargetSize() int64 {
+	if n.asg.DesiredCapacity == nil {
+		// TODO(jgonzalez): handle error condition better
+		return 0
+	}
+	return *n.asg.DesiredCapacity
 }
 
 // IncreaseSize increases the size of the node group. To delete a node you need
 // to explicitly name it and use DeleteNode. This function should wait until
 // node group size is updated.
-func (n *NodeGroup) IncreaseSize(delta int) error {
+func (n *NodeGroup) IncreaseSize(delta int64) error {
 	return ErrorNotImplemented
 }
 

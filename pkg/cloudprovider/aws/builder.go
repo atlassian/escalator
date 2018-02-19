@@ -19,6 +19,7 @@ func (b Builder) Build() cloudprovider.CloudProvider {
 		log.Fatalln("Failed to create aws autoscaling service")
 		return nil
 	}
+	//service.Config.Region = aws.String("")
 
 	cloud := &CloudProvider{
 		service: service,

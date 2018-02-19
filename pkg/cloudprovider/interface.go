@@ -18,6 +18,9 @@ type CloudProvider interface {
 	// GetNodeGroup gets the node group from the coudprovider. Returns if it exists or not
 	GetNodeGroup(string) (NodeGroup, bool)
 
+	// RegisterNodeGroup adds the nodegroup to the list of nodes groups
+	RegisterNodeGroups(...string) error
+
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
 	Refresh() error
@@ -36,21 +39,21 @@ type NodeGroup interface {
 	ID() string
 
 	// MinSize returns minimum size of the node group.
-	MinSize() int
+	MinSize() int64
 
 	// MaxSize returns maximum size of the node group.
-	MaxSize() int
+	MaxSize() int64
 
 	// TargetSize returns the current target size of the node group. It is possible that the
 	// number of nodes in Kubernetes is different at the moment but should be equal
 	// to Size() once everything stabilizes (new nodes finish startup and registration or
 	// removed nodes are deleted completely).
-	TargetSize() (int, error)
+	TargetSize() int64
 
 	// IncreaseSize increases the size of the node group. To delete a node you need
 	// to explicitly name it and use DeleteNode. This function should wait until
 	// node group size is updated.
-	IncreaseSize(delta int) error
+	IncreaseSize(delta int64) error
 
 	// DeleteNodes deletes nodes from this node group. Error is returned either on
 	// failure or if the given node doesn't belong to this node group. This function
