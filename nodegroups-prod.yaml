@@ -2,6 +2,7 @@ node_groups:
   - name: "buildeng"
     label_key: "customer"
     label_value: "buildeng"
+    cloud_provider_asg: "buildeng.cluster-0.ap-southeast-2.kitt-integration.kitt-inf.net"
     min_nodes: 6
     max_nodes: 300
     dry_mode: true

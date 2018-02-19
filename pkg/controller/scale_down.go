@@ -18,7 +18,7 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 		log.Warningln("Reaping nodes went bad", err)
 		// continue instead of exiting, because reaping nodes is separate than tainting
 	}
-	log.Infoln("There were", removed, "nodes removed this round")
+	log.Infoln("Reaper: There were", removed, "empty nodes deleted this round")
 
 	tainted, err := c.scaleDownTaint(opts)
 	return tainted, err

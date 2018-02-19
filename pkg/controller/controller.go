@@ -31,6 +31,8 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
+	nodeGroupASG cloudprovider.NodeGroup
+
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
 }
@@ -65,18 +67,23 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		return nil
 	}
 
-	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
-	nodegroupMap := make(map[string]*NodeGroupState)
-	for _, nodeGroupOpts := range opts.NodeGroups {
-		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
-			Opts:            nodeGroupOpts,
-			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
-		}
-	}
-
 	cloud := opts.CloudProviderBuilder.Build()
 	if cloud == nil {
 		log.Fatal("Failed to create cloudprovider")
+	}
+
+	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
+	nodegroupMap := make(map[string]*NodeGroupState)
+	for _, nodeGroupOpts := range opts.NodeGroups {
+		asg, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderASG)
+		if !ok {
+			log.Fatalf("could not find asg nodegroup \"%v\" on cloudprovider", nodeGroupOpts.CloudProviderASG)
+		}
+		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
+			Opts:            nodeGroupOpts,
+			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
+			nodeGroupASG:    asg,
+		}
 	}
 
 	return &Controller{
@@ -288,7 +295,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-		log.WithField("nodegroup", nodegroup).Infoln("There were", removed, "nodes removed this round")
+		log.WithField("nodegroup", nodegroup).Infoln("Reaper: There were", removed, "empty nodes deleted this round")
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
@@ -304,6 +311,7 @@ func (c *Controller) RunOnce() {
 	// Perform the ScaleUp/Taint logic
 	for nodegroup, state := range c.nodeGroups {
 		log.Debugln("**********[START NODEGROUP]**********")
+		c.cloudProvider.Refresh()
 		c.scaleNodeGroup(nodegroup, state)
 	}
 

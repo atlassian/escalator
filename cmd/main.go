@@ -19,12 +19,13 @@ import (
 
 var (
 	loglevel            = kingpin.Flag("loglevel", "Logging level passed into logrus. 4 for info, 5 for debug.").Short('v').Default(fmt.Sprintf("%d", log.InfoLevel)).Int()
+	logfmt              = kingpin.Flag("logfmt", "Set the format of logging output. (json, ascii)").Default("ascii").Enum("ascii", "json")
 	addr                = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
 	scanInterval        = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
 	kubeConfigFile      = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
 	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups nodegroups").Required().String()
 	drymode             = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
-	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Availiable options: aws").Default("aws").String()
+	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Availiable options: (aws)").Default("aws").Enum("aws")
 )
 
 // cloudProviderBuilder builds the requested cloud provider. aws, gce, etc
@@ -122,6 +123,11 @@ func main() {
 		log.Fatalf("Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)", *loglevel)
 	}
 	log.SetLevel(log.Level(*loglevel))
+
+	if *logfmt == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
+
 	log.Infoln("Starting with log level", log.GetLevel())
 
 	nodegroups := setupNodeGroups()

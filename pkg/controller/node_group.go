@@ -72,6 +72,7 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.Name) > 0, "name cannot be empty")
 	checkThat(len(nodegroup.LabelKey) > 0, "labelkey cannot be empty")
 	checkThat(len(nodegroup.LabelValue) > 0, "labelvalue cannot be empty")
+	checkThat(len(nodegroup.CloudProviderASG) > 0, "cloudprovider nodegroup asg cannot be empty")
 
 	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent >= 0, "taint upper capacity must be larger than 0")
 	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent >= 0, "taint lower capacity must be larger than 0")

@@ -27,5 +27,7 @@ func (b Builder) Build() cloudprovider.CloudProvider {
 
 	cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupIDs...)
 
+	log.Infoln("aws session created sucessfully")
+
 	return cloud
 }
