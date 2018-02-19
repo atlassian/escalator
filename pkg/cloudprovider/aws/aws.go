@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -12,8 +13,9 @@ import (
 // ProviderName identifies this module as aws
 const ProviderName = "aws"
 
-// ErrorNotImplemented indicates that a method or function has not been implemented yet
-var ErrorNotImplemented = fmt.Errorf("method not implemented")
+func instanceToProviderID(instance *autoscaling.Instance) string {
+	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
+}
 
 // CloudProvider providers an aws cloudprovider implementation
 type CloudProvider struct {
@@ -148,38 +150,65 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 
 	size := n.Size()
 
+	// This means that a scaling action is likely to be in progress and aws will reject the new api call until it's done
 	if size != n.TargetSize() {
 		return fmt.Errorf("Must wait until size(%v) == target(%v)", size, n.TargetSize())
 	}
 
-	if size+delta > n.MaxSize() {
-		return fmt.Errorf("size increase too large - desired:%v max:%v", size+delta, n.MaxSize())
-	}
-
-	input := &autoscaling.SetDesiredCapacityInput{
-		AutoScalingGroupName: awsapi.String(n.id),
-		DesiredCapacity:      awsapi.Int64(size + delta),
-		HonorCooldown:        awsapi.Bool(true),
-	}
-
-	result, err := n.provider.service.SetDesiredCapacity(input)
-	if err != nil {
-		if err != nil {
-			log.Errorf("failed to increase asg size: %v", err)
-			return err
-		}
-	}
-
-	log.Debugln("result returned:", result)
-
-	return nil
+	return n.setASGDesiredSize(size + delta)
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
 // failure or if the given node doesn't belong to this node group. This function
 // should wait until node group size is updated.
-func (n *NodeGroup) DeleteNodes(...*v1.Node) error {
-	return ErrorNotImplemented
+func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
+	if n.Size() <= n.MinSize() {
+		return fmt.Errorf("min sized reached, nodes will not be deleted")
+	}
+
+	for _, node := range nodes {
+		if !n.Belongs(node) {
+			return fmt.Errorf("node %v belongs in a different asg than %v", node.Name, n.ID())
+		}
+
+		// find which instance this is
+		var instanceID *string
+		for _, instance := range n.asg.Instances {
+			if node.Spec.ProviderID == instanceToProviderID(instance) {
+				instanceID = instance.InstanceId
+			}
+		}
+
+		if instanceID == nil {
+			return fmt.Errorf("failed to match node id (%v) to an aws instance id", node.Spec.ProviderID)
+		}
+
+		input := &autoscaling.TerminateInstanceInAutoScalingGroupInput{
+			InstanceId:                     instanceID,
+			ShouldDecrementDesiredCapacity: awsapi.Bool(true),
+		}
+
+		result, err := n.provider.service.TerminateInstanceInAutoScalingGroup(input)
+		if err != nil {
+			return fmt.Errorf("failed to terminate instance. err: %v", err)
+		}
+		log.Debugln(result.Activity.Description)
+	}
+
+	return nil
+}
+
+// Belongs determines if the node belongs in the current node group
+func (n *NodeGroup) Belongs(node *v1.Node) bool {
+	nodeProviderID := node.Spec.ProviderID
+
+	for _, id := range n.Nodes() {
+		if id == nodeProviderID {
+			return true
+		}
+	}
+
+	return false
 }
 
 // DecreaseTargetSize decreases the target size of the node group. This function
@@ -187,11 +216,54 @@ func (n *NodeGroup) DeleteNodes(...*v1.Node) error {
 // request for new nodes that have not been yet fulfilled. Delta should be negative.
 // It is assumed that cloud provider will not delete the existing nodes when there
 // is an option to just decrease the target.
-func (n *NodeGroup) DecreaseTargetSize(delta int) error {
-	return ErrorNotImplemented
+func (n *NodeGroup) DecreaseTargetSize(delta int64) error {
+	if delta >= 0 {
+		return fmt.Errorf("size decrease delta must be negative")
+	}
+	size := n.Size()
+	nodes := n.Nodes()
+
+	if size+delta < int64(len(nodes)) {
+		return fmt.Errorf("attempt to delete existing nodes targetSize:%v delta:%v existingNodes: %v",
+			size, delta, len(nodes))
+	}
+	return n.setASGDesiredSize(size + delta)
 }
 
 // Nodes returns a list of all nodes that belong to this node group.
-func (n *NodeGroup) Nodes() ([]string, error) {
-	return nil, ErrorNotImplemented
+func (n *NodeGroup) Nodes() []string {
+	result := make([]string, 0, len(n.asg.Instances))
+	for _, instance := range n.asg.Instances {
+		result = append(result, instanceToProviderID(instance))
+	}
+
+	return result
+}
+
+// setASGDesiredSize sets the asg desired size to the new size
+func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
+	if newSize < n.MinSize() {
+		return fmt.Errorf("attempt to set desired capacity (%v) below minimum (%v)", newSize, n.MinSize())
+	}
+	if newSize > n.MaxSize() {
+		return fmt.Errorf("attempt to set desired capacity (%v) above maximum (%v)", newSize, n.MaxSize())
+	}
+
+	input := &autoscaling.SetDesiredCapacityInput{
+		AutoScalingGroupName: awsapi.String(n.id),
+		DesiredCapacity:      awsapi.Int64(newSize),
+		HonorCooldown:        awsapi.Bool(true),
+	}
+
+	result, err := n.provider.service.SetDesiredCapacity(input)
+	if err != nil {
+		if err != nil {
+			log.Errorf("failed to set asg size: %v", err)
+			return err
+		}
+	}
+
+	log.Debugln("result returned:", result)
+
+	return nil
 }

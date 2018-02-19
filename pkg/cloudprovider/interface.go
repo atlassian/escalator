@@ -6,6 +6,9 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// ErrorNotImplemented indicates that a method or function has not been implemented yet
+var ErrorNotImplemented = fmt.Errorf("method not implemented")
+
 // CloudProvider contains configuration info and functions for interacting with
 // cloud provider (GCE, AWS, etc).
 type CloudProvider interface {
@@ -55,6 +58,9 @@ type NodeGroup interface {
 	// node group size is updated.
 	IncreaseSize(delta int64) error
 
+	// Belongs determines if the node belongs in the current node group
+	Belongs(*v1.Node) bool
+
 	// DeleteNodes deletes nodes from this node group. Error is returned either on
 	// failure or if the given node doesn't belong to this node group. This function
 	// should wait until node group size is updated.
@@ -65,10 +71,10 @@ type NodeGroup interface {
 	// request for new nodes that have not been yet fulfilled. Delta should be negative.
 	// It is assumed that cloud provider will not delete the existing nodes when there
 	// is an option to just decrease the target.
-	DecreaseTargetSize(delta int) error
+	DecreaseTargetSize(delta int64) error
 
 	// Nodes returns a list of all nodes that belong to this node group.
-	Nodes() ([]string, error)
+	Nodes() []string
 }
 
 // Builder interface provides a method to build a cloudprovider
