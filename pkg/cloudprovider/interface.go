@@ -15,7 +15,7 @@ type CloudProvider interface {
 	// NodeGroups returns all node groups configured for this cloud provider.
 	NodeGroups() []NodeGroup
 
-	// Get the node group from the coudprovider. Returns if it exists or not
+	// GetNodeGroup gets the node group from the coudprovider. Returns if it exists or not
 	GetNodeGroup(string) (NodeGroup, bool)
 
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
@@ -32,7 +32,7 @@ type NodeGroup interface {
 	// Implements stringer returns a string containing all information regarding this node group.
 	fmt.Stringer
 
-	// Id returns an unique identifier of the node group.
+	// ID returns an unique identifier of the node group.
 	ID() string
 
 	// MinSize returns minimum size of the node group.
