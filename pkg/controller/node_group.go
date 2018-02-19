@@ -16,9 +16,10 @@ const DefaultNodeGroup = "default"
 // NodeGroupOptions represents a nodegroup running on our cluster
 // We differentiate nodegroups by their node label
 type NodeGroupOptions struct {
-	Name       string `json:"name,omitempty" yaml:"name,omitempty"`
-	LabelKey   string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
-	LabelValue string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
+	Name             string `json:"name,omitempty" yaml:"name,omitempty"`
+	LabelKey         string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
+	LabelValue       string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
+	CloudProviderASG string `json:"cloud_provider_asg,omitempty" yaml:"cloud_provider_asg,omitempty"`
 
 	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
 	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`

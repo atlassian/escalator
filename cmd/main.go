@@ -43,15 +43,22 @@ func (b cloudProviderBuilder) Build() cloudprovider.CloudProvider {
 	}
 }
 
-func setupCloudProvider() cloudprovider.Builder {
+// setupCloudProvider creates the cloudprovider builder with the nodegroup opts
+func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.Builder {
+	var nodegroupIDs []string
+	for _, n := range nodegroups {
+		nodegroupIDs = append(nodegroupIDs, n.CloudProviderASG)
+	}
 	cloudBuilder := cloudProviderBuilder{
 		ProviderOpts: cloudprovider.BuildOpts{
-			ProviderID: *cloudProviderID,
+			ProviderID:   *cloudProviderID,
+			NodeGroupIDs: nodegroupIDs,
 		},
 	}
 	return cloudBuilder
 }
 
+// setupNodeGroups reads and validates the nodegroupoptions
 func setupNodeGroups() []controller.NodeGroupOptions {
 	// nodegroupConfigFile is required by kingpin. Won't get to here if it's not defined
 	configFile, err := os.Open(*nodegroupConfigFile)
@@ -80,6 +87,7 @@ func setupNodeGroups() []controller.NodeGroupOptions {
 	return nodegroups
 }
 
+// setupK8SClient creates the incluster or out of cluster kubernetes config
 func setupK8SClient() kubernetes.Interface {
 	var k8sClient kubernetes.Interface
 
@@ -118,7 +126,7 @@ func main() {
 
 	nodegroups := setupNodeGroups()
 	k8sClient := setupK8SClient()
-	cloudBuilder := setupCloudProvider()
+	cloudBuilder := setupCloudProvider(nodegroups)
 
 	// global stop channel. Close signal will be sent to broadvast a shutdown to everything waiting for it to stop
 	stopChan := make(chan struct{}, 1)
