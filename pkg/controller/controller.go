@@ -240,13 +240,20 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// --- Scale Up conditions ---
 	// Need to scale up so capacity can handle requests
 	case maxPercent > nodeGroup.Opts.ScaleUpThreshholdPercent:
-		// TODO(jgonzalez): calculate nodes needed
-		// For now (dev) set it to the config revival rate
-		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
-
-		// if ScaleUpThreshholdPercent is our "max target" or  "slack capacity"
+		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThreshholdPercent
+
+		// we assume that all nodes have the same capacity
+		nodeWorth := 1.0 / float64(len(allNodes)) * 100.0
+
+		percentageNeededCPU := cpuPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
+		percentageNeededMem := memPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
+
+		nodesNeededCPU := math.Ceil(percentageNeededCPU / nodeWorth)
+		nodesNeededMem := math.Ceil(percentageNeededMem / nodeWorth)
+
+		nodesDelta = int(math.Max(nodesNeededCPU, nodesNeededMem))
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
@@ -284,6 +291,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		}
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
+		// reap any expired nodes
 		removed, err := c.TryRemoveTaintedNodes(scaleOpts{
 			nodes:               allNodes,
 			taintedNodes:        taintedNodes,
@@ -304,9 +312,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 // RunOnce performs the main autoscaler logic once
 func (c *Controller) RunOnce() {
 	startTime := time.Now()
-
-	// TODO(jgonzalez/dangot):
-	// REAPER GOES HERE
 
 	c.cloudProvider.Refresh()
 	// Perform the ScaleUp/Taint logic
