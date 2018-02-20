@@ -176,6 +176,7 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 		for _, instance := range n.asg.Instances {
 			if node.Spec.ProviderID == instanceToProviderID(instance) {
 				instanceID = instance.InstanceId
+				break
 			}
 		}
 

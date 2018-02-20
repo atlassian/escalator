@@ -308,10 +308,10 @@ func (c *Controller) RunOnce() {
 	// TODO(jgonzalez/dangot):
 	// REAPER GOES HERE
 
+	c.cloudProvider.Refresh()
 	// Perform the ScaleUp/Taint logic
 	for nodegroup, state := range c.nodeGroups {
 		log.Debugln("**********[START NODEGROUP]**********")
-		c.cloudProvider.Refresh()
 		c.scaleNodeGroup(nodegroup, state)
 	}
 
