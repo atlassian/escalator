@@ -241,14 +241,8 @@ func (n *NodeGroup) Nodes() []string {
 }
 
 // setASGDesiredSize sets the asg desired size to the new size
+// user must make sure that newSize is not out of bounds of the asg
 func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
-	if newSize < n.MinSize() {
-		return fmt.Errorf("attempt to set desired capacity (%v) below minimum (%v)", newSize, n.MinSize())
-	}
-	if newSize > n.MaxSize() {
-		return fmt.Errorf("attempt to set desired capacity (%v) above maximum (%v)", newSize, n.MaxSize())
-	}
-
 	input := &autoscaling.SetDesiredCapacityInput{
 		AutoScalingGroupName: awsapi.String(n.id),
 		DesiredCapacity:      awsapi.Int64(newSize),
