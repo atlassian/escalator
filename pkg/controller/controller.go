@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"k8s.io/api/core/v1"
@@ -20,6 +21,8 @@ type Controller struct {
 	Opts     Opts
 	stopChan <-chan struct{}
 
+	cloudProvider cloudprovider.CloudProvider
+
 	nodeGroups map[string]*NodeGroupState
 }
 
@@ -28,14 +31,17 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
+	nodeGroupASG cloudprovider.NodeGroup
+
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
 }
 
 // Opts provide the Controller with config for runtime
 type Opts struct {
-	K8SClient  kubernetes.Interface
-	NodeGroups []NodeGroupOptions
+	K8SClient            kubernetes.Interface
+	NodeGroups           []NodeGroupOptions
+	CloudProviderBuilder cloudprovider.Builder
 
 	ScanInterval time.Duration
 	DryMode      bool
@@ -61,20 +67,31 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		return nil
 	}
 
+	cloud := opts.CloudProviderBuilder.Build()
+	if cloud == nil {
+		log.Fatal("Failed to create cloudprovider")
+	}
+
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
 	nodegroupMap := make(map[string]*NodeGroupState)
 	for _, nodeGroupOpts := range opts.NodeGroups {
+		asg, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderASG)
+		if !ok {
+			log.Fatalf("could not find asg nodegroup \"%v\" on cloudprovider", nodeGroupOpts.CloudProviderASG)
+		}
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
+			nodeGroupASG:    asg,
 		}
 	}
 
 	return &Controller{
-		Client:     client,
-		Opts:       opts,
-		stopChan:   stopChan,
-		nodeGroups: nodegroupMap,
+		Client:        client,
+		Opts:          opts,
+		stopChan:      stopChan,
+		cloudProvider: cloud,
+		nodeGroups:    nodegroupMap,
 	}
 }
 
@@ -286,7 +303,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-		log.WithField("nodegroup", nodegroup).Infoln("There were", removed, "nodes removed this round")
+		log.WithField("nodegroup", nodegroup).Infoln("Reaper: There were", removed, "empty nodes deleted this round")
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
@@ -296,6 +313,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 func (c *Controller) RunOnce() {
 	startTime := time.Now()
 
+	c.cloudProvider.Refresh()
 	// Perform the ScaleUp/Taint logic
 	for nodegroup, state := range c.nodeGroups {
 		log.Debugln("**********[START NODEGROUP]**********")
