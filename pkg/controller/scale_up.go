@@ -10,6 +10,11 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// TODO:(jgonzalez/aprice)
+// Keep track of upcoming nodes and count them in the capacity calculation
+// Make sure to not continue counting them (separately) once they are up
+// When a node is being reaped. make sure to not count that in calcuations. (don't retaint it or untaint it)
+
 // ScaleUp performs the untaint and incrase asg logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	nodesToAdd := opts.nodesDelta
