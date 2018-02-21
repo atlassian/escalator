@@ -31,7 +31,7 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
-	nodeGroupASG cloudprovider.NodeGroup
+	ASG cloudprovider.NodeGroup
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
@@ -82,7 +82,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
-			nodeGroupASG:    asg,
+			ASG:             asg,
 		}
 	}
 
