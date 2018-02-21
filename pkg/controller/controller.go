@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"math"
 	"time"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
 
 	log "github.com/sirupsen/logrus"
@@ -98,16 +96,6 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
 func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 	return c.Opts.DryMode || nodeGroup.Opts.DryMode
-}
-
-// calcPercentUsage helper works out the percentage of cpu and mem for request/capacity
-func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
-	if cpuA.MilliValue() == 0 || memA.MilliValue() == 0 {
-		return 0, 0, errors.New("Cannot divide by zero in percent calculation")
-	}
-	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
-	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
-	return cpuPercent, memPercent, nil
 }
 
 // filterNodes separates nodes between tainted and untainted nodes
@@ -243,17 +231,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThreshholdPercent
-
-		// we assume that all nodes have the same capacity
-		nodeWorth := 1.0 / float64(len(allNodes)) * 100.0
-
-		percentageNeededCPU := cpuPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
-		percentageNeededMem := memPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
-
-		nodesNeededCPU := math.Ceil(percentageNeededCPU / nodeWorth)
-		nodesNeededMem := math.Ceil(percentageNeededMem / nodeWorth)
-
-		nodesDelta = int(math.Max(nodesNeededCPU, nodesNeededMem))
+		nodesDelta, err = calcScaleUpDelta(allNodes, cpuPercent, memPercent, nodeGroup)
+		if err != nil {
+			log.Errorf("Failed to calculate node delta: %v", err)
+			return
+		}
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)

@@ -145,6 +145,16 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 	return node
 }
 
+// BuildTestNodes creates multiple nodes with the specified capacity
+func BuildTestNodes(amount int, opts NodeOpts) []*apiv1.Node {
+	var nodes []*apiv1.Node
+	for i := 0; i < amount; i++ {
+		opts.Name = fmt.Sprintf("n%d", i)
+		nodes = append(nodes, BuildTestNode(opts))
+	}
+	return nodes
+}
+
 // PodOpts are options for a pod
 type PodOpts struct {
 	Name              string
