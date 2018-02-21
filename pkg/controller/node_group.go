@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"k8s.io/api/core/v1"
@@ -33,6 +34,13 @@ type NodeGroupOptions struct {
 
 	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
 	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
+
+	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
+	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
+
+	// Private variables for storing the parsed duration from the string
+	softDeleteGracePeriodDuration time.Duration
+	hardDeleteGracePeriodDuration time.Duration
 
 	// DEPRECATED
 	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
@@ -90,7 +98,40 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent == 0, "UntaintLowerCapacityThreshholdPercent is deprecated. please use ScaleUpThreshholdPercent")
 	checkThat(nodegroup.UntaintUpperCapacityThreshholdPercent == 0, "UntaintUpperCapacityThreshholdPercent is deprecated. please use ScaleUpThreshholdPercent")
 
+	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft grace period must not be empty")
+	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard grace period must not be empty")
+
+	checkThat(nodegroup.SoftDeleteGracePeriodDuration() > 0, "soft grace period failed to parse into a time.Duration. check your formatting.")
+	checkThat(nodegroup.HardDeleteGracePeriodDuration() > 0, "hard grace period failed to parse into a time.Duration. check your formatting.")
+	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft grace period must be less than hard grace period")
+
 	return problems
+}
+
+// SoftDeleteGracePeriodDuration lazily returns/parses the softDeleteGracePeriod string into a duration
+func (n *NodeGroupOptions) SoftDeleteGracePeriodDuration() time.Duration {
+	if n.softDeleteGracePeriodDuration == 0 {
+		duration, err := time.ParseDuration(n.SoftDeleteGracePeriod)
+		if err != nil {
+			return 0
+		}
+		n.softDeleteGracePeriodDuration = duration
+	}
+
+	return n.softDeleteGracePeriodDuration
+}
+
+// HardDeleteGracePeriodDuration lazily returns/parses the hardDeleteGracePeriodDuration string into a duration
+func (n *NodeGroupOptions) HardDeleteGracePeriodDuration() time.Duration {
+	if n.hardDeleteGracePeriodDuration == 0 {
+		duration, err := time.ParseDuration(n.HardDeleteGracePeriod)
+		if err != nil {
+			return 0
+		}
+		n.hardDeleteGracePeriodDuration = duration
+	}
+
+	return n.hardDeleteGracePeriodDuration
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
