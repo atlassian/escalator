@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -39,7 +40,20 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*sched
 }
 
 // NodeEmpty returns if the node is empty of pods, except for daemonsets
-func NodeEmpty(node *v1.Node) bool {
+func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*schedulercache.NodeInfo) bool {
+	nodeInfo, ok := nodeInfoMap[node.Name]
+	if !ok {
+		log.Warningln("could not find node %v in the nodeinfo map", node.Name)
+		return false
+	}
 
-	return false
+	// check all the pods and make sure they're daemonsets
+	// otherwise there are sacred pods still on the node
+	for _, pod := range nodeInfo.Pods() {
+		if !PodIsDaemonSet(pod) {
+			return false
+		}
+	}
+
+	return true
 }

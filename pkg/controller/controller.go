@@ -5,6 +5,8 @@ import (
 	"math"
 	"time"
 
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
@@ -30,6 +32,8 @@ type Controller struct {
 type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
+
+	NodeInfos map[string]*schedulercache.NodeInfo
 
 	ASG cloudprovider.NodeGroup
 
@@ -191,6 +195,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		)
 		return
 	}
+
+	// update the map of node to nodeinfo
+	// for working out which pods are on which nodes
+	nodeGroup.NodeInfos = k8s.CreateNodeNameToInfoMap(pods, allNodes)
 
 	// Calc capacity for untainted nodes
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)

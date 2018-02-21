@@ -32,29 +32,44 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		// if the time the node was tainted is larger than the hard period then it is deleted no matter what
 		// if the soft time is passed and the node is empty (exlcuding daemonsets) then it can be deleted
 		taintedTime, err := k8s.GetToBeRemovedTime(candidate)
-		if err != nil {
-			log.WithError(err).Errorf("unable to get tainted time from node %v", candidate.Name)
+		if err != nil || taintedTime == nil {
+			log.WithError(err).Errorf("unable to get tainted time from node %v. Ignore if running in drymode", candidate.Name)
 			continue
 		}
 
 		now := time.Now()
-		if now.Sub(*taintedTime) < opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
-			if k8s.NodeEmpty(candidate) || now.Sub(*taintedTime) < opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
+		if now.Sub(*taintedTime) > opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
+			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfos) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
 				// Cordon the node first so it isn't counted in the listed nodes anymore
-				cordonedNode, err := k8s.Cordon(candidate, c.Client)
-				if err != nil {
-					log.WithError(err).Errorf("Failed to cordon node %v before deleting from asg", err)
-					continue
+				drymode := c.dryMode(opts.nodeGroup)
+				log.WithField("drymode", drymode).Infof("cordoning node %v before deletion", candidate.Name)
+				if !drymode {
+					cordonedNode, err := k8s.Cordon(candidate, c.Client)
+					if err != nil {
+						log.WithError(err).Errorf("Failed to cordon node %v before deleting from asg.", err)
+						continue
+					}
+					toBeDeleted = append(toBeDeleted, cordonedNode)
 				}
-				toBeDeleted = append(toBeDeleted, cordonedNode)
+			} else {
+				log.Debugf("node %v not ready for deletion", candidate.Name)
 			}
+		} else {
+			log.Debugf("node %v not ready for deletion yet. Time remaining %v",
+				candidate.Name,
+				opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration()-now.Sub(*taintedTime),
+			)
 		}
 	}
 
 	// Terminate the nodes >:)
-	opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
+	err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
+	if err != nil {
+		log.WithError(err).Errorln("Failed to delete nodes ", toBeDeleted)
+	}
+	log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
 
-	return 0, nil
+	return len(toBeDeleted), nil
 }
 
 func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {

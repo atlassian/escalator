@@ -31,6 +31,5 @@ func Cordon(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) 
 	}
 
 	log.Infof("Successfully added cordon on node %v", updatedNodeWithCordon.Name)
-	IncrementTaintCount()
 	return updatedNodeWithCordon, nil
 }

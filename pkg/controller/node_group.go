@@ -147,10 +147,8 @@ type NodeGroupLister struct {
 func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 	return func(pod *v1.Pod) bool {
 		// Filter out DaemonSets in our calcuation
-		for _, ownerrefence := range pod.ObjectMeta.OwnerReferences {
-			if ownerrefence.Kind == "DaemonSet" {
-				return false
-			}
+		if k8s.PodIsDaemonSet(pod) {
+			return false
 		}
 
 		// check the node selector
@@ -197,6 +195,10 @@ func NewPodDefaultFilterFunc() k8s.PodFilterFunc {
 // NewNodeLabelFilterFunc creates a new NodeFilterFunc based on filtering by node labels
 func NewNodeLabelFilterFunc(labelKey, labelValue string) k8s.NodeFilterFunc {
 	return func(node *v1.Node) bool {
+		if node.Spec.Unschedulable {
+			return false
+		}
+
 		if value, ok := node.ObjectMeta.Labels[labelKey]; ok {
 			if value == labelValue {
 				return true
