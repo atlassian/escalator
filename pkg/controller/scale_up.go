@@ -50,7 +50,8 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 			log.Errorf("Failed to add nodes because of an error. Skipping ASG scaleup: %v", err)
 			return 0, err
 		}
-		return added, nil
+		opts.nodeGroup.upcommingNodes = added
+		return untainted + added, nil
 	}
 
 	return untainted, nil
@@ -68,7 +69,10 @@ func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
 			Infof("increasing asg by %v", nodesToAdd)
 
 		if !drymode {
-			opts.nodeGroup.ASG.IncreaseSize(nodesToAdd)
+			err := opts.nodeGroup.ASG.IncreaseSize(nodesToAdd)
+			if err != nil {
+				return 0, err
+			}
 		}
 	} else {
 		return 0, fmt.Errorf("adding %v nodes would breach max asg size (%v)", nodesToAdd, opts.nodeGroup.ASG.MaxSize())

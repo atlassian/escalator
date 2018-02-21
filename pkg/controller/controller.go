@@ -33,6 +33,10 @@ type NodeGroupState struct {
 
 	ASG cloudprovider.NodeGroup
 
+	// upcommingNodes used to keep track of how many nodes are currently
+	// being created by the asg and won't appear as nodes
+	upcommingNodes int
+
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
 }
@@ -203,6 +207,24 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.Errorf("Failed to calculate capacity: %v", err)
 		return
 	}
+
+	// FIXME: this doesn't really work as the ASG increases the size before the node is fully ready and on kube
+	// log.WithField("nodegroup", nodegroup).Debugf("there are %v upcomming nodes requested", nodeGroup.upcommingNodes)
+	// if nodeGroup.upcommingNodes > 0 {
+	// 	upcommingDelta := int(nodeGroup.ASG.TargetSize() - nodeGroup.ASG.Size())
+	// 	// asg has stabilised
+	// 	if upcommingDelta == 0 {
+	// 		log.WithField("nodegroup", nodegroup).Infof("asg has stabilised at %v nodes", nodeGroup.ASG.Size())
+	// 		nodeGroup.upcommingNodes = 0
+	// 	} else if upcommingDelta > 0 {
+	// 		// add these upcomming nodes to the capacity
+	// 		log.WithField("nodegroup", nodegroup).Infof("adding capacity for %v nodes", upcommingDelta)
+	// 		for i := 0; i < upcommingDelta; i++ {
+	// 			memCapacity.Add(*allNodes[0].Status.Allocatable.Memory())
+	// 			cpuCapacity.Add(*allNodes[0].Status.Allocatable.Cpu())
+	// 		}
+	// 	}
+	// }
 
 	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
