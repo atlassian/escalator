@@ -38,9 +38,12 @@ type NodeGroupOptions struct {
 	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 
+	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration time.Duration
 	hardDeleteGracePeriodDuration time.Duration
+	scaleUpCoolDownPeriodDuration time.Duration
 
 	// DEPRECATED
 	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
@@ -100,10 +103,13 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 
 	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft grace period must not be empty")
 	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard grace period must not be empty")
+	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale up cooldown period must not be empty")
 
 	checkThat(nodegroup.SoftDeleteGracePeriodDuration() > 0, "soft grace period failed to parse into a time.Duration. check your formatting.")
 	checkThat(nodegroup.HardDeleteGracePeriodDuration() > 0, "hard grace period failed to parse into a time.Duration. check your formatting.")
 	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft grace period must be less than hard grace period")
+
+	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() >= 0, "scale up cooldown period duration must be positive")
 
 	return problems
 }
@@ -132,6 +138,19 @@ func (n *NodeGroupOptions) HardDeleteGracePeriodDuration() time.Duration {
 	}
 
 	return n.hardDeleteGracePeriodDuration
+}
+
+// ScaleUpCoolDownPeriodDuration lazily returns/parses the scaleUpCoolDownPeriod string into a duration
+func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
+	if n.scaleUpCoolDownPeriodDuration == 0 {
+		duration, err := time.ParseDuration(n.ScaleUpCoolDownPeriod)
+		if err != nil {
+			return 0
+		}
+		n.scaleUpCoolDownPeriodDuration = duration
+	}
+
+	return n.scaleUpCoolDownPeriodDuration
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
