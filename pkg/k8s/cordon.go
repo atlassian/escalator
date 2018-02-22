@@ -9,52 +9,27 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// Cordon cordons the node
+// Cordon sets the cordoned state of the node to cordon boolean
 // returns the latest update of the node
-func Cordon(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
+func Cordon(cordon bool, node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
 	// fetch the latest version of the node to avoid conflict
 	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
 		return node, fmt.Errorf("failed to get node %v: %v", node.Name, err)
 	}
 
-	// check if already cordoned
-	if node.Spec.Unschedulable {
+	// check if already un/cordoned
+	if node.Spec.Unschedulable == cordon {
 		return updatedNode, nil
 	}
 
-	node.Spec.Unschedulable = true
+	node.Spec.Unschedulable = cordon
 
 	updatedNodeWithCordon, err := client.CoreV1().Nodes().Update(updatedNode)
 	if err != nil || updatedNodeWithCordon == nil {
-		return updatedNode, fmt.Errorf("failed to update node %v after adding cordon: %v", updatedNode.Name, err)
+		return updatedNode, fmt.Errorf("failed to update node %v after setting cordon to %v: %v", updatedNode.Name, cordon, err)
 	}
 
-	log.Infof("Successfully added cordon on node %v", updatedNodeWithCordon.Name)
+	log.Infof("Successfully changed cordon state on node %v", updatedNodeWithCordon.Name)
 	return updatedNodeWithCordon, nil
-}
-
-// Uncordon uncordons the node
-// returns the latest update of the node
-func Uncordon(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
-	// fetch the latest version of the node to avoid conflict
-	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
-	if err != nil || updatedNode == nil {
-		return node, fmt.Errorf("failed to get node %v: %v", node.Name, err)
-	}
-
-	// check if already uncordoned
-	if !node.Spec.Unschedulable {
-		return updatedNode, nil
-	}
-
-	node.Spec.Unschedulable = false
-
-	updatedNodeWithoutCordon, err := client.CoreV1().Nodes().Update(updatedNode)
-	if err != nil || updatedNodeWithoutCordon == nil {
-		return updatedNode, fmt.Errorf("failed to update node %v after adding cordon: %v", updatedNode.Name, err)
-	}
-
-	log.Infof("Successfully removed cordon from node %v", updatedNodeWithoutCordon.Name)
-	return updatedNodeWithoutCordon, nil
 }

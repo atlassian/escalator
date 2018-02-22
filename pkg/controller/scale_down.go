@@ -44,7 +44,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 				drymode := c.dryMode(opts.nodeGroup)
 				log.WithField("drymode", drymode).Infof("cordoning node %v before deletion", candidate.Name)
 				if !drymode {
-					cordonedNode, err := k8s.Cordon(candidate, c.Client)
+					cordonedNode, err := k8s.Cordon(true, candidate, c.Client)
 					if err != nil {
 						log.WithError(err).Errorf("Failed to cordon node %v before deleting from asg.", err)
 						continue
@@ -68,7 +68,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		if err != nil {
 			log.WithError(err).Errorln("Failed to delete nodes. Uncordoning them to be safe", toBeDeleted)
 			for _, node := range toBeDeleted {
-				node, err = k8s.Uncordon(node, c.Client)
+				node, err = k8s.Cordon(false, node, c.Client)
 			}
 			return 0, err
 		}
