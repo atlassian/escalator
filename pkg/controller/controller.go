@@ -266,48 +266,36 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
 
+	scaleOptions := scaleOpts{
+		nodes:               allNodes,
+		taintedNodes:        taintedNodes,
+		untaintedNodes:      untaintedNodes,
+		pods:                pods,
+		nodeGroup:           nodeGroup,
+		clusterUsagePercent: maxPercent,
+	}
+
 	// Clamp the nodes inside the min and max node count
 	var nodesDeltaResult int
 	switch {
 	case nodesDelta < 0:
 		// Try to scale down
-		nodesDeltaResult, err = c.ScaleDown(scaleOpts{
-			nodes:               allNodes,
-			taintedNodes:        taintedNodes,
-			untaintedNodes:      untaintedNodes,
-			pods:                pods,
-			nodeGroup:           nodeGroup,
-			clusterUsagePercent: maxPercent,
-			nodesDelta:          -nodesDelta,
-		})
+		scaleOptions.nodesDelta = -nodesDelta
+		nodesDeltaResult, err = c.ScaleDown(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	case nodesDelta > 0:
 		// Try to scale up
-		nodesDeltaResult, err = c.ScaleUp(scaleOpts{
-			nodes:               allNodes,
-			taintedNodes:        taintedNodes,
-			untaintedNodes:      untaintedNodes,
-			pods:                pods,
-			nodeGroup:           nodeGroup,
-			clusterUsagePercent: maxPercent,
-			nodesDelta:          nodesDelta,
-		})
+		scaleOptions.nodesDelta = nodesDelta
+		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
 		// reap any expired nodes
-		removed, err := c.TryRemoveTaintedNodes(scaleOpts{
-			nodes:               allNodes,
-			taintedNodes:        taintedNodes,
-			untaintedNodes:      untaintedNodes,
-			pods:                pods,
-			nodeGroup:           nodeGroup,
-			clusterUsagePercent: maxPercent,
-		})
+		removed, err := c.TryRemoveTaintedNodes(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}

@@ -62,16 +62,18 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		}
 	}
 
-	// Terminate the nodes >:)
-	err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
-	if err != nil {
-		log.WithError(err).Errorln("Failed to delete nodes. Uncordoning them to be safe", toBeDeleted)
-		for _, node := range toBeDeleted {
-			node, err = k8s.Uncordon(node, c.Client)
+	if len(toBeDeleted) > 0 {
+		// Terminate the nodes >:)
+		err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
+		if err != nil {
+			log.WithError(err).Errorln("Failed to delete nodes. Uncordoning them to be safe", toBeDeleted)
+			for _, node := range toBeDeleted {
+				node, err = k8s.Uncordon(node, c.Client)
+			}
+			return 0, err
 		}
-		return 0, err
+		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
 	}
-	log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
 
 	return len(toBeDeleted), nil
 }
