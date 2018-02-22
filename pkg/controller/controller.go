@@ -37,6 +37,8 @@ type NodeGroupState struct {
 
 	ASG cloudprovider.NodeGroup
 
+	upcommingNodes int
+
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
 }
