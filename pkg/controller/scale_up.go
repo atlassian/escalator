@@ -50,7 +50,7 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 			log.Errorf("Failed to add nodes because of an error. Skipping ASG scaleup: %v", err)
 			return 0, err
 		}
-		opts.nodeGroup.upcommingNodes = added
+		//opts.nodeGroup.upcommingNodes = added
 		return untainted + added, nil
 	}
 
