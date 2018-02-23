@@ -37,7 +37,7 @@ type NodeGroupState struct {
 
 	ASG cloudprovider.NodeGroup
 
-	upcommingNodes int
+	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
@@ -89,6 +89,11 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
 			ASG:             asg,
+			// Setup the scaleLock timeouts for this nodegroup
+			scaleUpLock: scaleLock{
+				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
+				maximumLockDuration: nodeGroupOpts.ScaleUpCoolDownTimeoutDuration(),
+			},
 		}
 	}
 
@@ -214,23 +219,13 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		return
 	}
 
-	// FIXME: this doesn't really work as the ASG increases the size before the node is fully ready and on kube
-	// log.WithField("nodegroup", nodegroup).Debugf("there are %v upcomming nodes requested", nodeGroup.upcommingNodes)
-	// if nodeGroup.upcommingNodes > 0 {
-	// 	upcommingDelta := int(nodeGroup.ASG.TargetSize() - nodeGroup.ASG.Size())
-	// 	// asg has stabilised
-	// 	if upcommingDelta == 0 {
-	// 		log.WithField("nodegroup", nodegroup).Infof("asg has stabilised at %v nodes", nodeGroup.ASG.Size())
-	// 		nodeGroup.upcommingNodes = 0
-	// 	} else if upcommingDelta > 0 {
-	// 		// add these upcomming nodes to the capacity
-	// 		log.WithField("nodegroup", nodegroup).Infof("adding capacity for %v nodes", upcommingDelta)
-	// 		for i := 0; i < upcommingDelta; i++ {
-	// 			memCapacity.Add(*allNodes[0].Status.Allocatable.Memory())
-	// 			cpuCapacity.Add(*allNodes[0].Status.Allocatable.Cpu())
-	// 		}
-	// 	}
-	// }
+	log.WithField("nodegroup", nodegroup).Debugf("there are %v upcomming nodes requested", nodeGroup.scaleUpLock.requestedNodes)
+	if nodeGroup.scaleUpLock.locked() {
+		// perform the upcomming node check
+		log.WithField("nodegroup", nodegroup).Infoln("waiting for scale to finish. entering scale lock check")
+
+		return
+	}
 
 	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
