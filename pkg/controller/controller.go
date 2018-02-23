@@ -353,8 +353,9 @@ func (c *Controller) RunOnce() {
 	// try refresh cred a few times if they go stale
 	// rebuild will create a new session from the metadata on the box
 	err := c.cloudProvider.Refresh()
-	for i := 0; i < 2 || err != nil; i++ {
+	for i := 0; i < 2 && err != nil; i++ {
 		log.Warnf("cloudprovider failed to refresh. trying to refetch credentials. tries = %v", i+1)
+		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
 		c.cloudProvider = c.Opts.CloudProviderBuilder.Build()
 		err = c.cloudProvider.Refresh()
 	}
