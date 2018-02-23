@@ -262,7 +262,7 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 	}
 }
 
-// BuildNodeGroupsStateWithClient builds a node group state
+// BuildNodeGroupsState builds a node group state
 func BuildNodeGroupsState(nodeGroups []NodeGroupOptions) map[string]*NodeGroupState {
 	nodeGroupsState := make(map[string]*NodeGroupState)
 	for _, ng := range nodeGroups {
