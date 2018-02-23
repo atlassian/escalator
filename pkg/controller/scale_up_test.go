@@ -51,12 +51,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			DryMode:  false,
 		},
 	}
-	nodeGroupsState := make(map[string]*NodeGroupState)
-	for _, ng := range nodeGroups {
-		nodeGroupsState[ng.Name] = &NodeGroupState{
-			Opts: ng,
-		}
-	}
+	nodeGroupsState := BuildNodeGroupsState(nodeGroups)
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
 	opts := Opts{

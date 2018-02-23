@@ -145,7 +145,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 	return node
 }
 
-// BuildTestNodes creates multiple nodes with the specified capacity
+// BuildTestNodes creates multiple nodes with the same options
 func BuildTestNodes(amount int, opts NodeOpts) []*apiv1.Node {
 	var nodes []*apiv1.Node
 	for i := 0; i < amount; i++ {
@@ -239,4 +239,14 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 	}
 
 	return pod
+}
+
+// BuildTestPods creates multiple pods with the same options
+func BuildTestPods(amount int, opts PodOpts) []*apiv1.Pod {
+	var pods []*apiv1.Pod
+	for i := 0; i < amount; i++ {
+		opts.Name = fmt.Sprintf("p%d", i)
+		pods = append(pods, BuildTestPod(opts))
+	}
+	return pods
 }
