@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
@@ -26,7 +27,55 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 
 // TryRemoveTaintedNodes attempts to remove nodes are tainted and empty or have passed their grace period
 func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
-	return 0, nil
+	var toBeDeleted []*v1.Node
+	for _, candidate := range opts.taintedNodes {
+		// if the time the node was tainted is larger than the hard period then it is deleted no matter what
+		// if the soft time is passed and the node is empty (exlcuding daemonsets) then it can be deleted
+		taintedTime, err := k8s.GetToBeRemovedTime(candidate)
+		if err != nil || taintedTime == nil {
+			log.WithError(err).Errorf("unable to get tainted time from node %v. Ignore if running in drymode", candidate.Name)
+			continue
+		}
+
+		now := time.Now()
+		if now.Sub(*taintedTime) > opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
+			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfos) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
+				// Cordon the node first so it isn't counted in the listed nodes anymore
+				drymode := c.dryMode(opts.nodeGroup)
+				log.WithField("drymode", drymode).Infof("cordoning node %v before deletion", candidate.Name)
+				if !drymode {
+					cordonedNode, err := k8s.Cordon(true, candidate, c.Client)
+					if err != nil {
+						log.WithError(err).Errorf("Failed to cordon node %v before deleting from asg.", err)
+						continue
+					}
+					toBeDeleted = append(toBeDeleted, cordonedNode)
+				}
+			} else {
+				log.Debugf("node %v not ready for deletion", candidate.Name)
+			}
+		} else {
+			log.Debugf("node %v not ready for deletion yet. Time remaining %v",
+				candidate.Name,
+				opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration()-now.Sub(*taintedTime),
+			)
+		}
+	}
+
+	if len(toBeDeleted) > 0 {
+		// Terminate the nodes >:)
+		err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
+		if err != nil {
+			log.WithError(err).Errorln("Failed to delete nodes. Uncordoning them to be safe", toBeDeleted)
+			for _, node := range toBeDeleted {
+				node, err = k8s.Cordon(false, node, c.Client)
+			}
+			return 0, err
+		}
+		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
+	}
+
+	return len(toBeDeleted), nil
 }
 
 func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {

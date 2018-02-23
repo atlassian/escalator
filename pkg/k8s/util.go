@@ -5,6 +5,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+// PodIsDaemonSet returns if the pod is a daemonset or not
+func PodIsDaemonSet(pod *v1.Pod) bool {
+	for _, ownerrefence := range pod.ObjectMeta.OwnerReferences {
+		if ownerrefence.Kind == "DaemonSet" {
+			return true
+		}
+	}
+	return false
+}
+
 // CalculatePodsRequestsTotal returns the total capacity of all pods
 func CalculatePodsRequestsTotal(pods []*v1.Pod) (resource.Quantity, resource.Quantity, error) {
 	var memoryRequest resource.Quantity

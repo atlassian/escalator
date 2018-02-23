@@ -4,6 +4,8 @@ import (
 	"math"
 	"time"
 
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
@@ -30,7 +32,9 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
-	nodeGroupASG cloudprovider.NodeGroup
+	NodeInfos map[string]*schedulercache.NodeInfo
+
+	ASG cloudprovider.NodeGroup
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
@@ -81,7 +85,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
-			nodeGroupASG:    asg,
+			ASG:             asg,
 		}
 	}
 
@@ -184,6 +188,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		return 0, err
 	}
 
+	// update the map of node to nodeinfo
+	// for working out which pods are on which nodes
+	nodeGroup.NodeInfos = k8s.CreateNodeNameToInfoMap(pods, allNodes)
+
 	// Calc capacity for untainted nodes
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
 	if err != nil {
@@ -244,48 +252,36 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
 
+	scaleOptions := scaleOpts{
+		nodes:               allNodes,
+		taintedNodes:        taintedNodes,
+		untaintedNodes:      untaintedNodes,
+		pods:                pods,
+		nodeGroup:           nodeGroup,
+		clusterUsagePercent: maxPercent,
+	}
+
 	// Clamp the nodes inside the min and max node count
 	var nodesDeltaResult int
 	switch {
 	case nodesDelta < 0:
 		// Try to scale down
-		nodesDeltaResult, err = c.ScaleDown(scaleOpts{
-			nodes:               allNodes,
-			taintedNodes:        taintedNodes,
-			untaintedNodes:      untaintedNodes,
-			pods:                pods,
-			nodeGroup:           nodeGroup,
-			clusterUsagePercent: maxPercent,
-			nodesDelta:          -nodesDelta,
-		})
+		scaleOptions.nodesDelta = -nodesDelta
+		nodesDeltaResult, err = c.ScaleDown(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	case nodesDelta > 0:
 		// Try to scale up
-		nodesDeltaResult, err = c.ScaleUp(scaleOpts{
-			nodes:               allNodes,
-			taintedNodes:        taintedNodes,
-			untaintedNodes:      untaintedNodes,
-			pods:                pods,
-			nodeGroup:           nodeGroup,
-			clusterUsagePercent: maxPercent,
-			nodesDelta:          nodesDelta,
-		})
+		scaleOptions.nodesDelta = nodesDelta
+		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
 		// reap any expired nodes
-		removed, err := c.TryRemoveTaintedNodes(scaleOpts{
-			nodes:               allNodes,
-			taintedNodes:        taintedNodes,
-			untaintedNodes:      untaintedNodes,
-			pods:                pods,
-			nodeGroup:           nodeGroup,
-			clusterUsagePercent: maxPercent,
-		})
+		removed, err := c.TryRemoveTaintedNodes(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}

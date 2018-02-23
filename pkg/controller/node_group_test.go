@@ -3,6 +3,7 @@ package controller_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/test"
@@ -317,6 +318,9 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.Equal(t, 5, opts[0].MinNodes)
 		assert.Equal(t, 300, opts[0].MaxNodes)
 		assert.Equal(t, true, opts[0].DryMode)
+		assert.Equal(t, "10m", opts[0].SoftDeleteGracePeriod)
+		assert.Equal(t, time.Minute*10, opts[0].SoftDeleteGracePeriodDuration())
+		assert.Equal(t, time.Duration(0), opts[0].HardDeleteGracePeriodDuration())
 
 		assert.NotNil(t, opts[1])
 		assert.Equal(t, "default", opts[1].Name)
@@ -372,6 +376,8 @@ node_groups:
     fast_node_removal_rate: 3
     slow_node_revival_rate: 2
     fast_node_revival_rate: 3
+    soft_delete_grace_period: 10m
+    hard_delete_grace_period: 42
   - name: "default"
     label_key: "customer"
     label_value: "shared"
@@ -428,8 +434,8 @@ func TestValidateNodeGroup(t *testing.T) {
 					MaxNodes:                            3,
 					SlowNodeRemovalRate:                 1,
 					FastNodeRemovalRate:                 2,
-					SlowNodeRevivalRate:                 1,
-					FastNodeRevivalRate:                 2,
+					SoftDeleteGracePeriod:               "10m",
+					HardDeleteGracePeriod:               "1h10m",
 				},
 			},
 			nil,
@@ -449,14 +455,15 @@ func TestValidateNodeGroup(t *testing.T) {
 					MaxNodes:                            0,
 					SlowNodeRemovalRate:                 1,
 					FastNodeRemovalRate:                 2,
-					SlowNodeRevivalRate:                 1,
-					FastNodeRevivalRate:                 2,
+					SoftDeleteGracePeriod:               "10",
+					HardDeleteGracePeriod:               "1h10m",
 				},
 			},
 			[]string{
 				"name cannot be empty",
 				"lower taint threshhold must be lower than upper taint threshold",
 				"min nodes must be smaller than max nodes",
+				"soft grace period failed to parse into a time.Duration. check your formatting.",
 			},
 		},
 	}

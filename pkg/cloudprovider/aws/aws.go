@@ -193,7 +193,7 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to terminate instance. err: %v", err)
 		}
-		log.Debugln(result.Activity.Description)
+		log.Debugln(*result.Activity.Description)
 	}
 
 	return nil
