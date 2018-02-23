@@ -12,3 +12,7 @@ docker-build:
 docker-push: build
 	docker push $(IMAGE_NAME):$(GIT_HASH)
 	echo $(IMAGE_NAME):$(GIT_HASH) is READDY.
+
+.PHONY: test
+test:
+	go test ./... -cover

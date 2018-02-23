@@ -49,6 +49,7 @@ type NodeGroupOptions struct {
 
 	// DEPRECATED
 	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
+	// DEPRECATED
 	UntaintLowerCapacityThreshholdPercent int `json:"untaint_lower_capacity_threshhold_percent,omitempty" yaml:"untaint_lower_capacity_threshhold_percent,omitempty"`
 	SlowNodeRevivalRate                   int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
 	FastNodeRevivalRate                   int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
@@ -259,4 +260,27 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 		k8s.NewFilteredPodsLister(allPodsLister, NewPodDefaultFilterFunc()),
 		k8s.NewFilteredNodesLister(allNodesLister, NewNodeLabelFilterFunc(nodeGroup.LabelKey, nodeGroup.LabelValue)),
 	}
+}
+
+// BuildNodeGroupsStateWithClient builds a node group state
+func BuildNodeGroupsState(nodeGroups []NodeGroupOptions) map[string]*NodeGroupState {
+	nodeGroupsState := make(map[string]*NodeGroupState)
+	for _, ng := range nodeGroups {
+		nodeGroupsState[ng.Name] = &NodeGroupState{
+			Opts: ng,
+		}
+	}
+	return nodeGroupsState
+}
+
+// BuildNodeGroupsStateWithClient builds a node group state with the client listers
+func BuildNodeGroupsStateWithClient(nodeGroups []NodeGroupOptions, client Client) map[string]*NodeGroupState {
+	nodeGroupsState := make(map[string]*NodeGroupState)
+	for _, ng := range nodeGroups {
+		nodeGroupsState[ng.Name] = &NodeGroupState{
+			Opts:            ng,
+			NodeGroupLister: client.Listers[ng.Name],
+		}
+	}
+	return nodeGroupsState
 }
