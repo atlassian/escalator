@@ -219,14 +219,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		return
 	}
 
-	log.WithField("nodegroup", nodegroup).Debugf("there are %v upcomming nodes requested", nodeGroup.scaleUpLock.requestedNodes)
-	if nodeGroup.scaleUpLock.locked() {
-		// perform the upcomming node check
-		log.WithField("nodegroup", nodegroup).Infoln("waiting for scale to finish. entering scale lock check")
-
-		return
-	}
-
 	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
 	bytesMemReq, _ := memRequest.AsInt64()
@@ -246,6 +238,52 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	log.WithField("nodegroup", nodegroup).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
 	metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(cpuPercent)
 	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
+
+	locked := nodeGroup.scaleUpLock.locked()
+	// logs, metrics
+	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcomming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
+	lockVal := 0.0
+	if locked {
+		lockVal = 1.0
+		log.WithField("nodegroup", nodegroup).Infof("%v before min cooldown. %v before lock timout.",
+			time.Until(nodeGroup.scaleUpLock.lockTime.Add(nodeGroup.scaleUpLock.minimumLockDuration)),
+			time.Until(nodeGroup.scaleUpLock.lockTime.Add(nodeGroup.scaleUpLock.maximumLockDuration)),
+		)
+	}
+	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
+
+	if locked {
+		// perform the upcomming node check
+		// a dumb check, but basically
+		// ---
+		// any nodes that are ready we count as GOOD nodes
+		// any nodes that are unready AND have been around longer than our timeout are BAD nodes
+		var readyNodesNotBroken int // GOOD
+		var unreadyNodesBroken int  // BAD
+		for _, node := range allNodes {
+			for _, cond := range node.Status.Conditions {
+				if cond.Type == v1.NodeReady {
+					if cond.Status == v1.ConditionTrue {
+						readyNodesNotBroken++
+					} else if time.Since(node.CreationTimestamp.Time) > nodeGroup.scaleUpLock.maximumLockDuration {
+						unreadyNodesBroken++
+					}
+					break
+				}
+			}
+		}
+		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
+		if nodeGroup.ASG.Size() == nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken {
+			log.Infoln()
+			nodeGroup.scaleUpLock.unlock()
+			log.WithField("nodegroup", nodegroup).Infoln("scale up finished")
+		} else {
+			log.WithField("nodegroup", nodegroup).Infoln("waiting for scale to finish.")
+		}
+
+		// don't do anything else until we're unlocked again
+		return
+	}
 
 	// Perform the scaling decision
 	maxPercent := int(math.Max(cpuPercent, memPercent))
@@ -273,7 +311,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		percentageNeededCPU := cpuPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
 		percentageNeededMem := memPercent - float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
 
-		nodesNeededCPU := math.Ceil(percentageNeededCPU / nodeWorth)
+		nodesNeededCPU := math.Ceil(percentageNeededCPU / nodeWorth) // plus a small buffer capacity of 10%
 		nodesNeededMem := math.Ceil(percentageNeededMem / nodeWorth)
 
 		nodesDelta = int(math.Max(nodesNeededCPU, nodesNeededMem))

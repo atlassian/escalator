@@ -24,11 +24,14 @@ type scaleLock struct {
 	maximumLockDuration time.Duration
 }
 
-func (l scaleLock) locked() bool {
-	if time.Since(l.lockTime) > l.maximumLockDuration {
-		return false
+func (l *scaleLock) locked() bool {
+	if time.Since(l.lockTime) < l.minimumLockDuration {
+		return true
 	}
-	return l.isLocked || time.Since(l.lockTime) < l.minimumLockDuration
+	if time.Since(l.lockTime) > l.maximumLockDuration {
+		l.unlock()
+	}
+	return l.isLocked
 }
 
 func (l *scaleLock) lock(nodes int) {
