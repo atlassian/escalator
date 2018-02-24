@@ -234,7 +234,6 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		pod.Spec.NodeName = opts.NodeName
 	}
 
-
 	for i := range containers {
 		if opts.CPU[i] >= 0 {
 			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPU[i], resource.DecimalSI)
