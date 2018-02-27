@@ -3,8 +3,7 @@ GIT_HASH := $(shell git rev-parse --short HEAD)
 WORKDIR := ${CURDIR}
 
 local-build:
-	go build cmd/main.go
-	mv main escalator
+	go build -o escalator cmd/main.go
 
 docker-build:
 	docker build --no-cache -t $(IMAGE_NAME):$(GIT_HASH) .
