@@ -26,6 +26,7 @@ type scaleLock struct {
 
 func (l *scaleLock) locked() bool {
 	if time.Since(l.lockTime) < l.minimumLockDuration {
+		log.Debugln("Locked, have not exceeded minimum lock duration")
 		return true
 	}
 	if time.Since(l.lockTime) > l.maximumLockDuration {
@@ -35,12 +36,14 @@ func (l *scaleLock) locked() bool {
 }
 
 func (l *scaleLock) lock(nodes int) {
+	log.Debugln("Locking scale lock")
 	l.isLocked = true
 	l.requestedNodes = nodes
 	l.lockTime = time.Now()
 }
 
 func (l *scaleLock) unlock() {
+	log.Debugln("Unlocking scale lock")
 	l.isLocked = false
 	l.requestedNodes = 0
 }
@@ -53,7 +56,7 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	if len(opts.untaintedNodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
 		// Clamp it to the max we can untaint
 		nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.untaintedNodes)
-		log.Infof("increasing nodes close to maximum (%v). Adjusting add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
+		log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
 		if nodesToAdd < 0 {
 			err := fmt.Errorf(
 				"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
@@ -63,6 +66,12 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 			log.WithError(err).Error("Cancelling scaleup")
 			return 0, err
 		}
+		opts.nodesDelta = nodesToAdd
+	}
+
+	if opts.nodesDelta <= 0 {
+		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v", opts.nodesDelta)
+		return 0, nil
 	}
 
 	untainted, err := c.scaleUpUntaint(opts)
@@ -101,6 +110,7 @@ func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
 		if !drymode {
 			err := opts.nodeGroup.ASG.IncreaseSize(nodesToAdd)
 			if err != nil {
+				log.Errorf("failed to set asg size: %v", err)
 				return 0, err
 			}
 		}

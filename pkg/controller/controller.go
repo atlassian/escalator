@@ -162,6 +162,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	untaintedNodes, taintedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
+	log.WithField("nodegroup", nodegroup).Infoln("pods total:", len(pods))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining untainted:", len(untaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining tainted:", len(taintedNodes))
@@ -234,11 +235,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	locked := nodeGroup.scaleUpLock.locked()
 	// logs, metrics
-	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcomming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
+	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcoming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
 	lockVal := 0.0
 	if locked {
 		lockVal = 1.0
-		log.WithField("nodegroup", nodegroup).Infof("%v before min cooldown. %v before lock timout.",
+		log.WithField("nodegroup", nodegroup).Infof("%v before min cooldown. %v before lock timeout.",
 			time.Until(nodeGroup.scaleUpLock.lockTime.Add(nodeGroup.scaleUpLock.minimumLockDuration)),
 			time.Until(nodeGroup.scaleUpLock.lockTime.Add(nodeGroup.scaleUpLock.maximumLockDuration)),
 		)
@@ -246,7 +247,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
 
 	if locked {
-		// perform the upcomming node check
+		// perform the upcoming node check
 		// a dumb check, but basically
 		// ---
 		// any nodes that are ready we count as GOOD nodes
@@ -266,12 +267,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 			}
 		}
 		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
-		if nodeGroup.ASG.Size() == nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken {
-			log.Infoln()
+		if nodeGroup.ASG.Size() == nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken == int(nodeGroup.ASG.TargetSize()) {
 			nodeGroup.scaleUpLock.unlock()
-			log.WithField("nodegroup", nodegroup).Infoln("scale up finished")
+			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
 		} else {
-			log.WithField("nodegroup", nodegroup).Infoln("waiting for scale to finish.")
+			log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
 		}
 
 		// don't do anything else until we're unlocked again
@@ -361,7 +361,7 @@ func (c *Controller) RunOnce() {
 	}
 	// Perform the ScaleUp/Taint logic
 	for nodegroup, state := range c.nodeGroups {
-		log.Debugln("**********[START NODEGROUP]**********")
+		log.Debugf("**********[START NODEGROUP %v]**********", nodegroup)
 		c.scaleNodeGroup(nodegroup, state)
 	}
 

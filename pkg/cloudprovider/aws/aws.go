@@ -250,15 +250,6 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 		HonorCooldown:        awsapi.Bool(true),
 	}
 
-	result, err := n.provider.service.SetDesiredCapacity(input)
-	if err != nil {
-		if err != nil {
-			log.Errorf("failed to set asg size: %v", err)
-			return err
-		}
-	}
-
-	log.Debugln("result returned:", result)
-
-	return nil
+	_, err := n.provider.service.SetDesiredCapacity(input)
+	return err
 }

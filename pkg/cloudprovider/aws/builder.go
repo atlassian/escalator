@@ -7,14 +7,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Builder builds the aws cloudprivider
+// Builder builds the aws cloudprovider
 type Builder struct {
 	ProviderOpts cloudprovider.BuildOpts
 }
 
 // Build the cloudprovider
 func (b Builder) Build() cloudprovider.CloudProvider {
-	service := autoscaling.New(session.New())
+	sess, err := session.NewSession()
+	if err != nil {
+		log.Fatalln("Failed to create aws session")
+		return nil
+	}
+	service := autoscaling.New(sess)
 	if service == nil {
 		log.Fatalln("Failed to create aws autoscaling service")
 		return nil
@@ -25,9 +30,13 @@ func (b Builder) Build() cloudprovider.CloudProvider {
 		nodeGroups: make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupIDs)),
 	}
 
-	cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupIDs...)
+	err = cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupIDs...)
+	if err != nil {
+		log.Fatalln(err)
+		return nil
+	}
 
-	log.Infoln("aws session created sucessfully")
+	log.Infoln("aws session created successfully")
 
 	return cloud
 }
