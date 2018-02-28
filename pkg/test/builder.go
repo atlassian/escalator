@@ -199,9 +199,9 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 			NodeAffinity: &apiv1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{
 					NodeSelectorTerms: []apiv1.NodeSelectorTerm{
-						0: apiv1.NodeSelectorTerm{
+						0: {
 							MatchExpressions: []apiv1.NodeSelectorRequirement{
-								apiv1.NodeSelectorRequirement{
+								{
 									Key: opts.NodeAffinityKey,
 									Values: []string{
 										0: opts.NodeAffinityValue,

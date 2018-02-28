@@ -3,7 +3,7 @@ package controller
 import (
 	"fmt"
 	"sort"
-	"time"
+	time "github.com/stephanos/clock"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"

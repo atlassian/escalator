@@ -9,6 +9,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	v1lister "k8s.io/client-go/listers/core/v1"
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 )
 
 // DefaultNodeGroup is used for any pods that don't have a node selector defined
@@ -262,24 +263,20 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 	}
 }
 
-// BuildNodeGroupsState builds a node group state
-func BuildNodeGroupsState(nodeGroups []NodeGroupOptions) map[string]*NodeGroupState {
-	nodeGroupsState := make(map[string]*NodeGroupState)
-	for _, ng := range nodeGroups {
-		nodeGroupsState[ng.Name] = &NodeGroupState{
-			Opts: ng,
-		}
-	}
-	return nodeGroupsState
+type nodeGroupsStateOpts struct {
+	nodeGroups []NodeGroupOptions
+	client     Client
+	asg        map[string]cloudprovider.NodeGroup
 }
 
-// BuildNodeGroupsStateWithClient builds a node group state with the client listers
-func BuildNodeGroupsStateWithClient(nodeGroups []NodeGroupOptions, client Client) map[string]*NodeGroupState {
+// BuildNodeGroupsState builds a node group state
+func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 	nodeGroupsState := make(map[string]*NodeGroupState)
-	for _, ng := range nodeGroups {
+	for _, ng := range opts.nodeGroups {
 		nodeGroupsState[ng.Name] = &NodeGroupState{
 			Opts:            ng,
-			NodeGroupLister: client.Listers[ng.Name],
+			NodeGroupLister: opts.client.Listers[ng.Name],
+			ASG:             opts.asg[ng.Name],
 		}
 	}
 	return nodeGroupsState
