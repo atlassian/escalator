@@ -3,7 +3,6 @@ package controller
 import (
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
@@ -12,41 +11,7 @@ import (
 )
 
 // TODO:(jgonzalez/aprice)
-// Keep track of upcoming nodes and count them in the capacity calculation
-// Make sure to not continue counting them (separately) once they are up
 // When a node is being reaped. make sure to not count that in calcuations. (don't retaint it or untaint it)
-
-type scaleLock struct {
-	isLocked            bool
-	requestedNodes      int
-	lockTime            time.Time
-	minimumLockDuration time.Duration
-	maximumLockDuration time.Duration
-}
-
-func (l *scaleLock) locked() bool {
-	if time.Since(l.lockTime) < l.minimumLockDuration {
-		log.Debugln("Locked, have not exceeded minimum lock duration")
-		return true
-	}
-	if time.Since(l.lockTime) > l.maximumLockDuration {
-		l.unlock()
-	}
-	return l.isLocked
-}
-
-func (l *scaleLock) lock(nodes int) {
-	log.Debugln("Locking scale lock")
-	l.isLocked = true
-	l.requestedNodes = nodes
-	l.lockTime = time.Now()
-}
-
-func (l *scaleLock) unlock() {
-	log.Debugln("Unlocking scale lock")
-	l.isLocked = false
-	l.requestedNodes = 0
-}
 
 // ScaleUp performs the untaint and incrase asg logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {

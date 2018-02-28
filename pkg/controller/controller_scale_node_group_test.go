@@ -264,6 +264,22 @@ func TestScaleNodeGroup(t *testing.T) {
 			0,
 			errors.New("unable to list nodes"),
 		},
+		{
+			"no need to scale up",
+			args{
+				buildTestNodes(10, 2000, 8000),
+				buildTestPods(5, 1000, 2000),
+				NodeGroupOptions{
+					Name:                     "default",
+					MinNodes:                 1,
+					MaxNodes:                 100,
+					ScaleUpThreshholdPercent: 70,
+				},
+				ListerOptions{},
+			},
+			0,
+			nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -276,7 +292,13 @@ func TestScaleNodeGroup(t *testing.T) {
 
 			// Create a test (mock) cloud provider
 			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
-			testNodeGroup := test.NewNodeGroup(tt.args.nodeGroupOptions.Name, int64(tt.args.nodeGroupOptions.MinNodes), int64(tt.args.nodeGroupOptions.MaxNodes), int64(len(tt.args.nodes)))
+			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.Name,
+				int64(tt.args.nodeGroupOptions.MinNodes),
+				int64(tt.args.nodeGroupOptions.MaxNodes),
+				int64(len(tt.args.nodes)),
+				false,
+			)
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
 			// Create a node group state with the mapping of node groups to the cloud providers node groups
@@ -317,6 +339,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		pods             []*v1.Pod
 		nodeGroupOptions NodeGroupOptions
 		listerOptions    ListerOptions
+		scaleFailure     bool
 	}
 
 	tests := []struct {
@@ -344,6 +367,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 					SoftDeleteGracePeriod:				 "1m",
 				},
 				ListerOptions{},
+				false,
 			},
 			1,
 			duration.Minute,
@@ -367,10 +391,32 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 					SoftDeleteGracePeriod:               "5m",
 				},
 				ListerOptions{},
+				false,
 			},
 			5,
 			duration.Minute,
 			-2,
+			nil,
+		},
+		{
+			"test nodes failing to come up, lock timeout",
+			args{
+				buildTestNodes(10, 2000, 8000),
+				buildTestPods(40, 500, 1000),
+				NodeGroupOptions{
+					Name:                     "default",
+					MinNodes:                 5,
+					MaxNodes:                 100,
+					ScaleUpThreshholdPercent: 50,
+					ScaleUpCoolDownPeriod:    "5m",
+					ScaleUpCoolDownTimeout:   "10m",
+				},
+				ListerOptions{},
+				true,
+			},
+			10,
+			duration.Minute,
+			5,
 			nil,
 		},
 	}
@@ -385,7 +431,13 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 
 			// Create a test (mock) cloud provider
 			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
-			testNodeGroup := test.NewNodeGroup(tt.args.nodeGroupOptions.Name, int64(tt.args.nodeGroupOptions.MinNodes), int64(tt.args.nodeGroupOptions.MaxNodes), int64(len(tt.args.nodes)))
+			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.Name,
+				int64(tt.args.nodeGroupOptions.MinNodes),
+				int64(tt.args.nodeGroupOptions.MaxNodes),
+				int64(len(tt.args.nodes)),
+				tt.args.scaleFailure,
+			)
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
 			// Create a node group state with the mapping of node groups to the cloud providers node groups
@@ -410,6 +462,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			time.Work = mockClock
 
 			// Run the initial run of the scale
+			log.Debug("------- controller.scaleNodeGroup -------")
 			nodesDelta, err := controller.scaleNodeGroup(tt.args.nodeGroupOptions.Name, nodeGroupsState[tt.args.nodeGroupOptions.Name])
 
 			// Ensure the returned nodes delta is what we wanted
@@ -418,12 +471,16 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 
 			// Run subsequent runs of the scale to "simulate" the deletion of the tainted nodes
 			for i := 0; i < tt.runs; i++ {
+				log.Debug("------- controller.scaleNodeGroup -------")
 				mockClock.Add(tt.runInterval)
 				controller.scaleNodeGroup(tt.args.nodeGroupOptions.Name, nodeGroupsState[tt.args.nodeGroupOptions.Name])
 			}
 
 			// Ensure the node group on the cloud provider side scales up/down to the correct amount
 			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), testNodeGroup.TargetSize())
+			if tt.args.scaleFailure {
+				assert.Equal(t, int64(len(tt.args.nodes)), testNodeGroup.Size())
+			}
 		})
 	}
 }

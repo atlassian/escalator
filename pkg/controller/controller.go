@@ -239,10 +239,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	lockVal := 0.0
 	if locked {
 		lockVal = 1.0
-		log.WithField("nodegroup", nodegroup).Infof("%v before min cooldown. %v before lock timeout.",
-			time.Until(nodeGroup.scaleUpLock.lockTime.Add(nodeGroup.scaleUpLock.minimumLockDuration)),
-			time.Until(nodeGroup.scaleUpLock.lockTime.Add(nodeGroup.scaleUpLock.maximumLockDuration)),
-		)
+		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
 	}
 	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
 
@@ -282,7 +279,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	maxPercent := int(math.Max(cpuPercent, memPercent))
 	nodesDelta := 0
 
-	// Determine if we want to scale up for down. Selects the first condition that is true
+	// Determine if we want to scale up or down. Selects the first condition that is true
 	switch {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes

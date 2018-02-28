@@ -277,6 +277,11 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 			Opts:            ng,
 			NodeGroupLister: opts.client.Listers[ng.Name],
 			ASG:             opts.asg[ng.Name],
+			// Setup the scaleLock timeouts for this nodegroup
+			scaleUpLock: scaleLock{
+				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
+				maximumLockDuration: ng.ScaleUpCoolDownTimeoutDuration(),
+			},
 		}
 	}
 	return nodeGroupsState
