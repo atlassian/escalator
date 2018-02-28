@@ -13,7 +13,7 @@ import (
 // TODO:(jgonzalez/aprice)
 // When a node is being reaped. make sure to not count that in calcuations. (don't retaint it or untaint it)
 
-// ScaleUp performs the untaint and incrase asg logic
+// ScaleUp performs the untaint and increase asg logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	nodesToAdd := opts.nodesDelta
 
