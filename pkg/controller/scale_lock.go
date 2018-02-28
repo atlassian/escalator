@@ -1,18 +1,18 @@
 package controller
 
 import (
-	time "github.com/stephanos/clock"
-	duration "time"
-	log "github.com/sirupsen/logrus"
 	"fmt"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type scaleLock struct {
 	isLocked            bool
 	requestedNodes      int
-	lockTime            duration.Time
-	minimumLockDuration duration.Duration
-	maximumLockDuration duration.Duration
+	lockTime            time.Time
+	minimumLockDuration time.Duration
+	maximumLockDuration time.Duration
 }
 
 func (l *scaleLock) locked() bool {
@@ -39,11 +39,11 @@ func (l *scaleLock) unlock() {
 	l.requestedNodes = 0
 }
 
-func (l *scaleLock) timeUntilMinimumUnlock() duration.Duration {
+func (l *scaleLock) timeUntilMinimumUnlock() time.Duration {
 	return l.lockTime.Add(l.minimumLockDuration).Sub(time.Now())
 }
 
-func (l *scaleLock) timeUntilMaximumUnlock() duration.Duration {
+func (l *scaleLock) timeUntilMaximumUnlock() time.Duration {
 	return l.lockTime.Add(l.maximumLockDuration).Sub(time.Now())
 }
 

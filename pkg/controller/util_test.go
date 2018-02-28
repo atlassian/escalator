@@ -62,19 +62,19 @@ func TestCalcNodeWorth(t *testing.T) {
 
 func TestCalcScaleUpDelta(t *testing.T) {
 	type args struct {
-		nodes []*v1.Node
+		nodes      []*v1.Node
 		cpuPercent float64
 		memPercent float64
-		nodeGroup *NodeGroupState
+		nodeGroup  *NodeGroupState
 	}
 
 	nodes := test.BuildTestNodes(100, test.NodeOpts{})
 
 	tests := []struct {
-		name  string
-		args  args
+		name string
+		args args
 		want int
-		err   error
+		err  error
 	}{
 		{
 			"scale up 10%",

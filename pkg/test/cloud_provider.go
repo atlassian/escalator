@@ -48,22 +48,20 @@ func (c *CloudProvider) RegisterNodeGroup(nodeGroup *NodeGroup) {
 }
 
 type NodeGroup struct {
-	id           string
-	minSize      int64
-	maxSize      int64
-	actualSize   int64
-	targetSize   int64
-	scaleFailure bool
+	id         string
+	minSize    int64
+	maxSize    int64
+	actualSize int64
+	targetSize int64
 }
 
-func NewNodeGroup(id string, minSize int64, maxSize int64, targetSize int64, scaleFailure bool) *NodeGroup {
+func NewNodeGroup(id string, minSize int64, maxSize int64, targetSize int64) *NodeGroup {
 	return &NodeGroup{
 		id,
 		minSize,
 		maxSize,
 		targetSize,
 		targetSize,
-		scaleFailure,
 	}
 }
 
@@ -120,8 +118,6 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 	// This is where we would tell the actual provider (AWS etc.) to change the scaling group desired size
 	// but we just update the internal target size of the node group to reflect the remote change
 	n.targetSize = newSize
-	if !n.scaleFailure {
-		n.actualSize = newSize
-	}
+	n.actualSize = newSize
 	return nil
 }

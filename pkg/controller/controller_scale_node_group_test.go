@@ -2,15 +2,15 @@ package controller
 
 import (
 	"errors"
-	"testing"
 	time "github.com/stephanos/clock"
+	"testing"
 	duration "time"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/test"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-	"github.com/atlassian/escalator/pkg/cloudprovider"
-	log "github.com/sirupsen/logrus"
 )
 
 type ListerOptions struct {
@@ -297,7 +297,6 @@ func TestScaleNodeGroup(t *testing.T) {
 				int64(tt.args.nodeGroupOptions.MinNodes),
 				int64(tt.args.nodeGroupOptions.MaxNodes),
 				int64(len(tt.args.nodes)),
-				false,
 			)
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
@@ -339,7 +338,6 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		pods             []*v1.Pod
 		nodeGroupOptions NodeGroupOptions
 		listerOptions    ListerOptions
-		scaleFailure     bool
 	}
 
 	tests := []struct {
@@ -364,10 +362,9 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 					TaintUpperCapacityThreshholdPercent: 60,
 					FastNodeRemovalRate:                 4,
 					SlowNodeRemovalRate:                 2,
-					SoftDeleteGracePeriod:				 "1m",
+					SoftDeleteGracePeriod:               "1m",
 				},
 				ListerOptions{},
-				false,
 			},
 			1,
 			duration.Minute,
@@ -391,32 +388,10 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 					SoftDeleteGracePeriod:               "5m",
 				},
 				ListerOptions{},
-				false,
 			},
 			5,
 			duration.Minute,
 			-2,
-			nil,
-		},
-		{
-			"test nodes failing to come up, lock timeout",
-			args{
-				buildTestNodes(10, 2000, 8000),
-				buildTestPods(40, 500, 1000),
-				NodeGroupOptions{
-					Name:                     "default",
-					MinNodes:                 5,
-					MaxNodes:                 100,
-					ScaleUpThreshholdPercent: 50,
-					ScaleUpCoolDownPeriod:    "5m",
-					ScaleUpCoolDownTimeout:   "10m",
-				},
-				ListerOptions{},
-				true,
-			},
-			10,
-			duration.Minute,
-			5,
 			nil,
 		},
 	}
@@ -436,7 +411,6 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				int64(tt.args.nodeGroupOptions.MinNodes),
 				int64(tt.args.nodeGroupOptions.MaxNodes),
 				int64(len(tt.args.nodes)),
-				tt.args.scaleFailure,
 			)
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
@@ -462,7 +436,6 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			time.Work = mockClock
 
 			// Run the initial run of the scale
-			log.Debug("------- controller.scaleNodeGroup -------")
 			nodesDelta, err := controller.scaleNodeGroup(tt.args.nodeGroupOptions.Name, nodeGroupsState[tt.args.nodeGroupOptions.Name])
 
 			// Ensure the returned nodes delta is what we wanted
@@ -471,16 +444,13 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 
 			// Run subsequent runs of the scale to "simulate" the deletion of the tainted nodes
 			for i := 0; i < tt.runs; i++ {
-				log.Debug("------- controller.scaleNodeGroup -------")
 				mockClock.Add(tt.runInterval)
 				controller.scaleNodeGroup(tt.args.nodeGroupOptions.Name, nodeGroupsState[tt.args.nodeGroupOptions.Name])
 			}
 
 			// Ensure the node group on the cloud provider side scales up/down to the correct amount
 			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), testNodeGroup.TargetSize())
-			if tt.args.scaleFailure {
-				assert.Equal(t, int64(len(tt.args.nodes)), testNodeGroup.Size())
-			}
+			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), testNodeGroup.Size())
 		})
 	}
 }
