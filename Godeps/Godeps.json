@@ -1,7 +1,7 @@
 {
 	"ImportPath": "github.com/atlassian/escalator",
 	"GoVersion": "go1.10",
-	"GodepVersion": "v79",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
@@ -372,6 +372,10 @@
 		{
 			"ImportPath": "github.com/spf13/pflag",
 			"Rev": "9ff6c6923cfffbcd502984b8e0c80539a94968b7"
+		},
+		{
+			"ImportPath": "github.com/stephanos/clock",
+			"Rev": "e4ec0ab5053ee441dab6c55d0c3633f275269f72"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",

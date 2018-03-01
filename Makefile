@@ -2,16 +2,17 @@ IMAGE_NAME := docker.atl-paas.net/kitt/escalator
 GIT_HASH := $(shell git rev-parse --short HEAD)
 WORKDIR := ${CURDIR}
 
-local-build:
-	go build cmd/main.go
-	mv main escalator
+local-build: escalator
+	go build -o escalator cmd/main.go
 
+.PHONY: docker-build
 docker-build:
 	docker build --no-cache -t $(IMAGE_NAME):$(GIT_HASH) .
 
-docker-push: build
+.PHONY: docker-push
+docker-push: docker-build
 	docker push $(IMAGE_NAME):$(GIT_HASH)
-	echo $(IMAGE_NAME):$(GIT_HASH) is READDY.
+	echo $(IMAGE_NAME):$(GIT_HASH) is READY.
 
 .PHONY: test
 test:

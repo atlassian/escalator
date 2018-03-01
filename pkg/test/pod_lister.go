@@ -1,11 +1,11 @@
 package test
 
 import (
-	listerv1 "k8s.io/client-go/listers/core/v1"
+	"errors"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	listerv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"errors"
 )
 
 func NewTestPodWatcher(pods []*v1.Pod, opts PodListerOptions) listerv1.PodLister {

@@ -2,8 +2,8 @@ package controller
 
 import (
 	"fmt"
+	time "github.com/stephanos/clock"
 	"sort"
-	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
@@ -30,7 +30,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	var toBeDeleted []*v1.Node
 	for _, candidate := range opts.taintedNodes {
 		// if the time the node was tainted is larger than the hard period then it is deleted no matter what
-		// if the soft time is passed and the node is empty (exlcuding daemonsets) then it can be deleted
+		// if the soft time is passed and the node is empty (excluding daemonsets) then it can be deleted
 		taintedTime, err := k8s.GetToBeRemovedTime(candidate)
 		if err != nil || taintedTime == nil {
 			log.WithError(err).Errorf("unable to get tainted time from node %v. Ignore if running in drymode", candidate.Name)
@@ -52,7 +52,10 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 					toBeDeleted = append(toBeDeleted, cordonedNode)
 				}
 			} else {
-				log.Debugf("node %v not ready for deletion", candidate.Name)
+				log.Debugf("node %v not ready for deletion. Hard delete time remaining %v",
+					candidate.Name,
+					opts.nodeGroup.Opts.HardDeleteGracePeriodDuration()-now.Sub(*taintedTime),
+				)
 			}
 		} else {
 			log.Debugf("node %v not ready for deletion yet. Time remaining %v",

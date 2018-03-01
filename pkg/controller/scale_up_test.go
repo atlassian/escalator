@@ -44,14 +44,17 @@ func TestControllerUntaintNewestN(t *testing.T) {
 	}
 
 	nodeGroups := []NodeGroupOptions{
-		NodeGroupOptions{
+		{
 			Name:     "buildeng",
 			MinNodes: 1,
 			MaxNodes: 5,
 			DryMode:  false,
 		},
 	}
-	nodeGroupsState := BuildNodeGroupsState(nodeGroups)
+
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+	})
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
 	opts := Opts{

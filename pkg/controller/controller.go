@@ -12,8 +12,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 
-	log "github.com/sirupsen/logrus"
 	"errors"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Controller contains the core logic of the Autoscaler
@@ -35,6 +36,8 @@ type NodeGroupState struct {
 	NodeInfos map[string]*schedulercache.NodeInfo
 
 	ASG cloudprovider.NodeGroup
+
+	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
@@ -86,6 +89,11 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
 			ASG:             asg,
+			// Setup the scaleLock timeouts for this nodegroup
+			scaleUpLock: scaleLock{
+				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
+				maximumLockDuration: nodeGroupOpts.ScaleUpCoolDownTimeoutDuration(),
+			},
 		}
 	}
 
@@ -154,6 +162,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	untaintedNodes, taintedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
+	log.WithField("nodegroup", nodegroup).Infoln("pods total:", len(pods))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining untainted:", len(untaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining tainted:", len(taintedNodes))
@@ -224,11 +233,53 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(cpuPercent)
 	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
 
+	locked := nodeGroup.scaleUpLock.locked()
+	// logs, metrics
+	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcoming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
+	lockVal := 0.0
+	if locked {
+		lockVal = 1.0
+		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
+	}
+	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
+
+	if locked {
+		// perform the upcoming node check
+		// a dumb check, but basically
+		// ---
+		// any nodes that are ready we count as GOOD nodes
+		// any nodes that are unready AND have been around longer than our timeout are BAD nodes
+		var readyNodesNotBroken int // GOOD
+		var unreadyNodesBroken int  // BAD
+		for _, node := range allNodes {
+			for _, cond := range node.Status.Conditions {
+				if cond.Type == v1.NodeReady {
+					if cond.Status == v1.ConditionTrue {
+						readyNodesNotBroken++
+					} else if time.Since(node.CreationTimestamp.Time) > nodeGroup.scaleUpLock.maximumLockDuration {
+						unreadyNodesBroken++
+					}
+					break
+				}
+			}
+		}
+		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
+		if nodeGroup.ASG.Size() == nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken == int(nodeGroup.ASG.TargetSize()) {
+			nodeGroup.scaleUpLock.unlock()
+			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
+		} else {
+			log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
+		}
+
+		// don't do anything else until we're unlocked again
+		return 0, nil
+	}
+
 	// Perform the scaling decision
 	maxPercent := int(math.Max(cpuPercent, memPercent))
 	nodesDelta := 0
 
-	// Determine if we want to scale up for down. Selects the first condition that is true
+	// Determine if we want to scale up or down. Selects the first condition that is true
 	switch {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes
@@ -296,10 +347,18 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 func (c *Controller) RunOnce() {
 	startTime := time.Now()
 
-	c.cloudProvider.Refresh()
+	// try refresh cred a few times if they go stale
+	// rebuild will create a new session from the metadata on the box
+	err := c.cloudProvider.Refresh()
+	for i := 0; i < 2 && err != nil; i++ {
+		log.Warnf("cloudprovider failed to refresh. trying to refetch credentials. tries = %v", i+1)
+		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
+		c.cloudProvider = c.Opts.CloudProviderBuilder.Build()
+		err = c.cloudProvider.Refresh()
+	}
 	// Perform the ScaleUp/Taint logic
 	for nodegroup, state := range c.nodeGroups {
-		log.Debugln("**********[START NODEGROUP]**********")
+		log.Debugf("**********[START NODEGROUP %v]**********", nodegroup)
 		c.scaleNodeGroup(nodegroup, state)
 	}
 

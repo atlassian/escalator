@@ -41,7 +41,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 	}
 
 	nodeGroups := []NodeGroupOptions{
-		NodeGroupOptions{
+		{
 			Name:     "buildeng",
 			MinNodes: 3,
 			MaxNodes: 6,
@@ -49,7 +49,9 @@ func TestControllerScaleDownTaint(t *testing.T) {
 		},
 	}
 
-	nodeGroupsState := BuildNodeGroupsState(nodeGroups)
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+	})
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
 	opts := Opts{
@@ -183,14 +185,16 @@ func TestControllerTaintOldestN(t *testing.T) {
 	}
 
 	nodeGroups := []NodeGroupOptions{
-		NodeGroupOptions{
+		{
 			Name:     "buildeng",
 			MinNodes: 1,
 			MaxNodes: 5,
 			DryMode:  false,
 		},
 	}
-	nodeGroupsState := BuildNodeGroupsState(nodeGroups)
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+	})
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
 	opts := Opts{

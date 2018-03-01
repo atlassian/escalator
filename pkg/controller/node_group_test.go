@@ -378,6 +378,7 @@ node_groups:
     fast_node_revival_rate: 3
     soft_delete_grace_period: 10m
     hard_delete_grace_period: 42
+    scale_up_cooldown_period: 1h2m30s
   - name: "default"
     label_key: "customer"
     label_value: "shared"
@@ -392,6 +393,7 @@ node_groups:
     fast_node_removal_rate: 3
     slow_node_revival_rate: 2
     fast_node_revival_rate: 3
+    scale_up_cooldown_period: 21h
 `
 
 var yamlBE = `node_groups:
@@ -436,6 +438,8 @@ func TestValidateNodeGroup(t *testing.T) {
 					FastNodeRemovalRate:                 2,
 					SoftDeleteGracePeriod:               "10m",
 					HardDeleteGracePeriod:               "1h10m",
+					ScaleUpCoolDownPeriod:               "55m",
+					ScaleUpCoolDownTimeout:              "2h",
 				},
 			},
 			nil,
@@ -457,6 +461,8 @@ func TestValidateNodeGroup(t *testing.T) {
 					FastNodeRemovalRate:                 2,
 					SoftDeleteGracePeriod:               "10",
 					HardDeleteGracePeriod:               "1h10m",
+					ScaleUpCoolDownPeriod:               "21h21m21s",
+					ScaleUpCoolDownTimeout:              "22h",
 				},
 			},
 			[]string{

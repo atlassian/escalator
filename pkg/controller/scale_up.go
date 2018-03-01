@@ -10,44 +10,18 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// ScaleUp performs the untaint and incrase asg logic
+// TODO:(jgonzalez/aprice)
+// When a node is being reaped. make sure to not count that in calcuations. (don't retaint it or untaint it)
+
+// ScaleUp performs the untaint and increase asg logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
-	untainted, err := c.scaleUpUntaint(opts)
-	// No nodes were untainted, so we need to scale up asg
-	if err != nil {
-		log.Error("Failed to untaint nodes because of an error. Skipping ASG scaleup")
-		return untainted, err
-	}
-
-	// remove the number of nodes that were just untainted and the remaining is how much to increase the asg by
-	opts.nodesDelta -= untainted
-	if opts.nodesDelta > 0 {
-		// TODO(jgonzalez): finish this we return values and such
-		c.scaleUpASG(opts)
-	}
-
-	return untainted, err
-}
-
-func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
-	nodegroupName := opts.nodeGroup.Opts.Name
-	nodesToAdd := opts.nodesDelta
-	log.WithField("nodegroup", nodegroupName).Infoln("Increasing ASG by", nodesToAdd)
-
-	//c.cloudProvider.GetNodeGroup(nodegroupName).IncreaseSize(nodesToAdd)
-
-	return 0, nil
-}
-
-func (c *Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
-	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := opts.nodesDelta
 
 	// check that untainting the nodes doesn't do bring us over max nodes
 	if len(opts.untaintedNodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
 		// Clamp it to the max we can untaint
 		nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.untaintedNodes)
-		log.Infof("untainted nodes close to maximum (%v). Adjusting untaint amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
+		log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
 		if nodesToAdd < 0 {
 			err := fmt.Errorf(
 				"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
@@ -57,7 +31,65 @@ func (c *Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
 			log.WithError(err).Error("Cancelling scaleup")
 			return 0, err
 		}
+		opts.nodesDelta = nodesToAdd
 	}
+
+	if opts.nodesDelta <= 0 {
+		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v", opts.nodesDelta)
+		return 0, nil
+	}
+
+	untainted, err := c.scaleUpUntaint(opts)
+	// No nodes were untainted, so we need to scale up asg
+	if err != nil {
+		log.Errorf("Failed to untaint nodes because of an error. Skipping ASG scaleup: %v", err)
+		return untainted, err
+	}
+
+	// remove the number of nodes that were just untainted and the remaining is how much to increase the asg by
+	opts.nodesDelta -= untainted
+	if opts.nodesDelta > 0 {
+		added, err := c.scaleUpASG(opts)
+		if err != nil {
+			log.Errorf("Failed to add nodes because of an error. Skipping ASG scaleup: %v", err)
+			return 0, err
+		}
+		opts.nodeGroup.scaleUpLock.lock(added)
+		return untainted + added, nil
+	}
+
+	return untainted, nil
+}
+
+// scaleUpASG increases the size of the asg by opts.nodesDelta
+func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
+	nodegroupName := opts.nodeGroup.Opts.Name
+	nodesToAdd := int64(opts.nodesDelta)
+
+	if nodesToAdd+opts.nodeGroup.ASG.Size() <= opts.nodeGroup.ASG.MaxSize() {
+		drymode := c.dryMode(opts.nodeGroup)
+		log.WithField("drymode", drymode).
+			WithField("nodegroup", nodegroupName).
+			Infof("increasing asg by %v", nodesToAdd)
+
+		if !drymode {
+			err := opts.nodeGroup.ASG.IncreaseSize(nodesToAdd)
+			if err != nil {
+				log.Errorf("failed to set asg size: %v", err)
+				return 0, err
+			}
+		}
+	} else {
+		return 0, fmt.Errorf("adding %v nodes would breach max asg size (%v)", nodesToAdd, opts.nodeGroup.ASG.MaxSize())
+	}
+
+	return int(nodesToAdd), nil
+}
+
+// scaleUpUntaint tries to untaint opts.nodesDelta nodes
+func (c *Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
+	nodegroupName := opts.nodeGroup.Opts.Name
+	nodesToAdd := opts.nodesDelta
 
 	if len(opts.taintedNodes) == 0 {
 		log.WithField("nodegroup", nodegroupName).Warningln("There are no tainted nodes to untaint")

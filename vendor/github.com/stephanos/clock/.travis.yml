@@ -1,0 +1,16 @@
+language: go
+go:
+  - 1.5
+  - 1.6
+  - 1.7
+
+install:
+  - go get -v -t ./...
+
+script:
+  - go build
+  - go test -v -covermode=count -coverprofile=profile.cov ./...
+
+after_success:
+  - go get -u github.com/mattn/goveralls
+  - ~/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
