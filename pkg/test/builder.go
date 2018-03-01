@@ -166,6 +166,7 @@ type PodOpts struct {
 	Owner             string
 	NodeAffinityKey   string
 	NodeAffinityValue string
+	NodeName          string
 }
 
 // BuildTestPod builds a pod for testing
@@ -227,6 +228,10 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 			NodeSelector: nodeSelector,
 			Affinity:     affinty,
 		},
+	}
+
+	if len(opts.NodeName) > 0 {
+		pod.Spec.NodeName = opts.NodeName
 	}
 
 	for i := range containers {
