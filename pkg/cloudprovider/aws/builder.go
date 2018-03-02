@@ -16,7 +16,6 @@ type Builder struct {
 func (b Builder) Build() cloudprovider.CloudProvider {
 	sess, err := session.NewSession()
 	if err != nil {
-		log.Fatalln("Failed to create aws session")
 		return nil
 	}
 	service := autoscaling.New(sess)
@@ -30,13 +29,7 @@ func (b Builder) Build() cloudprovider.CloudProvider {
 		nodeGroups: make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupIDs)),
 	}
 
-	err = cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupIDs...)
-	if err != nil {
-		log.Fatalln(err)
-		return nil
-	}
-
+	cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupIDs...)
 	log.Infoln("aws session created successfully")
-
 	return cloud
 }
