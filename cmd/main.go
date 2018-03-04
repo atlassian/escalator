@@ -23,9 +23,9 @@ var (
 	addr                = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
 	scanInterval        = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
 	kubeConfigFile      = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
-	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups nodegroups").Required().String()
+	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups").Required().String()
 	drymode             = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
-	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Availiable options: (aws)").Default("aws").Enum("aws")
+	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Available options: (aws)").Default("aws").Enum("aws")
 )
 
 // cloudProviderBuilder builds the requested cloud provider. aws, gce, etc

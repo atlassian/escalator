@@ -339,6 +339,16 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).Infoln("Reaper: There were", removed, "empty nodes deleted this round")
 	}
 
+	// If we ever get into a state where we have less nodes than the minimum
+	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
+		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
+		scaleOptions.nodesDelta = nodeGroup.Opts.MinNodes - len(untaintedNodes)
+		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
+		}
+	}
+
 	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
 	return nodesDelta, err
 }

@@ -19,17 +19,18 @@ func Cordon(cordon bool, node *apiv1.Node, client kubernetes.Interface) (*apiv1.
 	}
 
 	// check if already un/cordoned
-	if node.Spec.Unschedulable == cordon {
+	if updatedNode.Spec.Unschedulable == cordon {
+		log.WithField("cordon", cordon).Warnf("Node %v cordon is already un/cordoned", updatedNode.Name)
 		return updatedNode, nil
 	}
 
-	node.Spec.Unschedulable = cordon
+	updatedNode.Spec.Unschedulable = cordon
 
 	updatedNodeWithCordon, err := client.CoreV1().Nodes().Update(updatedNode)
 	if err != nil || updatedNodeWithCordon == nil {
 		return updatedNode, fmt.Errorf("failed to update node %v after setting cordon to %v: %v", updatedNode.Name, cordon, err)
 	}
 
-	log.Infof("Successfully changed cordon state on node %v", updatedNodeWithCordon.Name)
+	log.WithField("cordon", cordon).Infof("Successfully changed cordon state on node %v", updatedNodeWithCordon.Name)
 	return updatedNodeWithCordon, nil
 }
