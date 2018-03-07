@@ -35,6 +35,8 @@ type NodeGroupOptions struct {
 
 	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
 	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
+	SlowNodeRevivalRate int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
+	FastNodeRevivalRate int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
 
 	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
@@ -47,20 +49,6 @@ type NodeGroupOptions struct {
 	hardDeleteGracePeriodDuration  time.Duration
 	scaleUpCoolDownPeriodDuration  time.Duration
 	scaleUpCoolDownTimeoutDuration time.Duration
-
-	// DEPRECATED
-	UntaintUpperCapacityThreshholdPercent int `json:"untaint_upper_capacity_threshhold_percent,omitempty" yaml:"untaint_upper_capacity_threshhold_percent,omitempty"`
-	// DEPRECATED
-	UntaintLowerCapacityThreshholdPercent int `json:"untaint_lower_capacity_threshhold_percent,omitempty" yaml:"untaint_lower_capacity_threshhold_percent,omitempty"`
-	SlowNodeRevivalRate                   int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
-	FastNodeRevivalRate                   int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
-
-	// UNUSED
-	SoftTaintEffectPercent         int     `json:"soft_taint_effect_percent,omitempty" yaml:"soft_taint_effect_percent,omitempty"`
-	DampeningStrength              float64 `json:"dampening_strength,omitempty" yaml:"dampening_strength,omitempty"`
-	DaemonSetUsagePercent          int     `json:"daemon_set_usage_percent,omitempty" yaml:"daemon_set_usage_percent,omitempty"`
-	MinSlackSpacePercent           int     `json:"min_slack_space_percent,omitempty" yaml:"min_slack_space_percent,omitempty"`
-	ScaleDownMinGracePeriodSeconds int     `json:"scale_down_min_grace_period_seconds,omitempty" yaml:"scale_down_min_grace_period_seconds,omitempty"`
 }
 
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct
@@ -101,9 +89,6 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
 	checkThat(nodegroup.MaxNodes >= 0, "max nodes must be larger than 0")
 	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow removal rate must be smaller than fast removal rate")
-
-	checkThat(nodegroup.UntaintLowerCapacityThreshholdPercent == 0, "UntaintLowerCapacityThreshholdPercent is deprecated. please use ScaleUpThreshholdPercent")
-	checkThat(nodegroup.UntaintUpperCapacityThreshholdPercent == 0, "UntaintUpperCapacityThreshholdPercent is deprecated. please use ScaleUpThreshholdPercent")
 
 	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft grace period must not be empty")
 	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard grace period must not be empty")
