@@ -1,36 +1,47 @@
 # Escalator
-Batch Optimized Horizontal Autoscaler for Kubernetes
 
-Escalator is a cluster-level autoscaler for Kubernetes that is designed for batch workloads that cannot be fast-drained. Kubernetes is a container orchestration framework that schedules Docker containers on a cluster.
+Batch Optimized Horizontal Autoscaler for Kubernetes.
+
+Escalator is a cluster-level autoscaler for Kubernetes that is designed for batch workloads that cannot be fast-drained. 
+Kubernetes is a container orchestration framework that schedules Docker containers on a cluster.
 
 The key preliminary features are:
 
 - Cluster-level utilisation node scaling.
+- Calculate requests and capacity to determine whether to scale up, down or to stay at the current scale
 - Safely drain "sacred" pods from nodes to allow graceful termination
-- Designed to work on selected auto-scaling groups, to allow the default Kubernetes autoscaler to continue to scale our service based workloads
-- Automatically cycle oldest nodes
+- Designed to work on selected auto-scaling groups, to allow the default
+  [Kubernetes Autoscaler](https://github.com/kubernetes/autoscaler) to continue to scale our service based workloads
+- Automatically terminate oldest nodes first
+- Support for different cloud providers - only AWS at the moment
 
-The need for this autoscaler is dervied from our own experiences with very large batch workloads being scheduled that can't be force-drained by the default autoscaler.
+The need for this autoscaler is derived from our own experiences with very large batch workloads being scheduled that 
+can't be force-drained by the default autoscaler.
 
 ## Documentation and Design
+
 See [Docs](docs/)
 
 ## How to run
 
-### Locally
+### Locally (out of cluster)
+
 ```
 go run cmd/main.go --kubeconfig ~/.kube/config --nodegroups nodegroups.yaml
 ```
 
 ### Docker
+
 ```
-# will build and push the docker image to the registry
-make push
+# will build the docker image
+docker build -t atlassian/escalator .
 ```
-In the escalator-deployment:
+
+In the escalator deployment:
+
 ```
 # need to mount your config file to your container
-- image: docker.atl-paas.net/kitt/escalator:{{ escalator.version }}
+- image: atlassian/escalator:{{ escalator.version }}
   command:
   - ./main
   - --nodegroups
@@ -50,9 +61,9 @@ go test ./pkg/<package-name>
 ### NodeGroupConfig minimum yaml example
 ```
 node_groups:
-  - name: "buildeng"
+  - name: "nodegroup1"
     label_key: "customer"
-    label_value: "buildeng"
+    label_value: "nodegroup1"
     min_nodes: 5
     max_nodes: 300
     dry_mode: true
