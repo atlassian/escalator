@@ -2,91 +2,93 @@
 
 Batch Optimized Horizontal Autoscaler for Kubernetes.
 
-Escalator is a cluster-level autoscaler for Kubernetes that is designed for batch workloads that cannot be fast-drained. 
+Escalator is a cluster-level autoscaler for Kubernetes that is designed for very large batch workloads that cannot be 
+fast-drained, but also where the default autoscaler does not scale up fast enough. 
 Kubernetes is a container orchestration framework that schedules Docker containers on a cluster.
 
-The key preliminary features are:
+**The key preliminary features are:**
 
 - Cluster-level utilisation node scaling.
 - Calculate requests and capacity to determine whether to scale up, down or to stay at the current scale
-- Safely drain "sacred" pods from nodes to allow graceful termination
-- Designed to work on selected auto-scaling groups, to allow the default
+- Wait until non-daemonset pods on nodes have completed before terminating the node
+- Designed to work on selected auto-scaling groups to allow the default
   [Kubernetes Autoscaler](https://github.com/kubernetes/autoscaler) to continue to scale our service based workloads
 - Automatically terminate oldest nodes first
 - Support for different cloud providers - only AWS at the moment
 
-The need for this autoscaler is derived from our own experiences with very large batch workloads being scheduled that 
-can't be force-drained by the default autoscaler.
+The need for this autoscaler is derived from our own experiences with very large batch workloads being scheduled and the
+default autoscaler not scaling up the cluster fast enough. These workloads can't be force-drained by the default autoscaler
+and must complete before the node can be terminated.
 
 ## Documentation and Design
 
-See [Docs](docs/)
+See [Docs](docs/README.md)
+
+## Building
+
+```bash
+make setup
+make build
+```
 
 ## How to run
 
 ### Locally (out of cluster)
 
-```
-go run cmd/main.go --kubeconfig ~/.kube/config --nodegroups nodegroups.yaml
-```
-
-### Docker
-
-```
-# will build the docker image
-docker build -t atlassian/escalator .
+```bash
+go run cmd/main.go --kubeconfig=~/.kube/config --nodegroups=nodegroups.yaml
 ```
 
-In the escalator deployment:
+### Inside cluster
 
+```bash
+make docker-build
 ```
-# need to mount your config file to your container
-- image: atlassian/escalator:{{ escalator.version }}
+
+In the Escalator Kubernetes deployment:
+```yaml
+# You need to mount your config file into your container
+- image: atlassian/escalator
   command:
   - ./main
   - --nodegroups
   - /opt/conf/nodegroups/nodegroups_config.yaml
 ```
 
-## How to test
-#### Test everything
-```
-make test
-```
-#### Test a specific package
-```
-go test ./pkg/<package-name> 
-```
+#### nodegroups_config.yaml example
 
-### NodeGroupConfig minimum yaml example
-```
+```yaml
 node_groups:
-  - name: "nodegroup1"
-    label_key: "customer"
-    label_value: "nodegroup1"
-    min_nodes: 5
-    max_nodes: 300
-    dry_mode: true
-    taint_upper_capacity_threshhold_percent: 70
-    taint_lower_capacity_threshhold_percent: 50
-    untaint_upper_capacity_threshhold_percent: 95
-    untaint_lower_capacity_threshhold_percent: 90
-    slow_node_removal_rate: 2
-    fast_node_removal_rate: 3
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 3
-  - name: "default"
+  - name: "shared"
     label_key: "customer"
     label_value: "shared"
+    cloud_provider_asg: "shared-nodes"
     min_nodes: 1
-    max_nodes: 10
-    dry_mode: true
-    taint_upper_capacity_threshhold_percent: 25
-    taint_lower_capacity_threshhold_percent: 20
-    untaint_upper_capacity_threshhold_percent: 45
-    untaint_lower_capacity_threshhold_percent: 30
+    max_nodes: 30
+    dry_mode: false
+    taint_upper_capacity_threshhold_percent: 40
+    taint_lower_capacity_threshhold_percent: 10
     slow_node_removal_rate: 2
-    fast_node_removal_rate: 3
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 3
+    fast_node_removal_rate: 5
+    scale_up_threshhold_percent: 70
+    scale_up_cool_down_period: 2m
+    scale_up_cool_down_timeout: 10m
+    soft_delete_grace_period: 1m
+    hard_delete_grace_period: 10m
+
+```
+
+## Testing
+
+#### Test everything
+
+```bash
+make test
+```
+
+#### Test a specific package
+
+To test the controller package:
+```bash
+go test ./pkg/controller
 ```
