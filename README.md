@@ -81,7 +81,7 @@ node_groups:
 
 ## Configuring
 
-See [Configuration](docs/configuration)
+See [Configuration](docs/configuration/README.md)
 
 ## Testing
 

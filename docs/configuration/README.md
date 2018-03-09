@@ -85,4 +85,4 @@ without actually running them.
 
 #### `--cloudprovider`
 
-The cloud provider to use. Cloud provider configuration and be found [here](../cloudprovider/index.md).
+The cloud provider to use. Cloud provider configuration and be found [here](../cloudprovider/README.md).
