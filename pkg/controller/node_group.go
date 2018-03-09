@@ -35,8 +35,6 @@ type NodeGroupOptions struct {
 
 	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
 	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
-	SlowNodeRevivalRate int `json:"slow_node_revival_rate,omitempty" yaml:"slow_node_revival_rate,omitempty"`
-	FastNodeRevivalRate int `json:"fast_node_revival_rate,omitempty" yaml:"fast_node_revival_rate,omitempty"`
 
 	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`

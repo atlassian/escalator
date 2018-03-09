@@ -66,7 +66,7 @@ func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := int64(opts.nodesDelta)
 
-	if nodesToAdd+opts.nodeGroup.ASG.Size() <= opts.nodeGroup.ASG.MaxSize() {
+	if nodesToAdd+opts.nodeGroup.ASG.TargetSize() <= opts.nodeGroup.ASG.MaxSize() {
 		drymode := c.dryMode(opts.nodeGroup)
 		log.WithField("drymode", drymode).
 			WithField("nodegroup", nodegroupName).
