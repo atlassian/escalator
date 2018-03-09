@@ -46,6 +46,7 @@ make docker-build
 ```
 
 In the Escalator Kubernetes deployment:
+
 ```yaml
 # You need to mount your config file into your container
 - image: atlassian/escalator
@@ -77,6 +78,10 @@ node_groups:
     hard_delete_grace_period: 10m
 
 ```
+
+## Configuring
+
+See [Configuration](docs/configuration)
 
 ## Testing
 
