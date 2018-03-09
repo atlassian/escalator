@@ -1,3 +1,7 @@
+vendor/
+
+main
 escalator
+
 nodegroups-*.yaml
 .idea/
