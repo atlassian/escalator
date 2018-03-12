@@ -8,11 +8,11 @@ Kubernetes is a container orchestration framework that schedules Docker containe
 
 **The key preliminary features are:**
 
-- Cluster-level utilisation node scaling.
+- Utilisation based node scaling
 - Calculate requests and capacity to determine whether to scale up, down or to stay at the current scale
 - Wait until non-daemonset pods on nodes have completed before terminating the node
 - Designed to work on selected auto-scaling groups to allow the default
-  [Kubernetes Autoscaler](https://github.com/kubernetes/autoscaler) to continue to scale our service based workloads
+  [Kubernetes Autoscaler](https://github.com/kubernetes/autoscaler) to continue to scale service based workloads
 - Automatically terminate oldest nodes first
 - Support for different cloud providers - only AWS at the moment
 
@@ -36,7 +36,7 @@ make build
 ### Locally (out of cluster)
 
 ```bash
-go run cmd/main.go --kubeconfig=~/.kube/config --nodegroups=nodegroups.yaml
+go run cmd/main.go --kubeconfig=~/.kube/config --nodegroups=nodegroups_config.yaml
 ```
 
 ### Inside cluster
@@ -92,7 +92,8 @@ make test
 
 #### Test a specific package
 
-To test the controller package:
+For example, to test the controller package:
+
 ```bash
 go test ./pkg/controller
 ```
