@@ -76,7 +76,6 @@ node_groups:
     scale_up_cool_down_timeout: 10m
     soft_delete_grace_period: 1m
     hard_delete_grace_period: 10m
-
 ```
 
 ## Configuring
