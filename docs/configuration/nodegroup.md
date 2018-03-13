@@ -3,6 +3,8 @@
 Configuration of the Node groups that Escalator will monitor is done through a YAML configuration file. This file is
 required for Escalator to run. 
 
+The configuration is validated by Escalator on start.
+
 Example nodegroups.yml configuration:
 
 ```yaml

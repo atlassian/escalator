@@ -39,7 +39,7 @@ make build
 go run cmd/main.go --kubeconfig=~/.kube/config --nodegroups=nodegroups_config.yaml
 ```
 
-### Inside cluster
+### Deployment (in cluster)
 
 ```bash
 make docker-build
@@ -84,13 +84,11 @@ See [Configuration](docs/configuration/README.md)
 
 ## Testing
 
-#### Test everything
-
 ```bash
 make test
 ```
 
-#### Test a specific package
+### Test a specific package
 
 For example, to test the controller package:
 
