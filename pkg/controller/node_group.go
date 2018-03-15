@@ -183,13 +183,15 @@ func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 		}
 
 		// finally, if the pod has an affinity for our selector then we will include it
-		if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			for _, term := range pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-				for _, expression := range term.MatchExpressions {
-					if expression.Key == labelKey {
-						for _, value := range expression.Values {
-							if value == labelValue {
-								return true
+		if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity != nil && pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms != nil {
+				for _, term := range pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+					for _, expression := range term.MatchExpressions {
+						if expression.Key == labelKey {
+							for _, value := range expression.Values {
+								if value == labelValue {
+									return true
+								}
 							}
 						}
 					}
