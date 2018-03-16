@@ -8,6 +8,10 @@
     - [Advanced Configuration](./configuration/advanced-configuration.md)
 - [**Deployment**](./deployment/README.md)
     - [AWS](./deployment/aws/README.md)
+- [**Algorithm and Calculations**](./calculations.md)
+    - Assumptions
+    - Requests, capacity and utilisation
+    - Scale up delta
     
 ## Design
 
