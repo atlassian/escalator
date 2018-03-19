@@ -7,7 +7,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
-	"log"
 	"github.com/atlassian/escalator/pkg/k8s"
 )
 
@@ -164,9 +163,6 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 			nodes := test.BuildTestNodes(tt.args.initialNodeAmount, tt.args.nodeOpts)
 			cpuPercent, memPercent, _ := calculatePercentageUsage(tt.args.pods, nodes)
 
-			log.Println("cpuPercent", cpuPercent)
-			log.Println("memPercent", memPercent)
-
 			// Calculate scale up delta
 			want, _ := calcScaleUpDelta(nodes, cpuPercent, memPercent, tt.args.nodeGroup)
 
@@ -183,7 +179,6 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 			newCpuPercent, newMemPercent, _ := calculatePercentageUsage(tt.args.pods, newNodes)
 
 			threshold := float64(tt.args.nodeGroup.Opts.ScaleUpThreshholdPercent)
-			log.Println(newCpuPercent, newMemPercent)
 			assert.True(t, newCpuPercent <= threshold, "New CPU percent: %v should be less than threshold: %v", newCpuPercent, threshold)
 			assert.True(t, newMemPercent <= threshold, "New Mem percent: %v should be less than threshold: %v", newMemPercent, threshold)
 		})
