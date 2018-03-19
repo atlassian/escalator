@@ -374,8 +374,6 @@ node_groups:
     untaint_lower_capacity_threshhold_percent: 90
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 3
     soft_delete_grace_period: 10m
     hard_delete_grace_period: 42
     scale_up_cooldown_period: 1h2m30s
@@ -387,12 +385,8 @@ node_groups:
     dry_mode: true
     taint_upper_capacity_threshhold_percent: 25
     taint_lower_capacity_threshhold_percent: 20
-    untaint_upper_capacity_threshhold_percent: 45
-    untaint_lower_capacity_threshhold_percent: 30
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 3
     scale_up_cooldown_period: 21h
 `
 
@@ -405,12 +399,8 @@ var yamlBE = `node_groups:
     dry_mode: false
     taint_upper_capacity_threshhold_percent: 70
     taint_lower_capacity_threshhold_percent: 45
-    untaint_upper_capacity_threshhold_percent: 95
-    untaint_lower_capacity_threshhold_percent: 90
     slow_node_removal_rate: 2
-    fast_node_removal_rate: 5
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 10`
+    fast_node_removal_rate: 5`
 
 func TestValidateNodeGroup(t *testing.T) {
 	type args struct {

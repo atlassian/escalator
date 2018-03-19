@@ -148,22 +148,24 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 		return fmt.Errorf("size increase must be positive")
 	}
 
-	size := n.Size()
-
-	// This means that a scaling action is likely to be in progress and aws will reject the new api call until it's done
-	if size != n.TargetSize() {
-		return fmt.Errorf("Must wait until size(%v) == target(%v)", size, n.TargetSize())
+	if n.TargetSize()+delta > n.MaxSize() {
+		return fmt.Errorf("increasing size will breach maximum node size")
 	}
 
-	return n.setASGDesiredSize(size + delta)
+	log.WithField("asg", n.id).Debugln("IncreaseSize=", delta)
+	return n.setASGDesiredSize(n.TargetSize() + delta)
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
 // failure or if the given node doesn't belong to this node group. This function
 // should wait until node group size is updated.
 func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
-	if n.Size() <= n.MinSize() {
+	if n.TargetSize() <= n.MinSize() {
 		return fmt.Errorf("min sized reached, nodes will not be deleted")
+	}
+
+	if n.TargetSize()-int64(len(nodes)) < n.MinSize() {
+		return fmt.Errorf("terminating nodes will breach minimum node size")
 	}
 
 	for _, node := range nodes {
@@ -221,14 +223,13 @@ func (n *NodeGroup) DecreaseTargetSize(delta int64) error {
 	if delta >= 0 {
 		return fmt.Errorf("size decrease delta must be negative")
 	}
-	size := n.Size()
-	nodes := n.Nodes()
 
-	if size+delta < int64(len(nodes)) {
-		return fmt.Errorf("attempt to delete existing nodes targetSize:%v delta:%v existingNodes: %v",
-			size, delta, len(nodes))
+	if n.TargetSize()+delta < n.MinSize() {
+		return fmt.Errorf("decreasing target size will breach minimum node size")
 	}
-	return n.setASGDesiredSize(size + delta)
+
+	log.WithField("asg", n.id).Debugln("DecreaseTargetSize=", delta)
+	return n.setASGDesiredSize(n.TargetSize() + delta)
 }
 
 // Nodes returns a list of all nodes that belong to this node group.
@@ -250,6 +251,9 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 		HonorCooldown:        awsapi.Bool(true),
 	}
 
+	log.WithField("asg", n.id).Debugln("SetDesiredCapacity=", newSize)
+	log.WithField("asg", n.id).Debugln("CurrentSize=", n.Size())
+	log.WithField("asg", n.id).Debugln("TargetSize=", n.TargetSize())
 	_, err := n.provider.service.SetDesiredCapacity(input)
 	return err
 }

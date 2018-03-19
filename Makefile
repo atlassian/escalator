@@ -1,5 +1,5 @@
 .PHONY: local-build
-local-build: escalator
+local-build:
 	CGO_ENABLED=1 go build -o escalator cmd/main.go
 
 .PHONY: setup
