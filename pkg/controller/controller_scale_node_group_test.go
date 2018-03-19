@@ -63,8 +63,14 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 }
 
 func TestScaleNodeGroup(t *testing.T) {
+	type nodeArgs struct {
+		initialAmount int
+		cpu           int64
+		mem           int64
+	}
+
 	type args struct {
-		nodes            []*v1.Node
+		nodeArgs         nodeArgs
 		pods             []*v1.Pod
 		nodeGroupOptions NodeGroupOptions
 		listerOptions    ListerOptions
@@ -73,13 +79,12 @@ func TestScaleNodeGroup(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want int
 		err  error
 	}{
 		{
 			"100% cpu, 50% threshold",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(40, 500, 1000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -89,13 +94,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			5,
 			nil,
 		},
 		{
 			"100% mem, 50% threshold",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(40, 100, 2000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -105,13 +109,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			5,
 			nil,
 		},
 		{
 			"100% cpu, 70% threshold",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(40, 500, 1000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -121,13 +124,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			3,
 			nil,
 		},
 		{
 			"150% cpu, 70% threshold",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(60, 500, 1000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -137,24 +139,22 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			8,
 			nil,
 		},
 		{
 			"no nodes",
 			args{
-				buildTestNodes(0, 0, 0),
+				nodeArgs{0, 0, 0},
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{},
 				ListerOptions{},
 			},
-			0,
 			errors.New("no nodes remaining"),
 		},
 		{
 			"node count less than the minimum",
 			args{
-				buildTestNodes(1, 0, 0),
+				nodeArgs{1, 0, 0},
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
 					Name:     "default",
@@ -162,13 +162,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			0,
 			errors.New("node count less than the minimum"),
 		},
 		{
 			"node count larger than the maximum",
 			args{
-				buildTestNodes(10, 0, 0),
+				nodeArgs{10, 0, 0},
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
 					Name:     "default",
@@ -176,13 +175,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			0,
 			errors.New("node count larger than the maximum"),
 		},
 		{
 			"invalid node and pod usage/requests",
 			args{
-				buildTestNodes(10, 0, 0),
+				nodeArgs{10, 0, 0},
 				buildTestPods(5, 0, 0),
 				NodeGroupOptions{
 					Name:     "default",
@@ -191,13 +189,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			0,
-			errors.New("Cannot divide by zero in percent calculation"),
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"invalid node and pod usage/requests",
 			args{
-				buildTestNodes(10, -100, 0),
+				nodeArgs{10, -100, 0},
 				buildTestPods(5, 0, -100),
 				NodeGroupOptions{
 					Name:     "default",
@@ -206,13 +203,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			0,
-			errors.New("Cannot divide by zero in percent calculation"),
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"invalid node and pod usage/requests",
 			args{
-				buildTestNodes(10, -100, -100),
+				nodeArgs{10, -100, -100},
 				buildTestPods(5, -100, -100),
 				NodeGroupOptions{
 					Name:     "default",
@@ -221,13 +217,12 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			0,
-			errors.New("Cannot divide by zero in percent calculation"),
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"lister not being able to list pods",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(5, 1000, 2000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -241,13 +236,12 @@ func TestScaleNodeGroup(t *testing.T) {
 					},
 				},
 			},
-			0,
 			errors.New("unable to list pods"),
 		},
 		{
 			"lister not being able to list nodes",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(5, 1000, 2000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -261,13 +255,12 @@ func TestScaleNodeGroup(t *testing.T) {
 					},
 				},
 			},
-			0,
 			errors.New("unable to list nodes"),
 		},
 		{
 			"no need to scale up",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				nodeArgs{10, 2000, 8000},
 				buildTestPods(5, 1000, 2000),
 				NodeGroupOptions{
 					Name:                     "default",
@@ -277,7 +270,21 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			0,
+			nil,
+		},
+		{
+			"scale up test",
+			args{
+				nodeArgs{10, 1500, 5000},
+				buildTestPods(100, 500, 600),
+				NodeGroupOptions{
+					Name:                     "default",
+					MinNodes:                 5,
+					MaxNodes:                 100,
+					ScaleUpThreshholdPercent: 70,
+				},
+				ListerOptions{},
+			},
 			nil,
 		},
 	}
@@ -285,7 +292,9 @@ func TestScaleNodeGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
-			client, opts := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			ngName := tt.args.nodeGroupOptions.Name
+			nodes := buildTestNodes(tt.args.nodeArgs.initialAmount, tt.args.nodeArgs.cpu, tt.args.nodeArgs.mem)
+			client, opts := buildTestClient(nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
 
 			// For these test cases we only use 1 node group/ASG
 			nodeGroupSize := 1
@@ -296,7 +305,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				tt.args.nodeGroupOptions.Name,
 				int64(tt.args.nodeGroupOptions.MinNodes),
 				int64(tt.args.nodeGroupOptions.MaxNodes),
-				int64(len(tt.args.nodes)),
+				int64(len(nodes)),
 			)
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
@@ -317,14 +326,30 @@ func TestScaleNodeGroup(t *testing.T) {
 				cloudProvider: testCloudProvider,
 			}
 
-			nodesDelta, err := controller.scaleNodeGroup(tt.args.nodeGroupOptions.Name, nodeGroupsState[tt.args.nodeGroupOptions.Name])
+			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
 
-			// Ensure the returned nodes delta is what we wanted
-			assert.Equal(t, tt.want, nodesDelta)
+			// Ensure there were no errors
 			assert.Equal(t, tt.err, err)
 
+			if nodesDelta <= 0 {
+				return
+			}
+
 			// Ensure the node group on the cloud provider side scales up to the correct amount
-			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), testNodeGroup.TargetSize())
+			assert.Equal(t, int64(len(nodes)+nodesDelta), testNodeGroup.TargetSize())
+
+			// Create the nodes to simulate the cloud provider bringing up the new nodes
+			newNodes := append(nodes, buildTestNodes(nodesDelta, tt.args.nodeArgs.cpu, tt.args.nodeArgs.mem)...)
+			// Create a new client with the new nodes and update everything that uses the client
+			client, opts = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			controller.Client = client
+			controller.Opts = opts
+			nodeGroupsState[ngName].NodeGroupLister = client.Listers[ngName]
+
+			// Re-run the scale, ensure the result is 0 as we shouldn't need to scale up again
+			newNodesDelta, _ := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
+			assert.Equal(t, 0, newNodesDelta)
+
 		})
 	}
 

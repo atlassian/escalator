@@ -7,204 +7,193 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"testing"
+	"github.com/atlassian/escalator/pkg/k8s"
 )
 
-func TestCalcNodeWorth(t *testing.T) {
-	nodes := test.BuildTestNodes(200, test.NodeOpts{})
+func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
+	type args struct {
+		pods              []*v1.Pod
+		initialNodeAmount int
+		nodeOpts          test.NodeOpts
+		nodeGroup         *NodeGroupState
+	}
 
 	tests := []struct {
-		name  string
-		nodes []*v1.Node
-		want  float64
-		err   error
+		name string
+		args args
 	}{
 		{
-			"10 nodes",
-			nodes[:10],
-			10.0,
-			nil,
+			"test below threshold",
+			args{
+				test.BuildTestPods(10, test.PodOpts{
+					CPU: []int64{500},
+					Mem: []int64{100},
+				}),
+				2,
+				test.NodeOpts{
+					CPU: 1000,
+					Mem: 4000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 70,
+					},
+				},
+			},
 		},
 		{
-			"50 nodes",
-			nodes[:50],
-			2.0,
-			nil,
+			"test below threshold",
+			args{
+				test.BuildTestPods(10, test.PodOpts{
+					CPU: []int64{500},
+					Mem: []int64{2000},
+				}),
+				2,
+				test.NodeOpts{
+					CPU: 3000,
+					Mem: 1000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 70,
+					},
+				},
+			},
 		},
 		{
-			"100 nodes",
-			nodes[:100],
-			1.0,
-			nil,
+			"test below threshold",
+			args{
+				test.BuildTestPods(10, test.PodOpts{
+					CPU: []int64{500},
+					Mem: []int64{2000},
+				}),
+				2,
+				test.NodeOpts{
+					CPU: 3000,
+					Mem: 1000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 40,
+					},
+				},
+			},
 		},
 		{
-			"200 nodes",
-			nodes[:200],
-			0.5,
-			nil,
+			"test below threshold",
+			args{
+				test.BuildTestPods(10, test.PodOpts{
+					CPU: []int64{500},
+					Mem: []int64{2000},
+				}),
+				2,
+				test.NodeOpts{
+					CPU: 3000,
+					Mem: 1000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 23,
+					},
+				},
+			},
 		},
 		{
-			"0 nodes",
-			make([]*v1.Node, 0),
-			0,
-			errors.New("cannot divide by zero in percent calculation"),
+			"test below threshold",
+			args{
+				test.BuildTestPods(10, test.PodOpts{
+					CPU: []int64{500},
+					Mem: []int64{2000},
+				}),
+				2,
+				test.NodeOpts{
+					CPU: 3000,
+					Mem: 1000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 3,
+					},
+				},
+			},
+		},
+		{
+			"test below threshold",
+			args{
+				test.BuildTestPods(80, test.PodOpts{
+					CPU: []int64{1000},
+					Mem: []int64{1000},
+				}),
+				100,
+				test.NodeOpts{
+					CPU: 1000,
+					Mem: 1000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 70,
+					},
+				},
+			},
+		},
+		{
+			"test below threshold",
+			args{
+				test.BuildTestPods(150, test.PodOpts{
+					CPU: []int64{1000},
+					Mem: []int64{1000},
+				}),
+				100,
+				test.NodeOpts{
+					CPU: 1000,
+					Mem: 1000,
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						ScaleUpThreshholdPercent: 110,
+					},
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			want, err := calcNodeWorth(tt.nodes)
-			assert.Equal(t, tt.err, err)
-			assert.Equal(t, tt.want, want)
+			// Calculate percentage usage
+			nodes := test.BuildTestNodes(tt.args.initialNodeAmount, tt.args.nodeOpts)
+			cpuPercent, memPercent, _ := calculatePercentageUsage(tt.args.pods, nodes)
+
+			// Calculate scale up delta
+			want, _ := calcScaleUpDelta(nodes, cpuPercent, memPercent, tt.args.nodeGroup)
+
+			if want <= 0 {
+				return
+			}
+
+			// Add the scale up delta amount of nodes and see if the new total of nodes will
+			// bring it below the scale up threshold
+			newNodes := append(nodes, test.BuildTestNodes(want, tt.args.nodeOpts)...)
+
+			// Calculate the scale up percentage after adding the new nodes
+			// Both of the percentages should be below the scale up threshold percent
+			newCpuPercent, newMemPercent, _ := calculatePercentageUsage(tt.args.pods, newNodes)
+
+			threshold := float64(tt.args.nodeGroup.Opts.ScaleUpThreshholdPercent)
+			assert.True(t, newCpuPercent <= threshold, "New CPU percent: %v should be less than threshold: %v", newCpuPercent, threshold)
+			assert.True(t, newMemPercent <= threshold, "New Mem percent: %v should be less than threshold: %v", newMemPercent, threshold)
 		})
 	}
 
 }
 
-func TestCalcScaleUpDelta(t *testing.T) {
-	type args struct {
-		nodes      []*v1.Node
-		cpuPercent float64
-		memPercent float64
-		nodeGroup  *NodeGroupState
-	}
+// Helper function for calculating percentage usage
+func calculatePercentageUsage(pods []*v1.Pod, nodes []*v1.Node) (float64, float64, error) {
+	// Calculate requests and capacity
+	memRequest, cpuRequest, _ := k8s.CalculatePodsRequestsTotal(pods)
+	memCapacity, cpuCapacity, _ := k8s.CalculateNodesCapacityTotal(nodes)
 
-	nodes := test.BuildTestNodes(100, test.NodeOpts{})
-
-	tests := []struct {
-		name string
-		args args
-		want int
-		err  error
-	}{
-		{
-			"scale up 10%",
-			args{
-				nodes,
-				80,
-				80,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
-					},
-				},
-			},
-			10,
-			nil,
-		},
-		{
-			"scale up 10% cpu",
-			args{
-				nodes,
-				80,
-				50,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
-					},
-				},
-			},
-			10,
-			nil,
-		},
-		{
-			"scale up 20% mem",
-			args{
-				nodes,
-				80,
-				90,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
-					},
-				},
-			},
-			20,
-			nil,
-		},
-		{
-			"scale up 30% cpu",
-			args{
-				nodes,
-				80,
-				50,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 50,
-					},
-				},
-			},
-			30,
-			nil,
-		},
-		{
-			"scale up with zero nodes",
-			args{
-				make([]*v1.Node, 0),
-				80,
-				50,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
-					},
-				},
-			},
-			0,
-			errors.New("cannot divide by zero in percent calculation"),
-		},
-		{
-			"test with weird values",
-			args{
-				nodes,
-				100,
-				100,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 100,
-					},
-				},
-			},
-			0,
-			nil,
-		},
-		{
-			"test with weird values",
-			args{
-				nodes,
-				100,
-				100,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 0,
-					},
-				},
-			},
-			100,
-			nil,
-		},
-		{
-			"test with weird values",
-			args{
-				nodes,
-				0,
-				0,
-				&NodeGroupState{
-					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
-					},
-				},
-			},
-			-70,
-			errors.New("negative scale up delta"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			want, err := calcScaleUpDelta(tt.args.nodes, tt.args.cpuPercent, tt.args.memPercent, tt.args.nodeGroup)
-			assert.Equal(t, tt.err, err)
-			assert.Equal(t, tt.want, want)
-		})
-	}
+	// Calculate percentage usage
+	return calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
 }
 
 func TestCalcPercentUsage(t *testing.T) {
@@ -243,7 +232,7 @@ func TestCalcPercentUsage(t *testing.T) {
 			},
 			0,
 			0,
-			errors.New("Cannot divide by zero in percent calculation"),
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"zero numerator test",
@@ -267,7 +256,7 @@ func TestCalcPercentUsage(t *testing.T) {
 			},
 			0,
 			0,
-			errors.New("Cannot divide by zero in percent calculation"),
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 	}
 	for _, tt := range tests {

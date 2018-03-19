@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"github.com/google/uuid"
 )
 
 // NodeOpts minimal options for configuring a node object in testing
@@ -149,7 +150,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 func BuildTestNodes(amount int, opts NodeOpts) []*apiv1.Node {
 	var nodes []*apiv1.Node
 	for i := 0; i < amount; i++ {
-		opts.Name = fmt.Sprintf("n%d", i)
+		opts.Name = uuid.New().String()
 		nodes = append(nodes, BuildTestNode(opts))
 	}
 	return nodes
