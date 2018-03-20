@@ -12,6 +12,7 @@
     - Assumptions
     - Requests, capacity and utilisation
     - Scale up delta
+- [**Glossary**](./glossary.md)
     
 ## Design
 
