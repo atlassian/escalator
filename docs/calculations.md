@@ -6,7 +6,10 @@ To perform the requests, capacity, utilisation and scale up delta calculations, 
 important assumptions:
 
  - **All nodes in the node group have the same allocatable resources**
- - **All containers in the node group have specified resource requests**
+ - **All containers in pods in the node group have specified resource requests**
+ 
+**If Escalator is unable to make the above assumptions, e.g. there are containers without resource requests specified or
+nodes have different allocatable resources, scaling activities (scaling up or down) may have unintended side affects.**
 
 ## Requests, capacity and utilisation
 
@@ -21,7 +24,7 @@ memory. Escalator then takes the higher of the two (CPU and Memory) and uses it 
 
 **For example:**
 
-We have 10 pods with a single container, each requesting `500m` CPU and `100mb` memory.
+We have 10 pods with a single container, each container requesting `500m` CPU and `100mb` memory.
 The calculated requests would add up to 5 (`5000m`) CPU and `1000mb` memory.
  - `10 * 500m` = **5000m**
  - `10 * 100mb` = **1000mb** 
@@ -45,34 +48,37 @@ configured at. Threshold configuration is [documented here](./configuration/adva
 When it is determined that Escalator needs to scale up the node group, it needs to perform a calculation to determine
 how much to tell the cloud provider to scale up the node group by.
 
-The delta is calculated by first figuring out the worth of each node running in the node group. The node worth is 
-a percentage a single makes up of the total node group.
+The delta is calculated through the use of a percent decrease formula. We need to calculate how much to increase the
+node group by calculating the amount of nodes needed to decrease the utilisation to be below the 
+`scale_up_threshhold_percent` option.
 
 **For example:**
 
-- **100 nodes**, the node worth will be **1.0**, i.e. 1 node is **1% of the total capacity**
-- **10 nodes**, the node worth will be **10.0**, i.e. 1 node is **10% of the total capacity**
-- **37 nodes**, the node worth will be **2.7027027**, i.e. 1 node is **2.7027027% of the total capacity**
+- `scale_up_threshhold_percent` is `70`
+- CPU utilisation is `250`
+- `(250 - 70) / 70` = `2.57142857143`
+- `2.57142857143 * 2 nodes` = `5.14285714286`
+- Amount to increase by: `ceil(5.14285714286)` = `6` nodes
 
-To then calculate the scale up delta, we get the remaining percentage needed to bring the overall utilisation below the
-scale up threshold. With this remaining percentage and the node worth we can calculate the node delta.
-
-**For example:**
-
-- CPU Utilisation = `250%`
-- Scale up threshold (`scale_up_threshhold_percent`) = `70`
-- Node worth (2 nodes) = `50.0`
-- Remaining percentage needed to be below scale up threshold: `250 - 70` = `180`
-- Scale up delta: `180 / 50` = `3.6`
-- Amount sent to cloud provider to increase by: `ceil(3.6)` = `4` 
-- We `ceil()` the final scale up delta because we can only request whole nodes
-
-By requesting the node group to scale up by `4`, the new total node count will equal `6`. With a new node count of `6`,
-the node group utilisation is as follows:
+By requesting the node group to scale up by `6` nodes, the new total node count will be `8`. With a new node count of 
+`8`, the node group utilisation is as follows:
 
 The utilisation would then be calculated as follows:
- - CPU: `5000m / 6000m * 100` = **83.3334%**
- - Memory: `1000mb / 24000mb * 100` = **0.04167%**
+ - CPU: `5000m / 8000m * 100` = **62.5%**
+ - Memory: `1000mb / 32000mb * 100` = **3.125%**
 
 ## Daemonsets
+
+[Daemonsets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) are copies of pods that run on all 
+nodes in a cluster. Daemonsets are purposely factored out out of the utilisation calculations that Escalator performs.
+This is done for a variety of reasons, these being:
+
+ - Keeping the calculations for utilisation simple by only looking at the pods that have the appropriate node selector
+   or node affinity set.
+ - There is no simple way to select the daemonsets that are running in the node group, as they don't have any 
+   node selectors or node affinity.
+ - There is no simple way to calculate the utilisation of the daemonsets on any new nodes that are to be brought up.
+ 
+ **To mitigate this caveat, it is highly recommended that slack space is configured for the node group to cater for 
+ daemonsets. [More information on slack space](./configuration/advanced-configuration.md).**
 
