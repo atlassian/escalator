@@ -40,16 +40,10 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		now := time.Now()
 		if now.Sub(*taintedTime) > opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
 			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfos) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
-				// Cordon the node first so it isn't counted in the listed nodes anymore
 				drymode := c.dryMode(opts.nodeGroup)
-				log.WithField("drymode", drymode).Infof("cordoning node %v before deletion", candidate.Name)
+				log.WithField("drymode", drymode).Infof("Node %v, %v ready to be deleted", candidate.Name, candidate.Spec.ProviderID)
 				if !drymode {
-					cordonedNode, err := k8s.Cordon(true, candidate, c.Client)
-					if err != nil {
-						log.WithError(err).Errorf("Failed to cordon node %v before deleting from asg.", err)
-						continue
-					}
-					toBeDeleted = append(toBeDeleted, cordonedNode)
+					toBeDeleted = append(toBeDeleted, candidate)
 				}
 			} else {
 				log.Debugf("node %v not ready for deletion. Hard delete time remaining %v",
@@ -69,9 +63,8 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		// Terminate the nodes >:)
 		err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
 		if err != nil {
-			log.WithError(err).Errorln("Failed to delete nodes. Uncordoning them to be safe", toBeDeleted)
-			for _, node := range toBeDeleted {
-				node, err = k8s.Cordon(false, node, c.Client)
+			for _, nodeToDelete := range toBeDeleted {
+				log.WithError(err).Errorf("failed to delete node %v, %v", nodeToDelete.Name, nodeToDelete.Spec.ProviderID)
 			}
 			return 0, err
 		}
