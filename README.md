@@ -23,6 +23,13 @@ The need for this autoscaler is derived from our own experiences with very large
 default autoscaler not scaling up the cluster fast enough. These workloads can't be force-drained by the default 
 autoscaler and must complete before the node can be terminated.
 
+## Development Roadmap
+
+- [#56](https://github.com/atlassian/escalator/issues/56) - Implement leader election mechanism
+- [#57](https://github.com/atlassian/escalator/issues/57) - Implement healthcheck endpoint
+- [#60](https://github.com/atlassian/escalator/issues/60) - Add additional metrics
+- [#71](https://github.com/atlassian/escalator/issues/71) - Generate unique ID for each scale activity
+
 ## Documentation and Design
 
 See [Docs](docs/README.md)
