@@ -30,6 +30,14 @@ var (
 		[]string{"node_group"},
 	)
 	// NodeGroupNodes nodes considered by specific node groups
+	NodeGroupNodesCordoned = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_cordoned_nodes",
+			Help: "nodes considered by specific node groups that are cordoned",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupNodes nodes considered by specific node groups
 	NodeGroupNodes = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_group_nodes",
@@ -122,6 +130,7 @@ var (
 func init() {
 	prometheus.MustRegister(RunCount)
 	prometheus.MustRegister(NodeGroupNodes)
+	prometheus.MustRegister(NodeGroupNodesCordoned)
 	prometheus.MustRegister(NodeGroupNodesUntainted)
 	prometheus.MustRegister(NodeGroupNodesTainted)
 	prometheus.MustRegister(NodeGroupPods)

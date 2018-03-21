@@ -253,7 +253,7 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 
 	log.WithField("asg", n.id).Debugln("SetDesiredCapacity=", newSize)
 	log.WithField("asg", n.id).Debugln("CurrentSize=", n.Size())
-	log.WithField("asg", n.id).Debugln("TargetSize=", n.TargetSize())
+	log.WithField("asg", n.id).Debugln("CurrentTargetSize=", n.TargetSize())
 	_, err := n.provider.service.SetDesiredCapacity(input)
 	return err
 }

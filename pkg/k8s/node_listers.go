@@ -37,7 +37,6 @@ func (lister *FilteredNodesLister) List() ([]*v1.Node, error) {
 		return filteredNodes, err
 	}
 
-	filteredNodes = make([]*v1.Node, 0, len(allNodes))
 	// only include node that match the filtering function
 	for _, node := range allNodes {
 		if lister.filterFunc(node) {
