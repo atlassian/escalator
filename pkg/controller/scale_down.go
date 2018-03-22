@@ -60,18 +60,19 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	}
 
 	if len(toBeDeleted) > 0 {
-		// Delete the nodes from kubernetes
-		err := k8s.DeleteNodes(toBeDeleted, c.Client)
-		if err != nil {
-			log.WithError(err).Errorf("failed to delete nodes from kubernetes")
-			return 0, err
-		}
 		// Terminate the nodes in the cloud provider
-		err = opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
+		err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
 		if err != nil {
 			for _, nodeToDelete := range toBeDeleted {
 				log.WithError(err).Errorf("failed to terminate node in cloud provider %v, %v", nodeToDelete.Name, nodeToDelete.Spec.ProviderID)
 			}
+			return 0, err
+		}
+
+		// Delete the nodes from kubernetes
+		err = k8s.DeleteNodes(toBeDeleted, c.Client)
+		if err != nil {
+			log.WithError(err).Errorf("failed to delete nodes from kubernetes")
 			return 0, err
 		}
 		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
