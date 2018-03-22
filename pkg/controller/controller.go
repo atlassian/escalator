@@ -59,9 +59,7 @@ type scaleOpts struct {
 	nodes               []*v1.Node
 	taintedNodes        []*v1.Node
 	untaintedNodes      []*v1.Node
-	pods                []*v1.Pod
 	nodeGroup           *NodeGroupState
-	clusterUsagePercent int
 	nodesDelta          int
 }
 
@@ -112,9 +110,10 @@ func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 }
 
 // filterNodes separates nodes between tainted and untainted nodes
-func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node) (untaintedNodes []*v1.Node, taintedNodes []*v1.Node) {
+func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node) (untaintedNodes []*v1.Node, taintedNodes []*v1.Node, cordonedNodes []*v1.Node) {
 	untaintedNodes = make([]*v1.Node, 0, len(allNodes))
 	taintedNodes = make([]*v1.Node, 0, len(allNodes))
+	cordonedNodes = make([]*v1.Node, 0, len(allNodes))
 
 	for _, node := range allNodes {
 		if c.dryMode(nodeGroup) {
@@ -131,6 +130,11 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 				taintedNodes = append(taintedNodes, node)
 			}
 		} else {
+			// If the node is Unschedulable (cordoned), separate it out from the tainted/untainted
+			if node.Spec.Unschedulable {
+				cordonedNodes = append(cordonedNodes, node)
+				continue
+			}
 			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
 				untaintedNodes = append(untaintedNodes, node)
 			} else {
@@ -159,14 +163,16 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Filter into untainted and tainted nodes
-	untaintedNodes, taintedNodes := c.filterNodes(nodeGroup, allNodes)
+	untaintedNodes, taintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
 	log.WithField("nodegroup", nodegroup).Infoln("pods total:", len(pods))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
+	log.WithField("nodegroup", nodegroup).Infoln("cordoned nodes remaining total:", len(cordonedNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining untainted:", len(untaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining tainted:", len(taintedNodes))
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
+	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
 	metrics.NodeGroupNodesTainted.WithLabelValues(nodegroup).Set(float64(len(taintedNodes)))
 	metrics.NodeGroupPods.WithLabelValues(nodegroup).Set(float64(len(pods)))
@@ -221,6 +227,20 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	bytesMemCap, _ := memCapacity.AsInt64()
 	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(bytesMemCap))
 
+	// If we ever get into a state where we have less nodes than the minimum
+	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
+		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
+		result, err := c.ScaleUp(scaleOpts{
+			nodes: allNodes,
+			nodesDelta: nodeGroup.Opts.MinNodes - len(untaintedNodes),
+			nodeGroup: nodeGroup,
+		})
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
+		}
+		return result, err
+	}
+
 	// Calc %
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
 	if err != nil {
@@ -264,7 +284,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 			}
 		}
 		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
-		if nodeGroup.ASG.Size() == nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken == int(nodeGroup.ASG.TargetSize()) {
+		if nodeGroup.ASG.Size() >= nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken >= int(nodeGroup.ASG.TargetSize()) {
 			nodeGroup.scaleUpLock.unlock()
 			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
 		} else {
@@ -276,7 +296,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Perform the scaling decision
-	maxPercent := int(math.Max(cpuPercent, memPercent))
+	maxPercent := int(math.Ceil(math.Max(cpuPercent, memPercent)))
 	nodesDelta := 0
 
 	// Determine if we want to scale up or down. Selects the first condition that is true
@@ -294,7 +314,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThreshholdPercent
-		nodesDelta, err = calcScaleUpDelta(allNodes, cpuPercent, memPercent, nodeGroup)
+		nodesDelta, err = calcScaleUpDelta(untaintedNodes, cpuPercent, memPercent, nodeGroup)
 		if err != nil {
 			log.Errorf("Failed to calculate node delta: %v", err)
 			return nodesDelta, err
@@ -303,17 +323,15 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
 
+	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
 		nodes:               allNodes,
 		taintedNodes:        taintedNodes,
 		untaintedNodes:      untaintedNodes,
-		pods:                pods,
 		nodeGroup:           nodeGroup,
-		clusterUsagePercent: maxPercent,
 	}
 
-	// Clamp the nodes inside the min and max node count
-	var nodesDeltaResult int
+	// Perform a scale up, do nothing or scale down based on the nodes delta
 	switch {
 	case nodesDelta < 0:
 		// Try to scale down
@@ -339,16 +357,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).Infoln("Reaper: There were", removed, "empty nodes deleted this round")
 	}
 
-	// If we ever get into a state where we have less nodes than the minimum
-	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
-		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
-		scaleOptions.nodesDelta = nodeGroup.Opts.MinNodes - len(untaintedNodes)
-		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
-		if err != nil {
-			log.WithField("nodegroup", nodegroup).Error(err)
-		}
-	}
-
 	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
 	return nodesDelta, err
 }
@@ -372,6 +380,7 @@ func (c *Controller) RunOnce() {
 		c.scaleNodeGroup(nodegroup, state)
 	}
 
+	metrics.RunCount.Add(1)
 	endTime := time.Now()
 	log.Debugf("Scaling took a total of %v", endTime.Sub(startTime))
 }

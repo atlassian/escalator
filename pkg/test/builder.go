@@ -105,7 +105,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 	var taints []apiv1.Taint
 	if opts.Tainted {
 		taints = append(taints, apiv1.Taint{
-			Key:    "ToBeRemovedByAutoscaler",
+			Key:    "atlassian.com/escalator",
 			Value:  fmt.Sprint(time.Now().Unix()),
 			Effect: apiv1.TaintEffectNoSchedule,
 		})

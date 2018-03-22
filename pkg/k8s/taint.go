@@ -15,13 +15,13 @@ import (
 // Utility functions that assist with the tainting of nodes
 // ----
 // Taint Scheme:
-// Key: ToBeRemovedByAutoscaler
+// Key: atlassian.com/escalator
 // Value: time.Now().Unix()
 // Effect: NoSchedule
 
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
-	ToBeRemovedByAutoscalerKey = "ToBeRemovedByAutoscaler"
+	ToBeRemovedByAutoscalerKey = "atlassian.com/escalator"
 	// MaximumTaints we can taint at one time
 	MaximumTaints = 10
 )

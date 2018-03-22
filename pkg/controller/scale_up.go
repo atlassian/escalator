@@ -18,14 +18,14 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	nodesToAdd := opts.nodesDelta
 
 	// check that untainting the nodes doesn't do bring us over max nodes
-	if len(opts.untaintedNodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
+	if len(opts.nodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
 		// Clamp it to the max we can untaint
-		nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.untaintedNodes)
+		nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.nodes)
 		log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
 		if nodesToAdd < 0 {
 			err := fmt.Errorf(
 				"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
-				len(opts.untaintedNodes),
+				len(opts.nodes),
 				opts.nodeGroup.Opts.MaxNodes,
 			)
 			log.WithError(err).Error("Cancelling scaleup")
