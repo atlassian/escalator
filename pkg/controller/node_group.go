@@ -219,10 +219,6 @@ func NewPodDefaultFilterFunc() k8s.PodFilterFunc {
 // NewNodeLabelFilterFunc creates a new NodeFilterFunc based on filtering by node labels
 func NewNodeLabelFilterFunc(labelKey, labelValue string) k8s.NodeFilterFunc {
 	return func(node *v1.Node) bool {
-		if node.Spec.Unschedulable {
-			return false
-		}
-
 		if value, ok := node.ObjectMeta.Labels[labelKey]; ok {
 			if value == labelValue {
 				return true
