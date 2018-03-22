@@ -23,7 +23,7 @@ The need for this autoscaler is derived from our own experiences with very large
 default autoscaler not scaling up the cluster fast enough. These workloads can't be force-drained by the default 
 autoscaler and must complete before the node can be terminated.
 
-## Development Roadmap
+## Planned Features & Development Roadmap
 
 - [#56](https://github.com/atlassian/escalator/issues/56) - Implement leader election mechanism
 - [#57](https://github.com/atlassian/escalator/issues/57) - Implement healthcheck endpoint
@@ -36,7 +36,7 @@ See [Docs](docs/README.md)
 
 ## Requirements
 
-- [Kubernetes](https://kubernetes.io/) version 1.8+. Escalator has been tested and deployed on 1.8+ and newer and older 
+- [Kubernetes](https://kubernetes.io/) version 1.8+. Escalator has been tested and deployed on 1.8+ and newer. Older 
 versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
 - [Dep](https://golang.github.io/dep/). It is recommended to use a recent release from 
 [https://github.com/golang/dep/releases](https://github.com/golang/dep/releases)
