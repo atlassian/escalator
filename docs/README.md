@@ -12,6 +12,10 @@
     - Assumptions
     - Requests, capacity and utilisation
     - Scale up delta
+- [**Scale Process**](./scale-process.md)
+    - Scale up
+    - Scale down
+    - Scale lock
 - [**Glossary**](./glossary.md)
     
 ## Design
