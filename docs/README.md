@@ -16,6 +16,9 @@
     - Scale up
     - Scale down
     - Scale lock
+- [**Metrics**](./metrics.md)
+    - Exposed Metrics
+    - Recommendations
 - [**Glossary**](./glossary.md)
         
 ## Package Layout and Usage
@@ -58,5 +61,5 @@
     - On a "do nothing" event
         - Terminate any nodes that have passed the grace period and are empty
 
-![Algorithm](Algorithm.png)
+![Algorithm](./Algorithm.png)
 
