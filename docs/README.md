@@ -2,6 +2,9 @@
 
 ## Contents
 
+- [**Best Practices, Common Issues and Gotchas**](./best-practices-issues-gotchas.md)
+    - Best Practices
+    - Common Issues and Gotchas
 - [**Configuration**](./configuration/README.md)
     - [Command line options](./configuration/command-line.md)
     - [Node Group Configuration](./configuration/nodegroup.md)
