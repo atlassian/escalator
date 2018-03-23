@@ -17,10 +17,29 @@
     - Scale down
     - Scale lock
 - [**Glossary**](./glossary.md)
-    
+        
+## Package Layout and Usage
+
+- `cmd`
+    - contains command function, setup, and config loading
+- `pkg/controller`
+    - contains the core logic specific to escalator and nodegroups
+- `pkg/k8s`
+    - provides application utils and help with interfacing with Kubernetes and client-go
+- `pkg/cloudprovider`
+    - provides everything related to cloud providers
+    - `pkg/cloudprovider/aws`
+      - provides the aws implementation of cloudprovider
+- `pkg/metrics`
+    - provides a place for all metric setup to live
+- `pkg/test`
+    - provides Kubernetes and cloudprovider helpers for testing
+
 ## Design
 
 ### Summary
+
+**Full scale up/down process can be found [here](./scale-process.md)**
 
 - The autoscaler is designed as a static autoscaler. 
 - Start watching all pods and nodes in the cluster for a certain node group, including pending pods
@@ -38,24 +57,6 @@
         - Terminate any nodes that have passed the grace period and are empty
     - On a "do nothing" event
         - Terminate any nodes that have passed the grace period and are empty
-        
-### Package Layout and Usage
-
-- `cmd`
-    - contains command function, setup, and config loading
-- `pkg/controller`
-    - contains the core logic specific to escalator and nodegroups
-- `pkg/k8s`
-    - provides application utils and help with interfacing with Kubernetes and client-go
-- `pkg/cloudprovider`
-    - provides everything related to cloud providers
-    - `pkg/cloudprovider/aws`
-      - provides the aws implementation of cloudprovider
-- `pkg/metrics`
-    - provides a place for all metric setup to live
-- `pkg/test`
-    - provides Kubernetes and cloudprovider helpers for testing
 
 ![Algorithm](Algorithm.png)
 
-![UML](UML.png)
