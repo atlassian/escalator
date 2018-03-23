@@ -16,6 +16,10 @@
     - Scale up
     - Scale down
     - Scale lock
+- [**Pod and Node Selectors**](./pod-node-selectors.md)
+    - Nodes
+    - Pods
+    - More Information
 - [**Metrics**](./metrics.md)
     - Exposed Metrics
     - Recommendations

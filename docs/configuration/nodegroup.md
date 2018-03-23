@@ -41,42 +41,7 @@ Multiple node groups will need to have unique names.
 `label_key` and `label_value` is the key-value pair used to select nodes and pods for consideration in the calculations 
 for a node group.
 
-You can see which nodes Escalator will monitor with the following `kubectl` command:
-
-`kubectl get nodes --selector=customer=shared`
-
-Selecting pods is a little more complex, as it considers the pod's nodeSelector, as well as the pod's nodeAffinity.
-
-The following pod node selector will include the pod in the `customer=shared` node group:
-
-```yaml
-spec:
-  nodeSelector:
-    customer: shared
-```
-
-The following pod node affinity will include the pod in the `customer=shared` node group:
-
-```yaml
-spec:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: customer
-            operator: In
-            values:
-            - shared
-```
-
-Replace `customer=shared` with your node/pod label key-value.
-
-More information on node labels, node selectors and node affinity can be found 
-[here](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/).
-
-More information on Labels and Selectors can be found 
-[here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
+**Pod and Node selectors are documented [here](../pod-node-selectors.md).**
 
 ### `cloud_provider_asg`
 
