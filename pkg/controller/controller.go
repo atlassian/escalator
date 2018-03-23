@@ -296,21 +296,21 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Perform the scaling decision
-	maxPercent := int(math.Ceil(math.Max(cpuPercent, memPercent)))
+	maxPercent := math.Max(cpuPercent, memPercent)
 	nodesDelta := 0
 
 	// Determine if we want to scale up or down. Selects the first condition that is true
 	switch {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes
-	case maxPercent < nodeGroup.Opts.TaintLowerCapacityThreshholdPercent:
+	case maxPercent < float64(nodeGroup.Opts.TaintLowerCapacityThreshholdPercent):
 		nodesDelta = -nodeGroup.Opts.FastNodeRemovalRate
 	// reached medium low %. slowly remove nodes
-	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
+	case maxPercent < float64(nodeGroup.Opts.TaintUpperCapacityThreshholdPercent):
 		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
 	// --- Scale Up conditions ---
 	// Need to scale up so capacity can handle requests
-	case maxPercent > nodeGroup.Opts.ScaleUpThreshholdPercent:
+	case maxPercent > float64(nodeGroup.Opts.ScaleUpThreshholdPercent):
 		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThreshholdPercent
