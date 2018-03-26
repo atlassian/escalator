@@ -28,10 +28,10 @@ type NodeGroupOptions struct {
 
 	DryMode bool `json:"dry_mode,omitempty" yaml:"dry_mode,omitempty"`
 
-	TaintUpperCapacityThreshholdPercent int `json:"taint_upper_capacity_threshhold_percent,omitempty" yaml:"taint_upper_capacity_threshhold_percent,omitempty"`
-	TaintLowerCapacityThreshholdPercent int `json:"taint_lower_capacity_threshhold_percent,omitempty" yaml:"taint_lower_capacity_threshhold_percent,omitempty"`
+	TaintUpperCapacityThresholdPercent int `json:"taint_upper_capacity_threshold_percent,omitempty" yaml:"taint_upper_capacity_threshold_percent,omitempty"`
+	TaintLowerCapacityThresholdPercent int `json:"taint_lower_capacity_threshold_percent,omitempty" yaml:"taint_lower_capacity_threshold_percent,omitempty"`
 
-	ScaleUpThreshholdPercent int `json:"scale_up_threshhold_percent,omitempty" yaml:"scale_up_threshhold_percent,omitempty"`
+	ScaleUpThresholdPercent int `json:"scale_up_threshold_percent,omitempty" yaml:"scale_up_threshold_percent,omitempty"`
 
 	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
 	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
@@ -75,13 +75,13 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.LabelValue) > 0, "labelvalue cannot be empty")
 	checkThat(len(nodegroup.CloudProviderASG) > 0, "cloudprovider nodegroup asg cannot be empty")
 
-	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent >= 0, "taint upper capacity must be larger than 0")
-	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent >= 0, "taint lower capacity must be larger than 0")
-	checkThat(nodegroup.ScaleUpThreshholdPercent >= 0, "scale up threshhold should be larger than 0")
+	checkThat(nodegroup.TaintUpperCapacityThresholdPercent >= 0, "taint upper capacity must be larger than 0")
+	checkThat(nodegroup.TaintLowerCapacityThresholdPercent >= 0, "taint lower capacity must be larger than 0")
+	checkThat(nodegroup.ScaleUpThresholdPercent >= 0, "scale up threshold should be larger than 0")
 
-	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent < nodegroup.TaintUpperCapacityThreshholdPercent,
-		"lower taint threshhold must be lower than upper taint threshold")
-	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent < nodegroup.ScaleUpThreshholdPercent,
+	checkThat(nodegroup.TaintLowerCapacityThresholdPercent < nodegroup.TaintUpperCapacityThresholdPercent,
+		"lower taint threshold must be lower than upper taint threshold")
+	checkThat(nodegroup.TaintUpperCapacityThresholdPercent < nodegroup.ScaleUpThresholdPercent,
 		"taint upper capacity threshold should be lower than scale up threshold")
 
 	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
