@@ -1,6 +1,6 @@
 # AWS
 
-Escalator is able to scale auto scaling groups in AWS. These must be specified in the `nodegroups_config.yaml` passed
+Escalator is able to scale auto scaling groups (ASG) in AWS. These must be specified in the `nodegroups_config.yaml` passed
 to the `--nodegroups=` flag. All of the auto scaling groups that are specified must reside in the same AWS region.
 
 ## How to enable
@@ -58,6 +58,8 @@ more responsive scaling. For a `scale_up_cool_down_period` period of `2m` (2 min
 cooldown to `60` (60 seconds).
 - Have the same min/max nodes in the auto scaling group as `min_nodes` and `max_nodes` in the `nodegroups_config.yaml`
 file.
+- Have "scale in protection" enabled on all instances in the ASG to prevent cases where instances are terminated by
+AWS but may still have workloads running.
 
 ## Deployment
 

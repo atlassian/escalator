@@ -5,7 +5,7 @@ required for Escalator to run.
 
 The configuration is validated by Escalator on start.
 
-Example nodegroups.yml configuration:
+Example `nodegroups_config.yaml` configuration:
 
 ```yaml
 node_groups:
@@ -45,10 +45,11 @@ for a node group.
 
 ### `cloud_provider_asg`
 
-`cloud_provider_asg` is the auto scaling group in the cloud provider that Escalator will either increase the size
+`cloud_provider_asg` is the node group in the cloud provider that Escalator will either increase the size
 of or terminate nodes in when Escalator scales up or down.
 
-In AWS this is the name of the auto scaling group. More information on AWS deployments can be found here.
+- **AWS:** this is the name of the auto scaling group. More information on AWS deployments can be found 
+[here](../deployment/aws/README.md).
 
 ### `min_nodes` and `max_nodes`
 
@@ -58,7 +59,7 @@ value to the min or max value. For example:
 
 `min_nodes` is configured to be **5**. The current node count is **7**. Escalator needs to scale down and terminate 
 **3** nodes. The new current node count after scale down will exceed **5** if we terminate **3** nodes, so Escalator 
-will clamp/adjust the scale down amount to terminate **2** nodes. The new current node count will be **5**.
+will clamp/adjust the scale down amount to only terminate **2** nodes. The new current node count will be **5**.
 
 `max_nodes` is configured to be **20**. The current node count is **18**. Escalator needs to scale up and create 
 **3** nodes. The new current node count after scale up will exceed **20** if we create **3** nodes, so Escalator will 
@@ -71,7 +72,7 @@ activity if the activity exceeds the cloud provider's limits.
 ### `dry_mode`
 
 This flag allows running a specific node group in dry mode. This will ensure Escalator doesn't taint, cordon or modify
-the auto scaling group, but just logs out the actions it would perform. This is helpful in understanding what
+the node group, but just logs out the actions it would perform. This is helpful in understanding what
 Escalator would do in specific scenarios.
 
 Note: this flag is overridden by the `--drymode` command line flag.
@@ -83,9 +84,6 @@ when the utilisation of the node group goes below this value. For example:
 
 If the node group utilisation is **38%**, and `taint_upper_capacity_threshhold_percent` is configured as **40**,
 Escalator will taint nodes at the rate defined in `slow_node_removal_rate`.
-
-[**Slack space**]() can be configured by leaving a gap between the `scale_up_threshhold_percent` and 
-`taint_upper_capacity_threshhold_percent`.
 
 ### `taint_lower_capacity_threshhold_percent`
 
@@ -107,20 +105,23 @@ The amount of nodes to taint whenever the node group utilisation goes below the
 
 ### `scale_up_threshhold_percent`
 
-This value defines the threshold at which Escalator will increase the size of the auto scaling group. Escalator will
-calculate based on the current utilisation how much to increase the auto scaling group to be below the value of this
+This value defines the threshold at which Escalator will increase the size of the node group. Escalator will
+calculate based on the current utilisation how much to increase the node group to be below the value of this
 option. For example:
 
 `scale_up_threshhold_percent` is configured as **70** and the current node group utilisation is **75%**, Escalator will
-increase the size of the auto scaling group so that the utilisation drops below **70**.
+increase the size of the node group so that the utilisation drops below **70**.
 
 Escalator calculates the utilisation based on the CPU and Memory limits/requests of containers running in the node
 group and uses whichever is the higher value as the utilisation. More information on utilisation calculation can be
-found here.
+found [here](../calculations.md).
+
+[**Slack space**](./advanced-configuration.md) can be configured by leaving a gap between the 
+`scale_up_threshhold_percent` and `100%`, e.g. a value of `70` will mean `30%` slack space.
 
 ### `scale_up_cool_down_period` and `scale_up_cool_down_timeout`
 
-`scale_up_cool_down_period` is a grace period before Escalator can consider the scale up of the auto scaling group
+`scale_up_cool_down_period` is a grace period before Escalator can consider the scale up of the node group
 a success. This grace period is managed by the scale up locking mechanism and will not unlock the lock mechanism until
 at least the `scale_up_cool_down_period` has passed.
 
