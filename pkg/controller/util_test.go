@@ -36,7 +36,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
+						ScaleUpThresholdPercent: 70,
 					},
 				},
 			},
@@ -55,7 +55,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
+						ScaleUpThresholdPercent: 70,
 					},
 				},
 			},
@@ -74,7 +74,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 40,
+						ScaleUpThresholdPercent: 40,
 					},
 				},
 			},
@@ -93,7 +93,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 23,
+						ScaleUpThresholdPercent: 23,
 					},
 				},
 			},
@@ -112,7 +112,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 3,
+						ScaleUpThresholdPercent: 3,
 					},
 				},
 			},
@@ -131,7 +131,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 70,
+						ScaleUpThresholdPercent: 70,
 					},
 				},
 			},
@@ -150,7 +150,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 				},
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
-						ScaleUpThreshholdPercent: 110,
+						ScaleUpThresholdPercent: 110,
 					},
 				},
 			},
@@ -178,7 +178,7 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 			// Both of the percentages should be below the scale up threshold percent
 			newCpuPercent, newMemPercent, _ := calculatePercentageUsage(tt.args.pods, newNodes)
 
-			threshold := float64(tt.args.nodeGroup.Opts.ScaleUpThreshholdPercent)
+			threshold := float64(tt.args.nodeGroup.Opts.ScaleUpThresholdPercent)
 			assert.True(t, newCpuPercent <= threshold, "New CPU percent: %v should be less than threshold: %v", newCpuPercent, threshold)
 			assert.True(t, newMemPercent <= threshold, "New Mem percent: %v should be less than threshold: %v", newMemPercent, threshold)
 		})
