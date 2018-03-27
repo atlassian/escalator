@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+	"github.com/atlassian/escalator/pkg/metrics"
 )
 
 // ProviderName identifies this module as aws
@@ -76,6 +77,14 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 			group,
 			c,
 		)
+	}
+
+	// Update metrics for each node group
+	for _, nodeGroup := range c.nodeGroups {
+		metrics.CloudProviderMinSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.MinSize()))
+		metrics.CloudProviderMaxSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.MaxSize()))
+		metrics.CloudProviderTargetSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.TargetSize()))
+		metrics.CloudProviderSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.Size()))
 	}
 
 	return nil
