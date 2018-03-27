@@ -375,9 +375,10 @@ func (c *Controller) RunOnce() {
 		err = c.cloudProvider.Refresh()
 	}
 	// Perform the ScaleUp/Taint logic
-	for nodegroup, state := range c.nodeGroups {
-		log.Debugf("**********[START NODEGROUP %v]**********", nodegroup)
-		c.scaleNodeGroup(nodegroup, state)
+	for _, nodeGroupOpts := range c.Opts.NodeGroups {
+		log.Debugf("**********[START NODEGROUP %v]**********", nodeGroupOpts.Name)
+		state := c.nodeGroups[nodeGroupOpts.Name]
+		c.scaleNodeGroup(nodeGroupOpts.Name, state)
 	}
 
 	metrics.RunCount.Add(1)
