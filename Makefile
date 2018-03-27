@@ -1,10 +1,12 @@
-IMAGE_NAME := docker.atl-paas.net/kitt/escalator
-GIT_HASH := $(shell git rev-parse --short HEAD)
-WORKDIR := ${CURDIR}
+.PHONY: local-build
+local-build:
+	CGO_ENABLED=1 go build -o escalator cmd/main.go
 
-build:
-	docker build --no-cache -t $(IMAGE_NAME):$(GIT_HASH) .
+.PHONY: setup
+setup:
+	go get -u github.com/golang/dep/cmd/dep
+	dep ensure
 
-push: build
-	docker push $(IMAGE_NAME):$(GIT_HASH)
-	echo $(IMAGE_NAME):$(GIT_HASH) is READDY.
+.PHONY: test
+test:
+	go test ./... -cover

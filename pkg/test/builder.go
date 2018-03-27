@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"github.com/google/uuid"
 )
 
 // NodeOpts minimal options for configuring a node object in testing
@@ -20,6 +21,7 @@ type NodeOpts struct {
 	LabelKey   string
 	LabelValue string
 	Creation   time.Time
+	Tainted    bool
 }
 
 // BuildFakeClient creates a fake client
@@ -99,6 +101,16 @@ func NameFromChan(c <-chan string, timeout time.Duration) string {
 
 // BuildTestNode creates a node with specified capacity.
 func BuildTestNode(opts NodeOpts) *apiv1.Node {
+
+	var taints []apiv1.Taint
+	if opts.Tainted {
+		taints = append(taints, apiv1.Taint{
+			Key:    "atlassian.com/escalator",
+			Value:  fmt.Sprint(time.Now().Unix()),
+			Effect: apiv1.TaintEffectNoSchedule,
+		})
+	}
+
 	node := &apiv1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:     opts.Name,
@@ -110,6 +122,7 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 		},
 		Spec: apiv1.NodeSpec{
 			ProviderID: opts.Name,
+			Taints:     taints,
 		},
 		Status: apiv1.NodeStatus{
 			Capacity: apiv1.ResourceList{
@@ -133,6 +146,16 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 	return node
 }
 
+// BuildTestNodes creates multiple nodes with the same options
+func BuildTestNodes(amount int, opts NodeOpts) []*apiv1.Node {
+	var nodes []*apiv1.Node
+	for i := 0; i < amount; i++ {
+		opts.Name = uuid.New().String()
+		nodes = append(nodes, BuildTestNode(opts))
+	}
+	return nodes
+}
+
 // PodOpts are options for a pod
 type PodOpts struct {
 	Name              string
@@ -144,6 +167,7 @@ type PodOpts struct {
 	Owner             string
 	NodeAffinityKey   string
 	NodeAffinityValue string
+	NodeName          string
 }
 
 // BuildTestPod builds a pod for testing
@@ -177,9 +201,9 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 			NodeAffinity: &apiv1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{
 					NodeSelectorTerms: []apiv1.NodeSelectorTerm{
-						0: apiv1.NodeSelectorTerm{
+						0: {
 							MatchExpressions: []apiv1.NodeSelectorRequirement{
-								apiv1.NodeSelectorRequirement{
+								{
 									Key: opts.NodeAffinityKey,
 									Values: []string{
 										0: opts.NodeAffinityValue,
@@ -207,6 +231,10 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		},
 	}
 
+	if len(opts.NodeName) > 0 {
+		pod.Spec.NodeName = opts.NodeName
+	}
+
 	for i := range containers {
 		if opts.CPU[i] >= 0 {
 			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPU[i], resource.DecimalSI)
@@ -217,4 +245,14 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 	}
 
 	return pod
+}
+
+// BuildTestPods creates multiple pods with the same options
+func BuildTestPods(amount int, opts PodOpts) []*apiv1.Pod {
+	var pods []*apiv1.Pod
+	for i := 0; i < amount; i++ {
+		opts.Name = fmt.Sprintf("p%d", i)
+		pods = append(pods, BuildTestPod(opts))
+	}
+	return pods
 }

@@ -3,6 +3,7 @@ package controller_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/test"
@@ -317,6 +318,9 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.Equal(t, 5, opts[0].MinNodes)
 		assert.Equal(t, 300, opts[0].MaxNodes)
 		assert.Equal(t, true, opts[0].DryMode)
+		assert.Equal(t, "10m", opts[0].SoftDeleteGracePeriod)
+		assert.Equal(t, time.Minute*10, opts[0].SoftDeleteGracePeriodDuration())
+		assert.Equal(t, time.Duration(0), opts[0].HardDeleteGracePeriodDuration())
 
 		assert.NotNil(t, opts[1])
 		assert.Equal(t, "default", opts[1].Name)
@@ -370,8 +374,9 @@ node_groups:
     untaint_lower_capacity_threshhold_percent: 90
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 3
+    soft_delete_grace_period: 10m
+    hard_delete_grace_period: 42
+    scale_up_cooldown_period: 1h2m30s
   - name: "default"
     label_key: "customer"
     label_value: "shared"
@@ -380,12 +385,9 @@ node_groups:
     dry_mode: true
     taint_upper_capacity_threshhold_percent: 25
     taint_lower_capacity_threshhold_percent: 20
-    untaint_upper_capacity_threshhold_percent: 45
-    untaint_lower_capacity_threshhold_percent: 30
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 3
+    scale_up_cooldown_period: 21h
 `
 
 var yamlBE = `node_groups:
@@ -397,16 +399,12 @@ var yamlBE = `node_groups:
     dry_mode: false
     taint_upper_capacity_threshhold_percent: 70
     taint_lower_capacity_threshhold_percent: 45
-    untaint_upper_capacity_threshhold_percent: 95
-    untaint_lower_capacity_threshhold_percent: 90
     slow_node_removal_rate: 2
-    fast_node_removal_rate: 5
-    slow_node_revival_rate: 2
-    fast_node_revival_rate: 10`
+    fast_node_removal_rate: 5`
 
 func TestValidateNodeGroup(t *testing.T) {
 	type args struct {
-		nodegroup *controller.NodeGroupOptions
+		nodegroup controller.NodeGroupOptions
 	}
 	tests := []struct {
 		name string
@@ -416,20 +414,22 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"valid nodegroup",
 			args{
-				&controller.NodeGroupOptions{
-					Name:                                  "test",
-					LabelKey:                              "customer",
-					LabelValue:                            "buileng",
-					TaintUpperCapacityThreshholdPercent:   70,
-					TaintLowerCapacityThreshholdPercent:   60,
-					UntaintUpperCapacityThreshholdPercent: 90,
-					UntaintLowerCapacityThreshholdPercent: 80,
-					MinNodes:            1,
-					MaxNodes:            3,
-					SlowNodeRemovalRate: 1,
-					FastNodeRemovalRate: 2,
-					SlowNodeRevivalRate: 1,
-					FastNodeRevivalRate: 2,
+				controller.NodeGroupOptions{
+					Name:                                "test",
+					LabelKey:                            "customer",
+					LabelValue:                          "buileng",
+					CloudProviderASG:                    "somegroup",
+					TaintUpperCapacityThreshholdPercent: 70,
+					TaintLowerCapacityThreshholdPercent: 60,
+					ScaleUpThreshholdPercent:            100,
+					MinNodes:                            1,
+					MaxNodes:                            3,
+					SlowNodeRemovalRate:                 1,
+					FastNodeRemovalRate:                 2,
+					SoftDeleteGracePeriod:               "10m",
+					HardDeleteGracePeriod:               "1h10m",
+					ScaleUpCoolDownPeriod:               "55m",
+					ScaleUpCoolDownTimeout:              "2h",
 				},
 			},
 			nil,
@@ -437,26 +437,29 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"invalid nodegroup",
 			args{
-				&controller.NodeGroupOptions{
-					Name:                                  "",
-					LabelKey:                              "customer",
-					LabelValue:                            "buileng",
-					TaintUpperCapacityThreshholdPercent:   70,
-					TaintLowerCapacityThreshholdPercent:   90,
-					UntaintUpperCapacityThreshholdPercent: 90,
-					UntaintLowerCapacityThreshholdPercent: 80,
-					MinNodes:            1,
-					MaxNodes:            0,
-					SlowNodeRemovalRate: 1,
-					FastNodeRemovalRate: 2,
-					SlowNodeRevivalRate: 1,
-					FastNodeRevivalRate: 2,
+				controller.NodeGroupOptions{
+					Name:                                "",
+					LabelKey:                            "customer",
+					LabelValue:                          "buileng",
+					CloudProviderASG:                    "somegroup",
+					TaintUpperCapacityThreshholdPercent: 70,
+					TaintLowerCapacityThreshholdPercent: 90,
+					ScaleUpThreshholdPercent:            100,
+					MinNodes:                            1,
+					MaxNodes:                            0,
+					SlowNodeRemovalRate:                 1,
+					FastNodeRemovalRate:                 2,
+					SoftDeleteGracePeriod:               "10",
+					HardDeleteGracePeriod:               "1h10m",
+					ScaleUpCoolDownPeriod:               "21h21m21s",
+					ScaleUpCoolDownTimeout:              "22h",
 				},
 			},
 			[]string{
 				"name cannot be empty",
 				"lower taint threshhold must be lower than upper taint threshold",
 				"min nodes must be smaller than max nodes",
+				"soft grace period failed to parse into a time.Duration. check your formatting.",
 			},
 		},
 	}

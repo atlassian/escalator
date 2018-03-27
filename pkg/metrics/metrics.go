@@ -30,6 +30,14 @@ var (
 		[]string{"node_group"},
 	)
 	// NodeGroupNodes nodes considered by specific node groups
+	NodeGroupNodesCordoned = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_cordoned_nodes",
+			Help: "nodes considered by specific node groups that are cordoned",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupNodes nodes considered by specific node groups
 	NodeGroupNodes = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_group_nodes",
@@ -99,7 +107,7 @@ var (
 			Name: "node_group_taint_event",
 			Help: "indicates a scale down event",
 		},
-		[]string{"nodegroup"},
+		[]string{"node_group"},
 	)
 	// NodeGroupUntaintEvent indicates a scale up event
 	NodeGroupUntaintEvent = prometheus.NewGaugeVec(
@@ -107,13 +115,22 @@ var (
 			Name: "node_group_untaint_event",
 			Help: "indicates a scale up event",
 		},
-		[]string{"nodegroup"},
+		[]string{"node_group"},
+	)
+	// NodeGroupScaleLock indicates if the nodegroup is locked from scaling
+	NodeGroupScaleLock = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "node_group_scale_lock",
+			Help: "indicates if the nodegroup is locked from scaling",
+		},
+		[]string{"node_group"},
 	)
 )
 
 func init() {
 	prometheus.MustRegister(RunCount)
 	prometheus.MustRegister(NodeGroupNodes)
+	prometheus.MustRegister(NodeGroupNodesCordoned)
 	prometheus.MustRegister(NodeGroupNodesUntainted)
 	prometheus.MustRegister(NodeGroupNodesTainted)
 	prometheus.MustRegister(NodeGroupPods)
@@ -125,6 +142,7 @@ func init() {
 	prometheus.MustRegister(NodeGroupMemCapacity)
 	prometheus.MustRegister(NodeGroupTaintEvent)
 	prometheus.MustRegister(NodeGroupUntaintEvent)
+	prometheus.MustRegister(NodeGroupScaleLock)
 }
 
 // Start starts the metrics endpoint on a new thread

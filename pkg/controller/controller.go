@@ -1,16 +1,18 @@
 package controller
 
 import (
-	"errors"
 	"math"
-	"sort"
 	"time"
 
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
+
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -18,16 +20,24 @@ import (
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
 	Client   *Client
-	Opts     *Opts
+	Opts     Opts
 	stopChan <-chan struct{}
+
+	cloudProvider cloudprovider.CloudProvider
 
 	nodeGroups map[string]*NodeGroupState
 }
 
 // NodeGroupState contains everything about a node group in the current state of the application
 type NodeGroupState struct {
-	Opts *NodeGroupOptions
+	Opts NodeGroupOptions
 	*NodeGroupLister
+
+	NodeInfos map[string]*schedulercache.NodeInfo
+
+	ASG cloudprovider.NodeGroup
+
+	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
@@ -35,160 +45,76 @@ type NodeGroupState struct {
 
 // Opts provide the Controller with config for runtime
 type Opts struct {
-	K8SClient  kubernetes.Interface
-	NodeGroups []*NodeGroupOptions
+	K8SClient            kubernetes.Interface
+	NodeGroups           []NodeGroupOptions
+	CloudProviderBuilder cloudprovider.Builder
 
 	ScanInterval time.Duration
 	DryMode      bool
 }
 
+// scaleOpts provides options for a scale function
+// wraps options that would be passed as args
+type scaleOpts struct {
+	nodes               []*v1.Node
+	taintedNodes        []*v1.Node
+	untaintedNodes      []*v1.Node
+	nodeGroup           *NodeGroupState
+	nodesDelta          int
+}
+
 // NewController creates a new controller with the specified options
-func NewController(opts *Opts, stopChan <-chan struct{}) *Controller {
+func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	client := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
 	if client == nil {
 		log.Fatalln("Failed to create controller client")
 		return nil
 	}
 
+	cloud := opts.CloudProviderBuilder.Build()
+	if cloud == nil {
+		log.Fatal("Failed to create cloudprovider")
+	}
+
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
 	nodegroupMap := make(map[string]*NodeGroupState)
 	for _, nodeGroupOpts := range opts.NodeGroups {
+		asg, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderASG)
+		if !ok {
+			log.Fatalf("could not find asg nodegroup \"%v\" on cloudprovider", nodeGroupOpts.CloudProviderASG)
+		}
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:            nodeGroupOpts,
 			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
+			ASG:             asg,
+			// Setup the scaleLock timeouts for this nodegroup
+			scaleUpLock: scaleLock{
+				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
+				maximumLockDuration: nodeGroupOpts.ScaleUpCoolDownTimeoutDuration(),
+			},
 		}
 	}
 
 	return &Controller{
-		Client:     client,
-		Opts:       opts,
-		stopChan:   stopChan,
-		nodeGroups: nodegroupMap,
+		Client:        client,
+		Opts:          opts,
+		stopChan:      stopChan,
+		cloudProvider: cloud,
+		nodeGroups:    nodegroupMap,
 	}
 }
 
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
-func (c Controller) dryMode(nodeGroup *NodeGroupState) bool {
+func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 	return c.Opts.DryMode || nodeGroup.Opts.DryMode
 }
 
-// calcPercentUsage helper works out the percentage of cpu and mem for request/capacity
-func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
-	if cpuA.MilliValue() == 0 || memA.MilliValue() == 0 {
-		return 0, 0, errors.New("Cannot divide by zero in percent calculation")
-	}
-	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
-	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
-	return cpuPercent, memPercent, nil
-}
+// filterNodes separates nodes between tainted and untainted nodes
+func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node) (untaintedNodes []*v1.Node, taintedNodes []*v1.Node, cordonedNodes []*v1.Node) {
+	untaintedNodes = make([]*v1.Node, 0, len(allNodes))
+	taintedNodes = make([]*v1.Node, 0, len(allNodes))
+	cordonedNodes = make([]*v1.Node, 0, len(allNodes))
 
-// taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indices of the nodes it tainted
-// indices are from the parameter nodes indexes, not the sorted index
-func (c Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
-	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
-	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i})
-	}
-	sort.Sort(sorted)
-
-	taintedIndices := make([]int, 0, n)
-	for i, bundle := range sorted {
-		// stop at N (or when array is fully iterated)
-		if len(taintedIndices) >= n || i >= k8s.MaximumTaints {
-			break
-		}
-
-		// only actually taint in dry mode
-		if !c.dryMode(nodeGroup) {
-			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
-
-			// Taint the node
-			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
-			if err != nil {
-				log.Errorf("While tainting %v: %v", bundle.node.Name, err)
-			} else {
-				bundle.node = updatedNode
-				taintedIndices = append(taintedIndices, bundle.index)
-			}
-		} else {
-			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
-			k8s.IncrementTaintCount()
-			taintedIndices = append(taintedIndices, bundle.index)
-			log.WithField("drymode", "on").Infoln("Tainting node", bundle.node.Name)
-		}
-	}
-
-	return taintedIndices
-}
-
-// untaintNewestN sorts nodes by creation time and untaints the newest N. It will return an array of indices of the nodes it untainted
-// indices are from the parameter nodes indexes, not the sorted index
-func (c Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
-	sorted := make(nodesByNewestCreationTime, 0, len(nodes))
-	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i})
-	}
-	sort.Sort(sorted)
-
-	untaintedIndices := make([]int, 0, n)
-	for _, bundle := range sorted {
-		// stop at N (or when array is fully iterated)
-		if len(untaintedIndices) >= n {
-			break
-		}
-		// only actually taint in dry mode
-		if !c.dryMode(nodeGroup) {
-			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
-				log.WithField("drymode", "off").Infoln("Untainting node", bundle.node.Name)
-
-				// Remove the taint from the node
-				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
-				if err != nil {
-					log.Errorf("Failed to untaint node %v: %v", bundle.node.Name, err)
-				} else {
-					bundle.node = updatedNode
-					untaintedIndices = append(untaintedIndices, bundle.index)
-				}
-			}
-		} else {
-			deleteIndex := -1
-			for i, name := range nodeGroup.taintTracker {
-				if bundle.node.Name == name {
-					deleteIndex = i
-					break
-				}
-			}
-			if deleteIndex != -1 {
-				// Delete from tracker
-				nodeGroup.taintTracker = append(nodeGroup.taintTracker[:deleteIndex], nodeGroup.taintTracker[deleteIndex+1:]...)
-				untaintedIndices = append(untaintedIndices, bundle.index)
-				log.WithField("drymode", "on").Infoln("Untainting node", bundle.node.Name)
-			}
-		}
-	}
-
-	return untaintedIndices
-}
-
-// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
-func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) {
-	// list all pods
-	pods, err := nodeGroup.Pods.List()
-	if err != nil {
-		log.Errorf("Failed to list pods: %v", err)
-		return
-	}
-
-	// List all nodes
-	allNodes, err := nodeGroup.Nodes.List()
-	if err != nil {
-		log.Errorf("Failed to list nodes: %v", err)
-		return
-	}
-
-	// Filter into untainted and tainted nodes
-	untaintedNodes := make([]*v1.Node, 0, len(allNodes))
-	taintedNodes := make([]*v1.Node, 0, len(allNodes))
 	for _, node := range allNodes {
 		if c.dryMode(nodeGroup) {
 			var contains bool
@@ -204,6 +130,11 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 				taintedNodes = append(taintedNodes, node)
 			}
 		} else {
+			// If the node is Unschedulable (cordoned), separate it out from the tainted/untainted
+			if node.Spec.Unschedulable {
+				cordonedNodes = append(cordonedNodes, node)
+				continue
+			}
 			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
 				untaintedNodes = append(untaintedNodes, node)
 			} else {
@@ -212,30 +143,80 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 		}
 	}
 
+	return
+}
+
+// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
+func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) (int, error) {
+	// list all pods
+	pods, err := nodeGroup.Pods.List()
+	if err != nil {
+		log.Errorf("Failed to list pods: %v", err)
+		return 0, err
+	}
+
+	// List all nodes
+	allNodes, err := nodeGroup.Nodes.List()
+	if err != nil {
+		log.Errorf("Failed to list nodes: %v", err)
+		return 0, err
+	}
+
+	// Filter into untainted and tainted nodes
+	untaintedNodes, taintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
+
 	// Metrics and Logs
+	log.WithField("nodegroup", nodegroup).Infoln("pods total:", len(pods))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
+	log.WithField("nodegroup", nodegroup).Infoln("cordoned nodes remaining total:", len(cordonedNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining untainted:", len(untaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining tainted:", len(taintedNodes))
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
+	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
 	metrics.NodeGroupNodesTainted.WithLabelValues(nodegroup).Set(float64(len(taintedNodes)))
 	metrics.NodeGroupPods.WithLabelValues(nodegroup).Set(float64(len(pods)))
 
+	// We want to be really simple right now so we don't do anything if we are outside the range of allowed nodes
+	// We assume it is a config error or something bad has gone wrong in the cluster
 	if len(allNodes) == 0 {
-		log.WithField("nodegroup", nodegroup).Infoln("no nodes remaining")
-		return
+		err = errors.New("no nodes remaining")
+		log.WithField("nodegroup", nodegroup).Warningln(err.Error())
+		return 0, err
 	}
+	if len(allNodes) < nodeGroup.Opts.MinNodes {
+		err = errors.New("node count less than the minimum")
+		log.WithField("nodegroup", nodegroup).Warningf(
+			"Node count of %v less than minimum of %v",
+			len(allNodes),
+			nodeGroup.Opts.MinNodes,
+		)
+		return 0, err
+	}
+	if len(allNodes) > nodeGroup.Opts.MaxNodes {
+		err = errors.New("node count larger than the maximum")
+		log.WithField("nodegroup", nodegroup).Warningf(
+			"Node count of %v larger than maximum of %v",
+			len(allNodes),
+			nodeGroup.Opts.MaxNodes,
+		)
+		return 0, err
+	}
+
+	// update the map of node to nodeinfo
+	// for working out which pods are on which nodes
+	nodeGroup.NodeInfos = k8s.CreateNodeNameToInfoMap(pods, allNodes)
 
 	// Calc capacity for untainted nodes
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
 	if err != nil {
 		log.Errorf("Failed to calculate requests: %v", err)
-		return
+		return 0, err
 	}
 	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(untaintedNodes)
 	if err != nil {
 		log.Errorf("Failed to calculate capacity: %v", err)
-		return
+		return 0, err
 	}
 
 	// Metrics
@@ -246,11 +227,25 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 	bytesMemCap, _ := memCapacity.AsInt64()
 	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(bytesMemCap))
 
+	// If we ever get into a state where we have less nodes than the minimum
+	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
+		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
+		result, err := c.ScaleUp(scaleOpts{
+			nodes: allNodes,
+			nodesDelta: nodeGroup.Opts.MinNodes - len(untaintedNodes),
+			nodeGroup: nodeGroup,
+		})
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
+		}
+		return result, err
+	}
+
 	// Calc %
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
 	if err != nil {
 		log.Errorf("Failed to calculate percentages: %v", err)
-		return
+		return 0, err
 	}
 
 	// Metrics
@@ -258,11 +253,53 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 	metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(cpuPercent)
 	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
 
+	locked := nodeGroup.scaleUpLock.locked()
+	// logs, metrics
+	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcoming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
+	lockVal := 0.0
+	if locked {
+		lockVal = 1.0
+		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
+	}
+	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
+
+	if locked {
+		// perform the upcoming node check
+		// a dumb check, but basically
+		// ---
+		// any nodes that are ready we count as GOOD nodes
+		// any nodes that are unready AND have been around longer than our timeout are BAD nodes
+		var readyNodesNotBroken int // GOOD
+		var unreadyNodesBroken int  // BAD
+		for _, node := range allNodes {
+			for _, cond := range node.Status.Conditions {
+				if cond.Type == v1.NodeReady {
+					if cond.Status == v1.ConditionTrue {
+						readyNodesNotBroken++
+					} else if time.Since(node.CreationTimestamp.Time) > nodeGroup.scaleUpLock.maximumLockDuration {
+						unreadyNodesBroken++
+					}
+					break
+				}
+			}
+		}
+		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
+		if nodeGroup.ASG.Size() >= nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken >= int(nodeGroup.ASG.TargetSize()) {
+			nodeGroup.scaleUpLock.unlock()
+			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
+		} else {
+			log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
+		}
+
+		// don't do anything else until we're unlocked again
+		return 0, nil
+	}
+
 	// Perform the scaling decision
-	maxPercent := int(math.Max(cpuPercent, memPercent))
+	maxPercent := int(math.Ceil(math.Max(cpuPercent, memPercent)))
 	nodesDelta := 0
 
-	// Determine if we want to scale up for down. Selects the first condition that is true
+	// Determine if we want to scale up or down. Selects the first condition that is true
 	switch {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes
@@ -272,104 +309,84 @@ func (c Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) 
 	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
 		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
 	// --- Scale Up conditions ---
-	// reached very high %. aggressively add nodes back
-	case maxPercent > nodeGroup.Opts.UntaintUpperCapacityThreshholdPercent:
-		nodesDelta = nodeGroup.Opts.FastNodeRevivalRate
-	// reached medium high %. slowy add nodes back
-	case maxPercent > nodeGroup.Opts.UntaintLowerCapacityThreshholdPercent:
-		nodesDelta = nodeGroup.Opts.SlowNodeRevivalRate
+	// Need to scale up so capacity can handle requests
+	case maxPercent > nodeGroup.Opts.ScaleUpThreshholdPercent:
+		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
+		// we want to add enough nodes such that the maxPercentage cluster util
+		// drops back below ScaleUpThreshholdPercent
+		nodesDelta, err = calcScaleUpDelta(untaintedNodes, cpuPercent, memPercent, nodeGroup)
+		if err != nil {
+			log.Errorf("Failed to calculate node delta: %v", err)
+			return nodesDelta, err
+		}
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
 
-	// Clamp the nodes inside the min and max node count
-	switch {
-	case nodesDelta < 0:
-		if len(untaintedNodes)+nodesDelta < nodeGroup.Opts.MinNodes {
-			nodesDelta = nodeGroup.Opts.MinNodes - len(untaintedNodes)
-			if nodesDelta > 0 {
-				log.Warningf(
-					"The cluster is under utilised, but the number of nodes(%v) is less than specified minimum of %v. Switching to a scale up.",
-					len(untaintedNodes),
-					nodeGroup.Opts.MinNodes,
-				)
-			}
-		}
-	case nodesDelta > 0:
-		if len(untaintedNodes)+nodesDelta > nodeGroup.Opts.MaxNodes {
-			nodesDelta = nodeGroup.Opts.MaxNodes - len(untaintedNodes)
-			if nodesDelta < 0 {
-				log.Warningf(
-					"The cluster is over utilised, but the number of nodes(%v) is more than specified maximum of %v. Switching to a scale down.",
-					len(untaintedNodes),
-					nodeGroup.Opts.MaxNodes,
-				)
-			}
-		}
+	var nodesDeltaResult int
+	scaleOptions := scaleOpts{
+		nodes:               allNodes,
+		taintedNodes:        taintedNodes,
+		untaintedNodes:      untaintedNodes,
+		nodeGroup:           nodeGroup,
 	}
 
-	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDelta)
-
-	// Perform the scaling action
+	// Perform a scale up, do nothing or scale down based on the nodes delta
 	switch {
 	case nodesDelta < 0:
-		nodesToRemove := -nodesDelta
-		log.WithField("nodegroup", nodegroup).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
-		metrics.NodeGroupTaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToRemove))
-
-		// Lock the taintinf to a maximum on 10 nodes
-		if err := k8s.BeginTaintFailSafe(nodesToRemove); err != nil {
-			// Don't taint if there was an error on the lock
-			log.Errorf("Failed to get safetly lock on tainter: %v", err)
-			break
+		// Try to scale down
+		scaleOptions.nodesDelta = -nodesDelta
+		nodesDeltaResult, err = c.ScaleDown(scaleOptions)
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-		// Perform the tainting loop with the fail safe around it
-		tainted := c.taintOldestN(untaintedNodes, nodeGroup, nodesToRemove)
-		// Validate the Failsafe worked
-		if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
-			log.Errorf("Failed to validate safetly lock on tainter: %v", err)
-			break
-		}
-
-		log.Infof("Tainted a total of %v nodes", len(tainted))
-
 	case nodesDelta > 0:
-		nodesToAdd := nodesDelta
-		if len(taintedNodes) == 0 {
-			log.WithField("nodegroup", nodegroup).Warningln("There are no tainted nodes to untaint")
-			break
+		// Try to scale up
+		scaleOptions.nodesDelta = nodesDelta
+		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-
-		// Metrics & Logs
-		log.WithField("nodegroup", nodegroup).Infof("Scaling Up: Trying to untaint %v tainted nodes", nodesToAdd)
-		metrics.NodeGroupUntaintEvent.WithLabelValues(nodegroup).Add(float64(nodesToAdd))
-
-		untainted := c.untaintNewestN(taintedNodes, nodeGroup, nodesToAdd)
-		log.Infof("Untainted a total of %v nodes", len(untainted))
 	default:
 		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
+		// reap any expired nodes
+		removed, err := c.TryRemoveTaintedNodes(scaleOptions)
+		if err != nil {
+			log.WithField("nodegroup", nodegroup).Error(err)
+		}
+		log.WithField("nodegroup", nodegroup).Infoln("Reaper: There were", removed, "empty nodes deleted this round")
 	}
+
+	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
+	return nodesDelta, err
 }
 
 // RunOnce performs the main autoscaler logic once
-func (c Controller) RunOnce() {
+func (c *Controller) RunOnce() {
 	startTime := time.Now()
 
-	// TODO(jgonzalez/dangot):
-	// REAPER GOES HERE
-
+	// try refresh cred a few times if they go stale
+	// rebuild will create a new session from the metadata on the box
+	err := c.cloudProvider.Refresh()
+	for i := 0; i < 2 && err != nil; i++ {
+		log.Warnf("cloudprovider failed to refresh. trying to refetch credentials. tries = %v", i+1)
+		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
+		c.cloudProvider = c.Opts.CloudProviderBuilder.Build()
+		err = c.cloudProvider.Refresh()
+	}
 	// Perform the ScaleUp/Taint logic
 	for nodegroup, state := range c.nodeGroups {
-		log.Debugln("**********[START NODEGROUP]**********")
+		log.Debugf("**********[START NODEGROUP %v]**********", nodegroup)
 		c.scaleNodeGroup(nodegroup, state)
 	}
 
+	metrics.RunCount.Add(1)
 	endTime := time.Now()
 	log.Debugf("Scaling took a total of %v", endTime.Sub(startTime))
 }
 
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
-func (c Controller) RunForever(runImmediately bool) {
+func (c *Controller) RunForever(runImmediately bool) {
 	if runImmediately {
 		log.Debugln("**********[AUTOSCALER FIRST LOOP]**********")
 		c.RunOnce()

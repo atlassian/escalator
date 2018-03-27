@@ -19,7 +19,7 @@ See [Docs](docs/)
 
 ### Locally
 ```
-go run cmd.main.go--kubeconfig ~/.kube/config --nodegroups nodegroups.yaml
+go run cmd/main.go --kubeconfig ~/.kube/config --nodegroups nodegroups.yaml
 ```
 
 ### Docker
@@ -40,9 +40,9 @@ In the escalator-deployment:
 ## How to test
 #### Test everything
 ```
-go test ./...
+make test
 ```
-#### Test a package
+#### Test a specific package
 ```
 go test ./pkg/<package-name> 
 ```
