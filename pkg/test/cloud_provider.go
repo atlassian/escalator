@@ -90,14 +90,14 @@ func (n *NodeGroup) Size() int64 {
 }
 
 func (n *NodeGroup) IncreaseSize(delta int64) error {
-	return n.setASGDesiredSize(n.targetSize + delta)
+	return n.setDesiredSize(n.targetSize + delta)
 }
 
 func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 	for range nodes {
 		// Here we would normally tell the actual provider (AWS etc.) to terminate the instance and also decrement the
-		// desired capacity, but we just decrement the internal ASG size to reflect the remote change
-		n.setASGDesiredSize(n.targetSize - 1)
+		// desired capacity, but we just decrement the internal size to reflect the remote change
+		n.setDesiredSize(n.targetSize - 1)
 	}
 	return nil
 }
@@ -107,14 +107,14 @@ func (n *NodeGroup) Belongs(node *v1.Node) bool {
 }
 
 func (n *NodeGroup) DecreaseTargetSize(delta int64) error {
-	return n.setASGDesiredSize(n.targetSize + delta)
+	return n.setDesiredSize(n.targetSize + delta)
 }
 
 func (n *NodeGroup) Nodes() []string {
 	return nil
 }
 
-func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
+func (n *NodeGroup) setDesiredSize(newSize int64) error {
 	// This is where we would tell the actual provider (AWS etc.) to change the scaling group desired size
 	// but we just update the internal target size of the node group to reflect the remote change
 	n.targetSize = newSize

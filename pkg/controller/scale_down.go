@@ -61,7 +61,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 
 	if len(toBeDeleted) > 0 {
 		// Terminate the nodes in the cloud provider
-		err := opts.nodeGroup.ASG.DeleteNodes(toBeDeleted...)
+		err := opts.nodeGroup.CloudProviderNodeGroup.DeleteNodes(toBeDeleted...)
 		if err != nil {
 			for _, nodeToDelete := range toBeDeleted {
 				log.WithError(err).Errorf("failed to terminate node in cloud provider %v, %v", nodeToDelete.Name, nodeToDelete.Spec.ProviderID)

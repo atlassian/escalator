@@ -18,10 +18,10 @@ const DefaultNodeGroup = "default"
 // NodeGroupOptions represents a nodegroup running on our cluster
 // We differentiate nodegroups by their node label
 type NodeGroupOptions struct {
-	Name             string `json:"name,omitempty" yaml:"name,omitempty"`
-	LabelKey         string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
-	LabelValue       string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
-	CloudProviderASG string `json:"cloud_provider_asg,omitempty" yaml:"cloud_provider_asg,omitempty"`
+	Name                   string `json:"name,omitempty" yaml:"name,omitempty"`
+	LabelKey               string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
+	LabelValue             string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
+	CloudProviderGroupName string `json:"cloud_provider_group_name,omitempty" yaml:"cloud_provider_group_name,omitempty"`
 
 	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
 	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`
@@ -73,7 +73,7 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.Name) > 0, "name cannot be empty")
 	checkThat(len(nodegroup.LabelKey) > 0, "labelkey cannot be empty")
 	checkThat(len(nodegroup.LabelValue) > 0, "labelvalue cannot be empty")
-	checkThat(len(nodegroup.CloudProviderASG) > 0, "cloudprovider nodegroup asg cannot be empty")
+	checkThat(len(nodegroup.CloudProviderGroupName) > 0, "cloudprovider group name cannot be empty")
 
 	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent >= 0, "taint upper capacity must be larger than 0")
 	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent >= 0, "taint lower capacity must be larger than 0")
@@ -245,9 +245,9 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 }
 
 type nodeGroupsStateOpts struct {
-	nodeGroups []NodeGroupOptions
-	client     Client
-	asg        map[string]cloudprovider.NodeGroup
+	nodeGroups             []NodeGroupOptions
+	client                 Client
+	cloudProviderNodeGroup map[string]cloudprovider.NodeGroup
 }
 
 // BuildNodeGroupsState builds a node group state
@@ -255,9 +255,9 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 	nodeGroupsState := make(map[string]*NodeGroupState)
 	for _, ng := range opts.nodeGroups {
 		nodeGroupsState[ng.Name] = &NodeGroupState{
-			Opts:            ng,
-			NodeGroupLister: opts.client.Listers[ng.Name],
-			ASG:             opts.asg[ng.Name],
+			Opts:                   ng,
+			NodeGroupLister:        opts.client.Listers[ng.Name],
+			CloudProviderNodeGroup: opts.cloudProviderNodeGroup[ng.Name],
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
