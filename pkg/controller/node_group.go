@@ -18,20 +18,20 @@ const DefaultNodeGroup = "default"
 // NodeGroupOptions represents a nodegroup running on our cluster
 // We differentiate nodegroups by their node label
 type NodeGroupOptions struct {
-	Name             string `json:"name,omitempty" yaml:"name,omitempty"`
-	LabelKey         string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
-	LabelValue       string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
-	CloudProviderASG string `json:"cloud_provider_asg,omitempty" yaml:"cloud_provider_asg,omitempty"`
+	Name                   string `json:"name,omitempty" yaml:"name,omitempty"`
+	LabelKey               string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
+	LabelValue             string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
+	CloudProviderGroupName string `json:"cloud_provider_group_name,omitempty" yaml:"cloud_provider_group_name,omitempty"`
 
 	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
 	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`
 
 	DryMode bool `json:"dry_mode,omitempty" yaml:"dry_mode,omitempty"`
 
-	TaintUpperCapacityThreshholdPercent int `json:"taint_upper_capacity_threshhold_percent,omitempty" yaml:"taint_upper_capacity_threshhold_percent,omitempty"`
-	TaintLowerCapacityThreshholdPercent int `json:"taint_lower_capacity_threshhold_percent,omitempty" yaml:"taint_lower_capacity_threshhold_percent,omitempty"`
+	TaintUpperCapacityThresholdPercent int `json:"taint_upper_capacity_threshold_percent,omitempty" yaml:"taint_upper_capacity_threshold_percent,omitempty"`
+	TaintLowerCapacityThresholdPercent int `json:"taint_lower_capacity_threshold_percent,omitempty" yaml:"taint_lower_capacity_threshold_percent,omitempty"`
 
-	ScaleUpThreshholdPercent int `json:"scale_up_threshhold_percent,omitempty" yaml:"scale_up_threshhold_percent,omitempty"`
+	ScaleUpThresholdPercent int `json:"scale_up_threshold_percent,omitempty" yaml:"scale_up_threshold_percent,omitempty"`
 
 	SlowNodeRemovalRate int `json:"slow_node_removal_rate,omitempty" yaml:"slow_node_removal_rate,omitempty"`
 	FastNodeRemovalRate int `json:"fast_node_removal_rate,omitempty" yaml:"fast_node_removal_rate,omitempty"`
@@ -40,13 +40,11 @@ type NodeGroupOptions struct {
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 
 	ScaleUpCoolDownPeriod  string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
-	ScaleUpCoolDownTimeout string `json:"scale_up_cool_down_timeout,omitempty" yaml:"scale_up_cool_down_timeout,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration  time.Duration
 	hardDeleteGracePeriodDuration  time.Duration
 	scaleUpCoolDownPeriodDuration  time.Duration
-	scaleUpCoolDownTimeoutDuration time.Duration
 }
 
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct
@@ -73,15 +71,15 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.Name) > 0, "name cannot be empty")
 	checkThat(len(nodegroup.LabelKey) > 0, "labelkey cannot be empty")
 	checkThat(len(nodegroup.LabelValue) > 0, "labelvalue cannot be empty")
-	checkThat(len(nodegroup.CloudProviderASG) > 0, "cloudprovider nodegroup asg cannot be empty")
+	checkThat(len(nodegroup.CloudProviderGroupName) > 0, "cloudprovider group name cannot be empty")
 
-	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent >= 0, "taint upper capacity must be larger than 0")
-	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent >= 0, "taint lower capacity must be larger than 0")
-	checkThat(nodegroup.ScaleUpThreshholdPercent >= 0, "scale up threshhold should be larger than 0")
+	checkThat(nodegroup.TaintUpperCapacityThresholdPercent >= 0, "taint upper capacity must be larger than 0")
+	checkThat(nodegroup.TaintLowerCapacityThresholdPercent >= 0, "taint lower capacity must be larger than 0")
+	checkThat(nodegroup.ScaleUpThresholdPercent >= 0, "scale up threshold should be larger than 0")
 
-	checkThat(nodegroup.TaintLowerCapacityThreshholdPercent < nodegroup.TaintUpperCapacityThreshholdPercent,
-		"lower taint threshhold must be lower than upper taint threshold")
-	checkThat(nodegroup.TaintUpperCapacityThreshholdPercent < nodegroup.ScaleUpThreshholdPercent,
+	checkThat(nodegroup.TaintLowerCapacityThresholdPercent < nodegroup.TaintUpperCapacityThresholdPercent,
+		"lower taint threshold must be lower than upper taint threshold")
+	checkThat(nodegroup.TaintUpperCapacityThresholdPercent < nodegroup.ScaleUpThresholdPercent,
 		"taint upper capacity threshold should be lower than scale up threshold")
 
 	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
@@ -91,15 +89,12 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft grace period must not be empty")
 	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard grace period must not be empty")
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale up cooldown period must not be empty")
-	checkThat(len(nodegroup.ScaleUpCoolDownTimeout) > 0, "scale up cooldown timeout must not be empty")
 
 	checkThat(nodegroup.SoftDeleteGracePeriodDuration() > 0, "soft grace period failed to parse into a time.Duration. check your formatting.")
 	checkThat(nodegroup.HardDeleteGracePeriodDuration() > 0, "hard grace period failed to parse into a time.Duration. check your formatting.")
 	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft grace period must be less than hard grace period")
 
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() >= 0, "scale up cooldown period duration must be positive")
-	checkThat(nodegroup.ScaleUpCoolDownTimeoutDuration() >= 0, "scale up cooldown timeout duration must be positive")
-	checkThat(nodegroup.ScaleUpCoolDownTimeoutDuration() > nodegroup.ScaleUpCoolDownPeriodDuration(), "scaleup cooldown period must be smaller than the scaleup cooldown timeout")
 
 	return problems
 }
@@ -141,19 +136,6 @@ func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
 	}
 
 	return n.scaleUpCoolDownPeriodDuration
-}
-
-// ScaleUpCoolDownTimeoutDuration lazily returns/parses the scaleUpCoolDownTimeout string into a duration
-func (n *NodeGroupOptions) ScaleUpCoolDownTimeoutDuration() time.Duration {
-	if n.scaleUpCoolDownTimeoutDuration == 0 {
-		duration, err := time.ParseDuration(n.ScaleUpCoolDownTimeout)
-		if err != nil {
-			return 0
-		}
-		n.scaleUpCoolDownTimeoutDuration = duration
-	}
-
-	return n.scaleUpCoolDownTimeoutDuration
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
@@ -245,9 +227,9 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 }
 
 type nodeGroupsStateOpts struct {
-	nodeGroups []NodeGroupOptions
-	client     Client
-	asg        map[string]cloudprovider.NodeGroup
+	nodeGroups             []NodeGroupOptions
+	client                 Client
+	cloudProviderNodeGroup map[string]cloudprovider.NodeGroup
 }
 
 // BuildNodeGroupsState builds a node group state
@@ -255,13 +237,12 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 	nodeGroupsState := make(map[string]*NodeGroupState)
 	for _, ng := range opts.nodeGroups {
 		nodeGroupsState[ng.Name] = &NodeGroupState{
-			Opts:            ng,
-			NodeGroupLister: opts.client.Listers[ng.Name],
-			ASG:             opts.asg[ng.Name],
+			Opts:                   ng,
+			NodeGroupLister:        opts.client.Listers[ng.Name],
+			CloudProviderNodeGroup: opts.cloudProviderNodeGroup[ng.Name],
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
-				maximumLockDuration: ng.ScaleUpCoolDownTimeoutDuration(),
 			},
 		}
 	}

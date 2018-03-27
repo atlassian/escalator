@@ -50,7 +50,7 @@ func (b cloudProviderBuilder) Build() (cloudprovider.CloudProvider, error) {
 func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.Builder {
 	var nodegroupIDs []string
 	for _, n := range nodegroups {
-		nodegroupIDs = append(nodegroupIDs, n.CloudProviderASG)
+		nodegroupIDs = append(nodegroupIDs, n.CloudProviderGroupName)
 	}
 	cloudBuilder := cloudProviderBuilder{
 		ProviderOpts: cloudprovider.BuildOpts{

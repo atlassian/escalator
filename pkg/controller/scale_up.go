@@ -10,10 +10,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// TODO:(jgonzalez/aprice)
-// When a node is being reaped. make sure to not count that in calcuations. (don't retaint it or untaint it)
-
-// ScaleUp performs the untaint and increase asg logic
+// ScaleUp performs the untaint and increase cloud provider node group logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	nodesToAdd := opts.nodesDelta
 
@@ -40,18 +37,18 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	}
 
 	untainted, err := c.scaleUpUntaint(opts)
-	// No nodes were untainted, so we need to scale up asg
+	// No nodes were untainted, so we need to scale up cloud provider node group
 	if err != nil {
-		log.Errorf("Failed to untaint nodes because of an error. Skipping ASG scaleup: %v", err)
+		log.Errorf("Failed to untaint nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
 		return untainted, err
 	}
 
-	// remove the number of nodes that were just untainted and the remaining is how much to increase the asg by
+	// remove the number of nodes that were just untainted and the remaining is how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
 	if opts.nodesDelta > 0 {
-		added, err := c.scaleUpASG(opts)
+		added, err := c.scaleUpCloudProviderNodeGroup(opts)
 		if err != nil {
-			log.Errorf("Failed to add nodes because of an error. Skipping ASG scaleup: %v", err)
+			log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
 			return 0, err
 		}
 		opts.nodeGroup.scaleUpLock.lock(added)
@@ -61,26 +58,26 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	return untainted, nil
 }
 
-// scaleUpASG increases the size of the asg by opts.nodesDelta
-func (c *Controller) scaleUpASG(opts scaleOpts) (int, error) {
+// scaleUpCloudProviderNodeGroup increases the size of the cloud provider node group by opts.nodesDelta
+func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) {
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := int64(opts.nodesDelta)
 
-	if nodesToAdd+opts.nodeGroup.ASG.TargetSize() <= opts.nodeGroup.ASG.MaxSize() {
+	if nodesToAdd+opts.nodeGroup.CloudProviderNodeGroup.TargetSize() <= opts.nodeGroup.CloudProviderNodeGroup.MaxSize() {
 		drymode := c.dryMode(opts.nodeGroup)
 		log.WithField("drymode", drymode).
 			WithField("nodegroup", nodegroupName).
-			Infof("increasing asg by %v", nodesToAdd)
+			Infof("increasing cloud provider node group by %v", nodesToAdd)
 
 		if !drymode {
-			err := opts.nodeGroup.ASG.IncreaseSize(nodesToAdd)
+			err := opts.nodeGroup.CloudProviderNodeGroup.IncreaseSize(nodesToAdd)
 			if err != nil {
-				log.Errorf("failed to set asg size: %v", err)
+				log.Errorf("failed to set cloud provider node group size: %v", err)
 				return 0, err
 			}
 		}
 	} else {
-		return 0, fmt.Errorf("adding %v nodes would breach max asg size (%v)", nodesToAdd, opts.nodeGroup.ASG.MaxSize())
+		return 0, fmt.Errorf("adding %v nodes would breach max cloud provider node group size (%v)", nodesToAdd, opts.nodeGroup.CloudProviderNodeGroup.MaxSize())
 	}
 
 	return int(nodesToAdd), nil

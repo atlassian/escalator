@@ -368,10 +368,10 @@ node_groups:
     min_nodes: 5
     max_nodes: 300
     dry_mode: true
-    taint_upper_capacity_threshhold_percent: 70
-    taint_lower_capacity_threshhold_percent: 50
-    untaint_upper_capacity_threshhold_percent: 95
-    untaint_lower_capacity_threshhold_percent: 90
+    taint_upper_capacity_threshold_percent: 70
+    taint_lower_capacity_threshold_percent: 50
+    untaint_upper_capacity_threshold_percent: 95
+    untaint_lower_capacity_threshold_percent: 90
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
     soft_delete_grace_period: 10m
@@ -383,8 +383,8 @@ node_groups:
     min_nodes: 1
     max_nodes: 10
     dry_mode: true
-    taint_upper_capacity_threshhold_percent: 25
-    taint_lower_capacity_threshhold_percent: 20
+    taint_upper_capacity_threshold_percent: 25
+    taint_lower_capacity_threshold_percent: 20
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
     scale_up_cooldown_period: 21h
@@ -397,8 +397,8 @@ var yamlBE = `node_groups:
     min_nodes: 10
     max_nodes: 300
     dry_mode: false
-    taint_upper_capacity_threshhold_percent: 70
-    taint_lower_capacity_threshhold_percent: 45
+    taint_upper_capacity_threshold_percent: 70
+    taint_lower_capacity_threshold_percent: 45
     slow_node_removal_rate: 2
     fast_node_removal_rate: 5`
 
@@ -415,21 +415,20 @@ func TestValidateNodeGroup(t *testing.T) {
 			"valid nodegroup",
 			args{
 				controller.NodeGroupOptions{
-					Name:                                "test",
-					LabelKey:                            "customer",
-					LabelValue:                          "buileng",
-					CloudProviderASG:                    "somegroup",
-					TaintUpperCapacityThreshholdPercent: 70,
-					TaintLowerCapacityThreshholdPercent: 60,
-					ScaleUpThreshholdPercent:            100,
-					MinNodes:                            1,
-					MaxNodes:                            3,
-					SlowNodeRemovalRate:                 1,
-					FastNodeRemovalRate:                 2,
-					SoftDeleteGracePeriod:               "10m",
-					HardDeleteGracePeriod:               "1h10m",
-					ScaleUpCoolDownPeriod:               "55m",
-					ScaleUpCoolDownTimeout:              "2h",
+					Name:                               "test",
+					LabelKey:                           "customer",
+					LabelValue:                         "buileng",
+					CloudProviderGroupName:             "somegroup",
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
 				},
 			},
 			nil,
@@ -438,26 +437,25 @@ func TestValidateNodeGroup(t *testing.T) {
 			"invalid nodegroup",
 			args{
 				controller.NodeGroupOptions{
-					Name:                                "",
-					LabelKey:                            "customer",
-					LabelValue:                          "buileng",
-					CloudProviderASG:                    "somegroup",
-					TaintUpperCapacityThreshholdPercent: 70,
-					TaintLowerCapacityThreshholdPercent: 90,
-					ScaleUpThreshholdPercent:            100,
-					MinNodes:                            1,
-					MaxNodes:                            0,
-					SlowNodeRemovalRate:                 1,
-					FastNodeRemovalRate:                 2,
-					SoftDeleteGracePeriod:               "10",
-					HardDeleteGracePeriod:               "1h10m",
-					ScaleUpCoolDownPeriod:               "21h21m21s",
-					ScaleUpCoolDownTimeout:              "22h",
+					Name:                               "",
+					LabelKey:                           "customer",
+					LabelValue:                         "buileng",
+					CloudProviderGroupName:             "somegroup",
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 90,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           0,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "21h21m21s",
 				},
 			},
 			[]string{
 				"name cannot be empty",
-				"lower taint threshhold must be lower than upper taint threshold",
+				"lower taint threshold must be lower than upper taint threshold",
 				"min nodes must be smaller than max nodes",
 				"soft grace period failed to parse into a time.Duration. check your formatting.",
 			},

@@ -10,7 +10,7 @@ import (
 // calcScaleUpDelta determines the amount of nodes to scale up
 func calcScaleUpDelta(allNodes []*v1.Node, cpuPercent float64, memPercent float64, nodeGroup *NodeGroupState) (int, error) {
 	nodeCount := float64(len(allNodes))
-	scaleUpThresholdPercent := float64(nodeGroup.Opts.ScaleUpThreshholdPercent)
+	scaleUpThresholdPercent := float64(nodeGroup.Opts.ScaleUpThresholdPercent)
 
 	percentageNeededCPU := (cpuPercent - scaleUpThresholdPercent) / scaleUpThresholdPercent
 	percentageNeededMem := (memPercent - scaleUpThresholdPercent) / scaleUpThresholdPercent

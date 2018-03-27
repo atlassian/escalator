@@ -12,17 +12,13 @@ type scaleLock struct {
 	requestedNodes      int
 	lockTime            time.Time
 	minimumLockDuration time.Duration
-	maximumLockDuration time.Duration
 }
 
 func (l *scaleLock) locked() bool {
 	if time.Now().Sub(l.lockTime) < l.minimumLockDuration {
-		log.Debugln("Locked, have not exceeded minimum lock duration")
 		return true
 	}
-	if time.Now().Sub(l.lockTime) > l.maximumLockDuration {
-		l.unlock()
-	}
+	l.unlock()
 	return l.isLocked
 }
 
@@ -43,13 +39,11 @@ func (l *scaleLock) timeUntilMinimumUnlock() time.Duration {
 	return l.lockTime.Add(l.minimumLockDuration).Sub(time.Now())
 }
 
-func (l *scaleLock) timeUntilMaximumUnlock() time.Duration {
-	return l.lockTime.Add(l.maximumLockDuration).Sub(time.Now())
-}
-
 func (l scaleLock) String() string {
-	return fmt.Sprintf("%v before min cooldown. %v before lock timeout.",
+	return fmt.Sprintf(
+		"lock(%v): there are %v upcoming nodes requested, %v before min cooldown.",
+		l.locked(),
+		l.requestedNodes,
 		l.timeUntilMinimumUnlock(),
-		l.timeUntilMaximumUnlock(),
 	)
 }
