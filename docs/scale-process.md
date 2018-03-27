@@ -48,10 +48,14 @@ The following is documentation on the process that Escalator follows for scaling
 ## Scale lock
 
 The scale lock is a mechanism to ensure that the requested scale up amount to the cloud provider is successful before
-requesting additional scale ups.
+requesting additional scale ups or scaling down.
 
 This helps prevent cases where there may be an "infinite" scale up due to the delay in the time it takes for nodes to 
 appear in Kubernetes after they have been created by the cloud provider.
+
+It also prevents Escalator from scaling down whilst the cloud provider is mid way through bringing new nodes up. It
+allows the scale up activity to safely finish before performing any additional actions that will impact the node
+group.
 
 The scale lock is checked before any scaling activity is done - scale up, scale down or doing nothing. 
 

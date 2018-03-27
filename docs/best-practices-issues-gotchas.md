@@ -8,6 +8,8 @@
    tune the values accordingly once Escalator is running as desired in your environment.
  - Run it with a high `hard_delete_grace_period` timeout to prevent Escalator terminating nodes that are
    still running workloads.
+ - Run Escalator with a low scan interval, for example 30 or 60 seconds. This will ensure Escalator is responsive
+   enough during a spike in load or pods.
 
 ## Common Issues & Gotchas
 
