@@ -71,9 +71,9 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		return nil
 	}
 
-	cloud := opts.CloudProviderBuilder.Build()
-	if cloud == nil {
-		log.Fatal("Failed to create cloudprovider")
+	cloud, err := opts.CloudProviderBuilder.Build()
+	if cloud == nil || err != nil {
+		log.Fatal("Failed to create cloudprovider", err)
 	}
 
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
@@ -371,7 +371,10 @@ func (c *Controller) RunOnce() {
 	for i := 0; i < 2 && err != nil; i++ {
 		log.Warnf("cloudprovider failed to refresh. trying to refetch credentials. tries = %v", i+1)
 		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
-		c.cloudProvider = c.Opts.CloudProviderBuilder.Build()
+		c.cloudProvider, err = c.Opts.CloudProviderBuilder.Build()
+		if err != nil {
+			log.Fatalln(err)
+		}
 		err = c.cloudProvider.Refresh()
 	}
 	// Perform the ScaleUp/Taint logic
