@@ -125,6 +125,38 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// CloudProviderMinSize indicates the current cloud provider minimum size
+	CloudProviderMinSize = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "cloud_provider_min_size",
+			Help: "current cloud provider minimum size",
+		},
+		[]string{"cloud_provider", "id"},
+	)
+	// CloudProviderMaxSize indicates the current cloud provider maximum size
+	CloudProviderMaxSize = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "cloud_provider_max_size",
+			Help: "current cloud provider maximum size",
+		},
+		[]string{"cloud_provider", "id"},
+	)
+	// CloudProviderTargetSize indicates the current cloud provider target size
+	CloudProviderTargetSize = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "cloud_provider_target_size",
+			Help: "current cloud provider target size",
+		},
+		[]string{"cloud_provider", "id"},
+	)
+	// CloudProviderSize indicates the current cloud provider size
+	CloudProviderSize = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "cloud_provider_size",
+			Help: "current cloud provider size",
+		},
+		[]string{"cloud_provider", "id"},
+	)
 )
 
 func init() {
@@ -143,6 +175,10 @@ func init() {
 	prometheus.MustRegister(NodeGroupTaintEvent)
 	prometheus.MustRegister(NodeGroupUntaintEvent)
 	prometheus.MustRegister(NodeGroupScaleLock)
+	prometheus.MustRegister(CloudProviderMinSize)
+	prometheus.MustRegister(CloudProviderMaxSize)
+	prometheus.MustRegister(CloudProviderTargetSize)
+	prometheus.MustRegister(CloudProviderSize)
 }
 
 // Start starts the metrics endpoint on a new thread

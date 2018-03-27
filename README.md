@@ -56,10 +56,10 @@ node_groups:
     min_nodes: 5
     max_nodes: 300
     dry_mode: true
-    taint_upper_capacity_threshhold_percent: 70
-    taint_lower_capacity_threshhold_percent: 50
-    untaint_upper_capacity_threshhold_percent: 95
-    untaint_lower_capacity_threshhold_percent: 90
+    taint_upper_capacity_threshold_percent: 70
+    taint_lower_capacity_threshold_percent: 50
+    untaint_upper_capacity_threshold_percent: 95
+    untaint_lower_capacity_threshold_percent: 90
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
     slow_node_revival_rate: 2
@@ -70,10 +70,10 @@ node_groups:
     min_nodes: 1
     max_nodes: 10
     dry_mode: true
-    taint_upper_capacity_threshhold_percent: 25
-    taint_lower_capacity_threshhold_percent: 20
-    untaint_upper_capacity_threshhold_percent: 45
-    untaint_lower_capacity_threshhold_percent: 30
+    taint_upper_capacity_threshold_percent: 25
+    taint_lower_capacity_threshold_percent: 20
+    untaint_upper_capacity_threshold_percent: 45
+    untaint_lower_capacity_threshold_percent: 30
     slow_node_removal_rate: 2
     fast_node_removal_rate: 3
     slow_node_revival_rate: 2
