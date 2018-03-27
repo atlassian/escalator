@@ -90,7 +90,6 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
-				maximumLockDuration: nodeGroupOpts.ScaleUpCoolDownTimeoutDuration(),
 			},
 		}
 	}
@@ -255,7 +254,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	locked := nodeGroup.scaleUpLock.locked()
 	// logs, metrics
-	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcoming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
 	lockVal := 0.0
 	if locked {
 		lockVal = 1.0
@@ -268,23 +266,19 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// a dumb check, but basically
 		// ---
 		// any nodes that are ready we count as GOOD nodes
-		// any nodes that are unready AND have been around longer than our timeout are BAD nodes
-		var readyNodesNotBroken int // GOOD
-		var unreadyNodesBroken int  // BAD
+		var readyNodes int
 		for _, node := range allNodes {
 			for _, cond := range node.Status.Conditions {
 				if cond.Type == v1.NodeReady {
 					if cond.Status == v1.ConditionTrue {
-						readyNodesNotBroken++
-					} else if time.Since(node.CreationTimestamp.Time) > nodeGroup.scaleUpLock.maximumLockDuration {
-						unreadyNodesBroken++
+						readyNodes++
 					}
 					break
 				}
 			}
 		}
 		// check that our node group has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
-		if nodeGroup.CloudProviderNodeGroup.Size() >= nodeGroup.CloudProviderNodeGroup.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken >= int(nodeGroup.CloudProviderNodeGroup.TargetSize()) {
+		if nodeGroup.CloudProviderNodeGroup.Size() >= nodeGroup.CloudProviderNodeGroup.TargetSize() && readyNodes >= int(nodeGroup.CloudProviderNodeGroup.TargetSize()) {
 			nodeGroup.scaleUpLock.unlock()
 			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
 		} else {

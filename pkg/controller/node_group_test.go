@@ -429,7 +429,6 @@ func TestValidateNodeGroup(t *testing.T) {
 					SoftDeleteGracePeriod:              "10m",
 					HardDeleteGracePeriod:              "1h10m",
 					ScaleUpCoolDownPeriod:              "55m",
-					ScaleUpCoolDownTimeout:             "2h",
 				},
 			},
 			nil,
@@ -452,7 +451,6 @@ func TestValidateNodeGroup(t *testing.T) {
 					SoftDeleteGracePeriod:              "10",
 					HardDeleteGracePeriod:              "1h10m",
 					ScaleUpCoolDownPeriod:              "21h21m21s",
-					ScaleUpCoolDownTimeout:             "22h",
 				},
 			},
 			[]string{
