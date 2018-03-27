@@ -12,15 +12,15 @@ node_groups:
   - name: "shared"
     label_key: "customer"
     label_value: "shared"
-    cloud_provider_asg: "shared-nodes"
+    cloud_provider_group_name: "shared-nodes"
     min_nodes: 1
     max_nodes: 30
     dry_mode: false
-    taint_upper_capacity_threshhold_percent: 40
-    taint_lower_capacity_threshhold_percent: 10
+    taint_upper_capacity_threshold_percent: 40
+    taint_lower_capacity_threshold_percent: 10
     slow_node_removal_rate: 2
     fast_node_removal_rate: 5
-    scale_up_threshhold_percent: 70
+    scale_up_threshold_percent: 70
     scale_up_cool_down_period: 2m
     scale_up_cool_down_timeout: 10m
     soft_delete_grace_period: 1m
@@ -43,9 +43,9 @@ for a node group.
 
 **Pod and Node selectors are documented [here](../pod-node-selectors.md).**
 
-### `cloud_provider_asg`
+### `cloud_provider_group_name`
 
-`cloud_provider_asg` is the node group in the cloud provider that Escalator will either increase the size
+`cloud_provider_group_name` is the node group in the cloud provider that Escalator will either increase the size
 of or terminate nodes in when Escalator scales up or down.
 
 - **AWS:** this is the name of the auto scaling group. More information on AWS deployments can be found 
@@ -77,39 +77,39 @@ Escalator would do in specific scenarios.
 
 Note: this flag is overridden by the `--drymode` command line flag.
 
-### `taint_upper_capacity_threshhold_percent`
+### `taint_upper_capacity_threshold_percent`
 
 This option defines the threshold at which Escalator will slowly start tainting nodes. The slow tainting will only occur
 when the utilisation of the node group goes below this value. For example:
 
-If the node group utilisation is **38%**, and `taint_upper_capacity_threshhold_percent` is configured as **40**,
+If the node group utilisation is **38%**, and `taint_upper_capacity_threshold_percent` is configured as **40**,
 Escalator will taint nodes at the rate defined in `slow_node_removal_rate`.
 
-### `taint_lower_capacity_threshhold_percent`
+### `taint_lower_capacity_threshold_percent`
 
 This option defines the threshold at which Escalator will quickly/fast start tainting nodes. The fast tainting will only
 occur when the utilisation of the node group goes below this value. For example:
 
-If the node group utilisation is **5%**, and `taint_upper_capacity_threshhold_percent` is configured as **10**,
-Escalator will taint nodes at the rate defined in `taint_lower_capacity_threshhold_percent`.
+If the node group utilisation is **5%**, and `taint_upper_capacity_threshold_percent` is configured as **10**,
+Escalator will taint nodes at the rate defined in `taint_lower_capacity_threshold_percent`.
 
 ### `slow_node_removal_rate`
 
 The amount of nodes to taint whenever the node group utilisation goes below the 
-`taint_upper_capacity_threshhold_percent` value.
+`taint_upper_capacity_threshold_percent` value.
 
 ### `fast_node_removal_rate`
 
 The amount of nodes to taint whenever the node group utilisation goes below the 
-`taint_lower_capacity_threshhold_percent` value.
+`taint_lower_capacity_threshold_percent` value.
 
-### `scale_up_threshhold_percent`
+### `scale_up_threshold_percent`
 
 This value defines the threshold at which Escalator will increase the size of the node group. Escalator will
 calculate based on the current utilisation how much to increase the node group to be below the value of this
 option. For example:
 
-`scale_up_threshhold_percent` is configured as **70** and the current node group utilisation is **75%**, Escalator will
+`scale_up_threshold_percent` is configured as **70** and the current node group utilisation is **75%**, Escalator will
 increase the size of the node group so that the utilisation drops below **70**.
 
 Escalator calculates the utilisation based on the CPU and Memory limits/requests of containers running in the node
@@ -117,7 +117,7 @@ group and uses whichever is the higher value as the utilisation. More informatio
 found [here](../calculations.md).
 
 [**Slack space**](./advanced-configuration.md) can be configured by leaving a gap between the 
-`scale_up_threshhold_percent` and `100%`, e.g. a value of `70` will mean `30%` slack space.
+`scale_up_threshold_percent` and `100%`, e.g. a value of `70` will mean `30%` slack space.
 
 ### `scale_up_cool_down_period` and `scale_up_cool_down_timeout`
 

@@ -9,15 +9,15 @@ data:
       - name: "shared"
         label_key: "customer"
         label_value: "shared"
-        cloud_provider_asg: "shared-nodes"
+        cloud_provider_group_name: "shared-nodes"
         min_nodes: 1
         max_nodes: 30
         dry_mode: false
-        taint_upper_capacity_threshhold_percent: 40
-        taint_lower_capacity_threshhold_percent: 10
+        taint_upper_capacity_threshold_percent: 40
+        taint_lower_capacity_threshold_percent: 10
         slow_node_removal_rate: 2
         fast_node_removal_rate: 5
-        scale_up_threshhold_percent: 70
+        scale_up_threshold_percent: 70
         scale_up_cool_down_period: 2m
         scale_up_cool_down_timeout: 10m
         soft_delete_grace_period: 1m

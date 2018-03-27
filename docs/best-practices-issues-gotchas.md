@@ -13,3 +13,5 @@
 
  - Ensure scale in protection is enabled for the cloud provider node group. This will prevent the cloud provider from
    terminating instances in the rare case where there are more instances than the desired node group size.
+ - It is recommended to match Escalator `min_nodes` and `max_nodes` to the value in the cloud provider. This will 
+   prevent weird cases where Escalator will try to scale down but will be blocked by the cloud provider.

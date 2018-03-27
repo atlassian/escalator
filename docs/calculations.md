@@ -50,11 +50,11 @@ how much to tell the cloud provider to scale up the node group by.
 
 The delta is calculated through the use of a percent decrease formula. We need to calculate how much to increase the
 node group by calculating the amount of nodes needed to decrease the utilisation to be below the 
-`scale_up_threshhold_percent` option.
+`scale_up_threshold_percent` option.
 
 **For example:**
 
-- `scale_up_threshhold_percent` is `70`
+- `scale_up_threshold_percent` is `70`
 - CPU utilisation is `250`
 - `(250 - 70) / 70` = `2.57142857143`
 - `2.57142857143 * 2 nodes` = `5.14285714286`
