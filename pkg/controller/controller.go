@@ -35,7 +35,7 @@ type NodeGroupState struct {
 
 	NodeInfos map[string]*schedulercache.NodeInfo
 
-	ASG cloudprovider.NodeGroup
+	CloudProviderNodeGroup cloudprovider.NodeGroup
 
 	scaleUpLock scaleLock
 
@@ -56,11 +56,11 @@ type Opts struct {
 // scaleOpts provides options for a scale function
 // wraps options that would be passed as args
 type scaleOpts struct {
-	nodes               []*v1.Node
-	taintedNodes        []*v1.Node
-	untaintedNodes      []*v1.Node
-	nodeGroup           *NodeGroupState
-	nodesDelta          int
+	nodes          []*v1.Node
+	taintedNodes   []*v1.Node
+	untaintedNodes []*v1.Node
+	nodeGroup      *NodeGroupState
+	nodesDelta     int
 }
 
 // NewController creates a new controller with the specified options
@@ -79,14 +79,14 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
 	nodegroupMap := make(map[string]*NodeGroupState)
 	for _, nodeGroupOpts := range opts.NodeGroups {
-		asg, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderASG)
+		cloudProviderNodeGroup, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderGroupName)
 		if !ok {
-			log.Fatalf("could not find asg nodegroup \"%v\" on cloudprovider", nodeGroupOpts.CloudProviderASG)
+			log.Fatalf("could not find node group \"%v\" on cloud provider", nodeGroupOpts.CloudProviderGroupName)
 		}
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
-			Opts:            nodeGroupOpts,
-			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
-			ASG:             asg,
+			Opts:                   nodeGroupOpts,
+			NodeGroupLister:        client.Listers[nodeGroupOpts.Name],
+			CloudProviderNodeGroup: cloudProviderNodeGroup,
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
@@ -231,9 +231,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
 		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
 		result, err := c.ScaleUp(scaleOpts{
-			nodes: allNodes,
+			nodes:      allNodes,
 			nodesDelta: nodeGroup.Opts.MinNodes - len(untaintedNodes),
-			nodeGroup: nodeGroup,
+			nodeGroup:  nodeGroup,
 		})
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
@@ -283,8 +283,8 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 				}
 			}
 		}
-		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
-		if nodeGroup.ASG.Size() >= nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken >= int(nodeGroup.ASG.TargetSize()) {
+		// check that our node group has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
+		if nodeGroup.CloudProviderNodeGroup.Size() >= nodeGroup.CloudProviderNodeGroup.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken >= int(nodeGroup.CloudProviderNodeGroup.TargetSize()) {
 			nodeGroup.scaleUpLock.unlock()
 			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
 		} else {
@@ -305,11 +305,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// reached very low %. aggressively remove nodes
 	case maxPercent < nodeGroup.Opts.TaintLowerCapacityThreshholdPercent:
 		nodesDelta = -nodeGroup.Opts.FastNodeRemovalRate
-	// reached medium low %. slowly remove nodes
+		// reached medium low %. slowly remove nodes
 	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
 		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
-	// --- Scale Up conditions ---
-	// Need to scale up so capacity can handle requests
+		// --- Scale Up conditions ---
+		// Need to scale up so capacity can handle requests
 	case maxPercent > nodeGroup.Opts.ScaleUpThreshholdPercent:
 		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
@@ -325,10 +325,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
-		nodes:               allNodes,
-		taintedNodes:        taintedNodes,
-		untaintedNodes:      untaintedNodes,
-		nodeGroup:           nodeGroup,
+		nodes:          allNodes,
+		taintedNodes:   taintedNodes,
+		untaintedNodes: untaintedNodes,
+		nodeGroup:      nodeGroup,
 	}
 
 	// Perform a scale up, do nothing or scale down based on the nodes delta

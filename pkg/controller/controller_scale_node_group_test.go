@@ -296,7 +296,7 @@ func TestScaleNodeGroup(t *testing.T) {
 			nodes := buildTestNodes(tt.args.nodeArgs.initialAmount, tt.args.nodeArgs.cpu, tt.args.nodeArgs.mem)
 			client, opts := buildTestClient(nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
 
-			// For these test cases we only use 1 node group/ASG
+			// For these test cases we only use 1 node group/cloud provider node group
 			nodeGroupSize := 1
 
 			// Create a test (mock) cloud provider
@@ -310,12 +310,12 @@ func TestScaleNodeGroup(t *testing.T) {
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
 			// Create a node group state with the mapping of node groups to the cloud providers node groups
-			asgMap := make(map[string]cloudprovider.NodeGroup, nodeGroupSize)
-			asgMap[tt.args.nodeGroupOptions.Name] = testNodeGroup
+			cloudProviderNodeGroupMap := make(map[string]cloudprovider.NodeGroup, nodeGroupSize)
+			cloudProviderNodeGroupMap[tt.args.nodeGroupOptions.Name] = testNodeGroup
 			nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
-				nodeGroups: nodeGroups,
-				client:     *client,
-				asg:        asgMap,
+				nodeGroups:             nodeGroups,
+				client:                 *client,
+				cloudProviderNodeGroup: cloudProviderNodeGroupMap,
 			})
 
 			controller := &Controller{
@@ -426,7 +426,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
 			client, opts := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
 
-			// For these test cases we only use 1 node group/ASG
+			// For these test cases we only use 1 node group/cloud provider node group
 			nodeGroupSize := 1
 
 			// Create a test (mock) cloud provider
@@ -440,12 +440,12 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			testCloudProvider.RegisterNodeGroup(testNodeGroup)
 
 			// Create a node group state with the mapping of node groups to the cloud providers node groups
-			asgMap := make(map[string]cloudprovider.NodeGroup, nodeGroupSize)
-			asgMap[tt.args.nodeGroupOptions.Name] = testNodeGroup
+			cloudProviderNodeGroupMap := make(map[string]cloudprovider.NodeGroup, nodeGroupSize)
+			cloudProviderNodeGroupMap[tt.args.nodeGroupOptions.Name] = testNodeGroup
 			nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
-				nodeGroups: nodeGroups,
-				client:     *client,
-				asg:        asgMap,
+				nodeGroups:             nodeGroups,
+				client:                 *client,
+				cloudProviderNodeGroup: cloudProviderNodeGroupMap,
 			})
 
 			controller := &Controller{
