@@ -72,7 +72,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	}
 
 	cloud, err := opts.CloudProviderBuilder.Build()
-	if cloud == nil || err != nil {
+	if err != nil {
 		log.Fatal("Failed to create cloudprovider", err)
 	}
 
