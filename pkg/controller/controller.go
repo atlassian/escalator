@@ -253,41 +253,15 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
 
 	locked := nodeGroup.scaleUpLock.locked()
-	// logs, metrics
 	lockVal := 0.0
 	if locked {
+		// don't do anything else until we're unlocked again
 		lockVal = 1.0
 		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
-	}
-	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
-
-	if locked {
-		// perform the upcoming node check
-		// a dumb check, but basically
-		// ---
-		// any nodes that are ready we count as GOOD nodes
-		var readyNodes int
-		for _, node := range allNodes {
-			for _, cond := range node.Status.Conditions {
-				if cond.Type == v1.NodeReady {
-					if cond.Status == v1.ConditionTrue {
-						readyNodes++
-					}
-					break
-				}
-			}
-		}
-		// check that our node group has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
-		if nodeGroup.CloudProviderNodeGroup.Size() >= nodeGroup.CloudProviderNodeGroup.TargetSize() && readyNodes >= int(nodeGroup.CloudProviderNodeGroup.TargetSize()) {
-			nodeGroup.scaleUpLock.unlock()
-			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
-		} else {
-			log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
-		}
-
-		// don't do anything else until we're unlocked again
+		log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
 		return 0, nil
 	}
+	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
 
 	// Perform the scaling decision
 	maxPercent := math.Max(cpuPercent, memPercent)
