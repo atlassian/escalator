@@ -13,7 +13,11 @@ import (
 // Builder builds the aws cloudprovider
 type Builder struct {
 	ProviderOpts cloudprovider.BuildOpts
-	AssumeRoleARN   string
+	Opts         Opts
+}
+
+type Opts struct {
+	AssumeRoleARN string
 }
 
 // Build the cloudprovider
@@ -25,7 +29,7 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 
 	var creds *credentials.Credentials
 	if b.assumeRoleEnabled() {
-		creds = stscreds.NewCredentials(sess, b.AssumeRoleARN)
+		creds = stscreds.NewCredentials(sess, b.Opts.AssumeRoleARN)
 	}
 
 	service := autoscaling.New(sess, &aws.Config{
@@ -52,5 +56,5 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 
 // assumeRoleEnabled returns whether assume role is enabled
 func (b Builder) assumeRoleEnabled() bool {
-	return len(b.AssumeRoleARN) > 0
+	return len(b.Opts.AssumeRoleARN) > 0
 }

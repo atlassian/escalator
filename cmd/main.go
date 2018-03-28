@@ -26,7 +26,7 @@ var (
 	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups").Required().String()
 	drymode             = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
 	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Available options: (aws)").Default("aws").Enum("aws")
-	awsAssumeRoleARN    = kingpin.Flag("aws-assume-role-arn", "AWS role arn to assume. Only usable when using aws cloud provider. Example: arn:aws:iam::111111111111:role/escalator").String()
+	awsAssumeRoleARN    = kingpin.Flag("aws-assume-role-arn", "AWS role arn to assume. Only usable when using the aws cloud provider. Example: arn:aws:iam::111111111111:role/escalator").String()
 )
 
 // cloudProviderBuilder builds the requested cloud provider. aws, gce, etc
@@ -38,7 +38,12 @@ type cloudProviderBuilder struct {
 func (b cloudProviderBuilder) Build() (cloudprovider.CloudProvider, error) {
 	switch b.ProviderOpts.ProviderID {
 	case aws.ProviderName:
-		return aws.Builder{ProviderOpts: b.ProviderOpts, AssumeRoleARN: *awsAssumeRoleARN}.Build()
+		return aws.Builder{
+			ProviderOpts: b.ProviderOpts,
+			Opts: aws.Opts{
+				AssumeRoleARN: *awsAssumeRoleARN,
+			},
+		}.Build()
 	default:
 		err := fmt.Errorf("provider %v does not exist", b.ProviderOpts.ProviderID)
 		log.Fatalln(err)
