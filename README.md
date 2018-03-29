@@ -84,7 +84,7 @@ In the Escalator Kubernetes deployment:
 
 ```yaml
 node_groups:
-  - name: "shared"
+  - name: "default"
     label_key: "customer"
     label_value: "shared"
     cloud_provider_group_name: "shared-nodes"

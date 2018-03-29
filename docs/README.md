@@ -22,6 +22,7 @@
 - [**Pod and Node Selectors**](./pod-node-selectors.md)
     - Nodes
     - Pods
+    - Default Pod Selector
     - More Information
 - [**Metrics**](./metrics.md)
     - Exposed Metrics

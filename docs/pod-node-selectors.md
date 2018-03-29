@@ -47,6 +47,30 @@ Replace `customer` and `shared` with your node/pod label key-value.
 You can see the function that performs the filtering of pods in the 
 [`pkg/controller/node_group.go` file](../pkg/controller/node_group.go), specifically `NewPodAffinityFilterFunc()`.
 
+## Default Pod Selector
+
+Escalator includes an option to include pods into the utilisation calculations for pods that don't have a `nodeSelector`
+or a `nodeAffinity` specified. This is useful when running a "shared" node group that picks up any pods that don't run
+on a specific node. 
+
+When this option is used, a different pod filtering method is utilised:
+
+```go
+// allow pods without a node selector and without a pod affinity
+return len(pod.Spec.NodeSelector) == 0 && pod.Spec.Affinity == nil
+```
+
+To use this option, name the node group `default` in the `nodegroups_config.yaml` file like so:
+
+```yaml
+node_groups:
+  - name: "default"
+    label_key: "customer"
+    label_value: "shared"
+``` 
+
+`label_key` and `label_value` is still used for selecting which nodes are included in the capacity calculations.
+
 ## More information
 
  - More information on node labels, node selectors and node affinity can be found 
