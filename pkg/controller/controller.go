@@ -35,7 +35,7 @@ type NodeGroupState struct {
 
 	NodeInfos map[string]*schedulercache.NodeInfo
 
-	ASG cloudprovider.NodeGroup
+	CloudProviderNodeGroup cloudprovider.NodeGroup
 
 	scaleUpLock scaleLock
 
@@ -56,11 +56,11 @@ type Opts struct {
 // scaleOpts provides options for a scale function
 // wraps options that would be passed as args
 type scaleOpts struct {
-	nodes               []*v1.Node
-	taintedNodes        []*v1.Node
-	untaintedNodes      []*v1.Node
-	nodeGroup           *NodeGroupState
-	nodesDelta          int
+	nodes          []*v1.Node
+	taintedNodes   []*v1.Node
+	untaintedNodes []*v1.Node
+	nodeGroup      *NodeGroupState
+	nodesDelta     int
 }
 
 // NewController creates a new controller with the specified options
@@ -79,18 +79,17 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
 	nodegroupMap := make(map[string]*NodeGroupState)
 	for _, nodeGroupOpts := range opts.NodeGroups {
-		asg, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderASG)
+		cloudProviderNodeGroup, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderGroupName)
 		if !ok {
-			log.Fatalf("could not find asg nodegroup \"%v\" on cloudprovider", nodeGroupOpts.CloudProviderASG)
+			log.Fatalf("could not find node group \"%v\" on cloud provider", nodeGroupOpts.CloudProviderGroupName)
 		}
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
-			Opts:            nodeGroupOpts,
-			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
-			ASG:             asg,
+			Opts:                   nodeGroupOpts,
+			NodeGroupLister:        client.Listers[nodeGroupOpts.Name],
+			CloudProviderNodeGroup: cloudProviderNodeGroup,
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
-				maximumLockDuration: nodeGroupOpts.ScaleUpCoolDownTimeoutDuration(),
 			},
 		}
 	}
@@ -231,9 +230,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
 		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
 		result, err := c.ScaleUp(scaleOpts{
-			nodes: allNodes,
+			nodes:      allNodes,
 			nodesDelta: nodeGroup.Opts.MinNodes - len(untaintedNodes),
-			nodeGroup: nodeGroup,
+			nodeGroup:  nodeGroup,
 		})
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
@@ -254,63 +253,32 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
 
 	locked := nodeGroup.scaleUpLock.locked()
-	// logs, metrics
-	log.WithField("nodegroup", nodegroup).Infof("lock(%v): there are %v upcoming nodes requested.", locked, nodeGroup.scaleUpLock.requestedNodes)
 	lockVal := 0.0
 	if locked {
+		// don't do anything else until we're unlocked again
 		lockVal = 1.0
 		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
+		log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
+		return 0, nil
 	}
 	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
 
-	if locked {
-		// perform the upcoming node check
-		// a dumb check, but basically
-		// ---
-		// any nodes that are ready we count as GOOD nodes
-		// any nodes that are unready AND have been around longer than our timeout are BAD nodes
-		var readyNodesNotBroken int // GOOD
-		var unreadyNodesBroken int  // BAD
-		for _, node := range allNodes {
-			for _, cond := range node.Status.Conditions {
-				if cond.Type == v1.NodeReady {
-					if cond.Status == v1.ConditionTrue {
-						readyNodesNotBroken++
-					} else if time.Since(node.CreationTimestamp.Time) > nodeGroup.scaleUpLock.maximumLockDuration {
-						unreadyNodesBroken++
-					}
-					break
-				}
-			}
-		}
-		// check that our asg has stabilised on the cloud side, and check that the number of GOOD nodes we have are all accounted for
-		if nodeGroup.ASG.Size() >= nodeGroup.ASG.TargetSize() && readyNodesNotBroken == len(allNodes)-unreadyNodesBroken && readyNodesNotBroken >= int(nodeGroup.ASG.TargetSize()) {
-			nodeGroup.scaleUpLock.unlock()
-			log.WithField("nodegroup", nodegroup).Infoln("Scale up finished")
-		} else {
-			log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
-		}
-
-		// don't do anything else until we're unlocked again
-		return 0, nil
-	}
-
 	// Perform the scaling decision
-	maxPercent := int(math.Ceil(math.Max(cpuPercent, memPercent)))
+	maxPercent := math.Max(cpuPercent, memPercent)
 	nodesDelta := 0
 
 	// Determine if we want to scale up or down. Selects the first condition that is true
 	switch {
 	// --- Scale Down conditions ---
 	// reached very low %. aggressively remove nodes
-	case maxPercent < nodeGroup.Opts.TaintLowerCapacityThreshholdPercent:
+	case maxPercent < float64(nodeGroup.Opts.TaintLowerCapacityThresholdPercent):
 		nodesDelta = -nodeGroup.Opts.FastNodeRemovalRate
 	// reached medium low %. slowly remove nodes
-	case maxPercent < nodeGroup.Opts.TaintUpperCapacityThreshholdPercent:
+	case maxPercent < float64(nodeGroup.Opts.TaintUpperCapacityThresholdPercent):
 		nodesDelta = -nodeGroup.Opts.SlowNodeRemovalRate
 	// --- Scale Up conditions ---
 	// Need to scale up so capacity can handle requests
-	case maxPercent > nodeGroup.Opts.ScaleUpThreshholdPercent:
+	case maxPercent > float64(nodeGroup.Opts.ScaleUpThresholdPercent):
 		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThreshholdPercent
@@ -325,10 +293,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
-		nodes:               allNodes,
-		taintedNodes:        taintedNodes,
-		untaintedNodes:      untaintedNodes,
-		nodeGroup:           nodeGroup,
+		nodes:          allNodes,
+		taintedNodes:   taintedNodes,
+		untaintedNodes: untaintedNodes,
+		nodeGroup:      nodeGroup,
 	}
 
 	// Perform a scale up, do nothing or scale down based on the nodes delta
@@ -375,9 +343,10 @@ func (c *Controller) RunOnce() {
 		err = c.cloudProvider.Refresh()
 	}
 	// Perform the ScaleUp/Taint logic
-	for nodegroup, state := range c.nodeGroups {
-		log.Debugf("**********[START NODEGROUP %v]**********", nodegroup)
-		c.scaleNodeGroup(nodegroup, state)
+	for _, nodeGroupOpts := range c.Opts.NodeGroups {
+		log.Debugf("**********[START NODEGROUP %v]**********", nodeGroupOpts.Name)
+		state := c.nodeGroups[nodeGroupOpts.Name]
+		c.scaleNodeGroup(nodeGroupOpts.Name, state)
 	}
 
 	metrics.RunCount.Add(1)
