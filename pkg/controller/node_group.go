@@ -69,32 +69,32 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	}
 
 	checkThat(len(nodegroup.Name) > 0, "name cannot be empty")
-	checkThat(len(nodegroup.LabelKey) > 0, "labelkey cannot be empty")
-	checkThat(len(nodegroup.LabelValue) > 0, "labelvalue cannot be empty")
-	checkThat(len(nodegroup.CloudProviderGroupName) > 0, "cloudprovider group name cannot be empty")
+	checkThat(len(nodegroup.LabelKey) > 0, "label_key cannot be empty")
+	checkThat(len(nodegroup.LabelValue) > 0, "label_value cannot be empty")
+	checkThat(len(nodegroup.CloudProviderGroupName) > 0, "cloud_provider_group_name cannot be empty")
 
-	checkThat(nodegroup.TaintUpperCapacityThresholdPercent >= 0, "taint upper capacity must be larger than 0")
-	checkThat(nodegroup.TaintLowerCapacityThresholdPercent >= 0, "taint lower capacity must be larger than 0")
-	checkThat(nodegroup.ScaleUpThresholdPercent >= 0, "scale up threshold should be larger than 0")
+	checkThat(nodegroup.TaintUpperCapacityThresholdPercent > 0, "taint_upper_capacity_threshold_percent must be larger than 0")
+	checkThat(nodegroup.TaintLowerCapacityThresholdPercent > 0, "taint_lower_capacity_threshold_percent must be larger than 0")
+	checkThat(nodegroup.ScaleUpThresholdPercent > 0, "scale_up_threshold_percent must be larger than 0")
 
 	checkThat(nodegroup.TaintLowerCapacityThresholdPercent < nodegroup.TaintUpperCapacityThresholdPercent,
-		"lower taint threshold must be lower than upper taint threshold")
+		"taint_lower_capacity_threshold_percent must be less than taint_upper_capacity_threshold_percent")
 	checkThat(nodegroup.TaintUpperCapacityThresholdPercent < nodegroup.ScaleUpThresholdPercent,
-		"taint upper capacity threshold should be lower than scale up threshold")
+		"taint_upper_capacity_threshold_percent must be less than scale_up_threshold_percent")
 
-	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min nodes must be smaller than max nodes")
-	checkThat(nodegroup.MaxNodes >= 0, "max nodes must be larger than 0")
-	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow removal rate must be smaller than fast removal rate")
+	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min_nodes must be less than max_nodes")
+	checkThat(nodegroup.MaxNodes > 0, "max_nodes must be larger than 0")
+	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow_node_removal_rate must be less than fast_node_removal_rate")
 
-	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft grace period must not be empty")
-	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard grace period must not be empty")
-	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale up cooldown period must not be empty")
+	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft_delete_grace_period must not be empty")
+	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard_delete_grace_period must not be empty")
 
-	checkThat(nodegroup.SoftDeleteGracePeriodDuration() > 0, "soft grace period failed to parse into a time.Duration. check your formatting.")
-	checkThat(nodegroup.HardDeleteGracePeriodDuration() > 0, "hard grace period failed to parse into a time.Duration. check your formatting.")
-	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft grace period must be less than hard grace period")
+	checkThat(nodegroup.SoftDeleteGracePeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
+	checkThat(nodegroup.HardDeleteGracePeriodDuration() > 0, "hard_delete_grace_period failed to parse into a time.Duration. check your formatting.")
+	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft_delete_grace_period must be less than hard_delete_grace_period")
 
-	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() >= 0, "scale up cooldown period duration must be positive")
+	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
+	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
 
 	return problems
 }

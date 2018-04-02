@@ -455,9 +455,10 @@ func TestValidateNodeGroup(t *testing.T) {
 			},
 			[]string{
 				"name cannot be empty",
-				"lower taint threshold must be lower than upper taint threshold",
-				"min nodes must be smaller than max nodes",
-				"soft grace period failed to parse into a time.Duration. check your formatting.",
+				"taint_lower_capacity_threshold_percent must be less than taint_upper_capacity_threshold_percent",
+				"min_nodes must be less than max_nodes",
+				"max_nodes must be larger than 0",
+				"soft_delete_grace_period failed to parse into a time.Duration. check your formatting.",
 			},
 		},
 	}
