@@ -1,10 +1,9 @@
-.PHONY: local-build
-local-build:
+.PHONY: build
+build:
 	CGO_ENABLED=1 go build -o escalator cmd/main.go
 
 .PHONY: setup
 setup:
-	go get -u github.com/golang/dep/cmd/dep
 	dep ensure
 
 .PHONY: test
