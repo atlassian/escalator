@@ -11,6 +11,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+func TestPodIsDaemonSet(t *testing.T) {
+	deamon := test.BuildTestPod(test.PodOpts{
+		Owner: "DaemonSet",
+	})
+	pod := test.BuildTestPod(test.PodOpts{})
+
+	assert.True(t, k8s.PodIsDaemonSet(deamon))
+	assert.False(t, k8s.PodIsDaemonSet(pod))
+}
+
 func TestCalculatePodsRequestTotal(t *testing.T) {
 	p1 := test.BuildTestPod(test.PodOpts{
 		CPU: []int64{1000},

@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: escalator
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: escalator
+  labels:
+    k8s-addon: escalator.addons.k8s.io
+    k8s-app: escalator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - watch
+  - list
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - update
+  - patch
+  - watch
+  - list
+  - get
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: escalator
+  labels:
+    k8s-addon: escalator.addons.k8s.io
+    k8s-app: escalator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: escalator
+subjects:
+  - kind: ServiceAccount
+    name: escalator
+    namespace: kube-system

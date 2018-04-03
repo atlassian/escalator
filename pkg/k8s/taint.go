@@ -7,7 +7,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -16,13 +15,13 @@ import (
 // Utility functions that assist with the tainting of nodes
 // ----
 // Taint Scheme:
-// Key: ToBeRemovedByAutoscaler
+// Key: atlassian.com/escalator
 // Value: time.Now().Unix()
 // Effect: NoSchedule
 
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
-	ToBeRemovedByAutoscalerKey = "ToBeRemovedByAutoscaler"
+	ToBeRemovedByAutoscalerKey = "atlassian.com/escalator"
 	// MaximumTaints we can taint at one time
 	MaximumTaints = 10
 )
@@ -64,7 +63,7 @@ func EndTaintFailSafe(actualTainted int) error {
 
 // AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
-func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Node, error) {
+func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
 	if tainted > targetTaints {
 		log.Warningf("Taint count exceeds the target set by the lock")
 	}
@@ -97,7 +96,7 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*v1.Nod
 	updatedNode.Spec.Taints = append(updatedNode.Spec.Taints, apiv1.Taint{
 		Key:    ToBeRemovedByAutoscalerKey,
 		Value:  fmt.Sprint(time.Now().Unix()),
-		Effect: v1.TaintEffectNoSchedule,
+		Effect: apiv1.TaintEffectNoSchedule,
 	})
 
 	updatedNodeWithTaint, err := client.CoreV1().Nodes().Update(updatedNode)

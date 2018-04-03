@@ -1,0 +1,67 @@
+# Metrics
+
+Escalator exposes metrics of scaling, requests, capacity, utilisation, nodes and pods at the `/metrics` endpoint. 
+These metrics can be scraped by a monitoring system such as [Prometheus](https://prometheus.io/).
+
+It is highly recommended to collect the metrics exposed by Escalator, as it can provide helpful insight into how
+it is operating as well as when you need to debug it's operation.
+
+You can change which address:port combination the `/metrics` endpoint serves at using the `--address` flag. By default
+it serves the metrics at `0.0.0.0:8080/metrics`.
+
+## Exposed Metrics
+
+These are the metrics that Escalator exposes, and are subject to change:
+
+### General
+
+ - **`run_count`**: Number of times the controller has checked for cluster state
+ 
+### Node Group Nodes and Pods
+ 
+ - **`node_group_untainted_nodes`**: nodes considered by specific node groups that are untainted
+ - **`node_group_tainted_nodes`**: nodes considered by specific node groups that are tainted
+ - **`node_group_cordoned_nodes`**: nodes considered by specific node groups that are cordoned
+ - **`node_group_nodes`**: nodes considered by specific node groups
+ - **`node_group_pods`**: pods considered by specific node groups
+
+### Node Group CPU and Memory
+ 
+ - **`node_group_mem_percent`**: percentage of util of memory
+ - **`node_group_cpu_percent`**: percentage of util of cpu
+ - **`node_group_mem_request`**: milli value of node request mem
+ - **`node_group_cpu_request`**: milli value of node request cpu
+ - **`node_group_mem_capacity`**: milli value of node Capacity mem
+ - **`node_group_cpu_capacity`**: milli value of node capacity cpu
+
+### Node Group Scaling
+
+ - **`node_group_taint_event`**: indicates a scale down event
+ - **`node_group_untaint_event`**: indicates a scale up event
+ - **`node_group_scale_lock`**: indicates if the nodegroup is locked from scaling
+ - **`node_group_scale_delta`**: indicates current scale delta
+ 
+### Cloud Provider
+ 
+ - **`cloud_provider_min_size`**: current cloud provider minimum size
+ - **`cloud_provider_max_size`**: current cloud provider maximum size
+ - **`cloud_provider_target_size`**: current cloud provider target size
+ - **`cloud_provider_size`**: current cloud provider size
+ 
+## Grafana
+ 
+Included is an example dashboard in [`grafana-dashboard.json`](./grafana-dashboard.json) for use within 
+[Grafana](https://grafana.com/). It provides an overview of what Escalator is currently doing and what it has done over
+time. 
+This is exceptionally helpful when debugging issues with scaling up/down as it shows the overall utilisation for the
+node group at a specific time or over time.
+ 
+Below is a screenshot of the included dashboard:
+
+![Metrics Dashboard](./metrics-dashboard.png)
+ 
+## Recommendations
+ 
+It is highly recommended to monitor and graph the two utilisation metrics 
+(`node_group_mem_percent` and `node_group_cpu_percent`) as this will let you see the utilisation that Escalator
+calculates. Ideally these values should stay below your scale up threshold.

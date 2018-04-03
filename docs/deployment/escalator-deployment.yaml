@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: escalator
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: escalator
+      role: escalator
+  template:
+    metadata:
+      labels:
+        app: escalator
+        role: escalator
+    spec:
+      serviceAccountName: escalator
+      containers:
+      - image: atlassian/escalator
+        command:
+        - ./main
+        - --nodegroups
+        - /opt/conf/nodegroups/nodegroups_config.yaml
+        name: escalator
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: escalator-nodegroups
+          mountPath: /opt/conf/nodegroups
+          readOnly: true
+      volumes:
+      - name: escalator-nodegroups
+        configMap:
+          name: escalator-config
+          defaultMode: 0644
+          items:
+          - key: nodegroups_config.yaml
+            path: nodegroups_config.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    role: escalator
+    app: escalator
+  name: escalator
+  namespace: kube-system
+spec:
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    role: escalator
