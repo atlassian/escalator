@@ -34,7 +34,7 @@ func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, st
 	// once it's received, send the stop signal to the cache informers
 	go func() {
 		<-stopCache
-		log.Infoln("Stop signal recieved. Stopping cache watchers")
+		log.Infoln("Stop signal received. Stopping cache watchers")
 		close(podStopChan)
 		close(nodeStopChan)
 	}()

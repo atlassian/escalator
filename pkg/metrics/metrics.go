@@ -125,6 +125,13 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	NodeGroupScaleDelta = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "node_group_scale_delta",
+			Help: "indicates current scale delta",
+		},
+		[]string{"node_group"},
+	)
 	// CloudProviderMinSize indicates the current cloud provider minimum size
 	CloudProviderMinSize = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -175,6 +182,7 @@ func init() {
 	prometheus.MustRegister(NodeGroupTaintEvent)
 	prometheus.MustRegister(NodeGroupUntaintEvent)
 	prometheus.MustRegister(NodeGroupScaleLock)
+	prometheus.MustRegister(NodeGroupScaleDelta)
 	prometheus.MustRegister(CloudProviderMinSize)
 	prometheus.MustRegister(CloudProviderMaxSize)
 	prometheus.MustRegister(CloudProviderTargetSize)

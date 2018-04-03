@@ -14,6 +14,7 @@ type scaleLock struct {
 	minimumLockDuration time.Duration
 }
 
+// locked returns whether the scale lock is locked
 func (l *scaleLock) locked() bool {
 	if time.Now().Sub(l.lockTime) < l.minimumLockDuration {
 		return true
@@ -22,6 +23,7 @@ func (l *scaleLock) locked() bool {
 	return l.isLocked
 }
 
+// lock locks the scale lock
 func (l *scaleLock) lock(nodes int) {
 	log.Debugln("Locking scale lock")
 	l.isLocked = true
@@ -29,12 +31,14 @@ func (l *scaleLock) lock(nodes int) {
 	l.lockTime = time.Now()
 }
 
+// unlock unlocks the scale lock
 func (l *scaleLock) unlock() {
 	log.Debugln("Unlocking scale lock")
 	l.isLocked = false
 	l.requestedNodes = 0
 }
 
+// timeUntilMinimumUnlock returns the the time until the minimum unlock
 func (l *scaleLock) timeUntilMinimumUnlock() time.Duration {
 	return l.lockTime.Add(l.minimumLockDuration).Sub(time.Now())
 }
