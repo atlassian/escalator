@@ -36,6 +36,9 @@ any other benefit other than being useful for debugging a specific nodegroup.
 
 Multiple node groups will need to have unique names.
 
+If you configure the name of the node group to be `default`, it will watch all pods that do not have any affinity or
+node selectors specified. More information on the `default` option can be found [here](../pod-node-selectors.md).
+
 ### `label_key` and `label_value`
 
 `label_key` and `label_value` is the key-value pair used to select nodes and pods for consideration in the calculations 

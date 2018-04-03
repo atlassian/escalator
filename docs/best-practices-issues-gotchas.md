@@ -17,3 +17,7 @@
    terminating instances in the rare case where there are more instances than the desired node group size.
  - It is recommended to match Escalator `min_nodes` and `max_nodes` to the value in the cloud provider. This will 
    prevent weird cases where Escalator will try to scale down but will be blocked by the cloud provider.
+ - Escalator only supports one cloud provider per deployment. You will need to run multiple different deployments of 
+   Escalator inside the cluster to use more than one cloud provider.
+ - Escalator only supports one cloud provider region per deploy. As with running multiple cloud providers, multiple
+   different deployments of Escalator will need to be used.

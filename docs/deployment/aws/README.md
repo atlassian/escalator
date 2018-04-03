@@ -47,6 +47,13 @@ for more information on how the SDK obtains access.
 
 It is highly recommended to use IAM roles for Escalator access, using the above IAM policy.
 
+### STS Assume Role
+
+Escalator supports assuming a role when it starts. This is configured using the `--aws-assume-role-arn` flag when
+running Escalator. You can read more about it in 
+[assume-role](https://docs.aws.amazon.com/cli/latest/reference/sts/assume-role.html) and
+[Assuming a Role](https://docs.aws.amazon.com/cli/latest/userguide/cli-roles.html).
+
 ## Auto Scaling Group Configuration
 
 The targeted auto scaling groups in AWS don't have to be configured in a specific way, but we recommend the following:
@@ -83,3 +90,7 @@ in the `nodegroups_config.yaml` config passed to the `--nodegroups=` flag.
 - Escalator does not support scaling auto scaling groups that are located in different regions, they must all reside
 in the same region. Escalator will terminate itself if it isn't able to describe an auto scaling group in a different 
 region.
+- Ensure "scale in protection" is enabled for all ASGs.
+- Do not use 
+ [Auto Scaling Lifecycle Hooks](https://docs.aws.amazon.com/autoscaling/ec2/userguide/lifecycle-hooks.html) for
+ terminating of instances as Escalator will handle the termination of instances itself. 

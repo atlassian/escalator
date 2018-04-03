@@ -16,6 +16,8 @@ Flags:
       --nodegroups=NODEGROUPS  Config file for nodegroups
       --drymode                master drymode argument. If true, forces drymode on all nodegroups
       --cloud-provider=aws     Cloud provider to use. Available options: (aws)
+      --aws-assume-role-arn=AWS-ASSUME-ROLE-ARN  
+                               AWS role arn to assume. Only usable when using the aws cloud provider. Example: arn:aws:iam::111111111111:role/escalator
 ```
 
 ## Options
@@ -82,6 +84,10 @@ can be found here.
 Master drymode flag to force "dry mode" on all node groups. Dry mode will log the actions that Escalator will perform
 without actually running them.
 
-### `--cloudprovider`
+### `--cloud-provider`
 
 The cloud provider to use. Cloud provider configuration can be found [here](../deployment/README.md).
+
+### `--aws-assume-role-arn`
+
+Provides an option to specify an AWS IAM role to assume when Escalator starts. **Only works with AWS Cloud Provider.**
