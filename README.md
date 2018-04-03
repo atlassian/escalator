@@ -3,8 +3,8 @@
 **Escalator is a batch or job optimized horizontal autoscaler for Kubernetes**
 
 It is designed for large batch or job based workloads that cannot be force-drained and moved when the cluster needs to 
-scale up - Escalator will ensure pods have been completed on nodes before terminating them. It is also optimised for 
-scaling down the cluster as fast as possible to ensure pods are not left in a pending state.
+scale down - Escalator will ensure pods have been completed on nodes before terminating them. It is also optimised for 
+scaling up the cluster as fast as possible to ensure pods are not left in a pending state.
 
 ## Key Features
 
@@ -46,13 +46,13 @@ versions of Kubernetes may have bugs or issues that will prevent it from functio
 ## Building
 
 ```bash
-// Install dependencies
+# Install dependencies
 make setup
-// Build Escalator
+# Build Escalator
 make build
 ```
 
-## How to run
+## How to run - Quick Start
 
 ### Locally (out of cluster)
 
@@ -65,40 +65,17 @@ go run cmd/main.go --kubeconfig=~/.kube/config --nodegroups=nodegroups_config.ya
 See [Deployment](./docs/deployment/README.md) for full Deployment documentation.
 
 ```bash
-// Build the docker image
+# Build the docker image
 docker build -t atlassian/escalator .
-```
 
-In the Escalator Kubernetes deployment:
+# Create RBAC configuration
+kubectl create -f docs/deployment/escalator-rbac.yaml
 
-```yaml
-# You need to mount your config file into your container
-- image: atlassian/escalator
-  command:
-  - ./main
-  - --nodegroups
-  - /opt/conf/nodegroups/nodegroups_config.yaml
-```
+# Create config map - modify to suit your needs
+kubectl create -f docs/deployment/escalator-cm.yaml
 
-#### nodegroups_config.yaml example
-
-```yaml
-node_groups:
-  - name: "default"
-    label_key: "customer"
-    label_value: "shared"
-    cloud_provider_group_name: "shared-nodes"
-    min_nodes: 1
-    max_nodes: 30
-    dry_mode: false
-    taint_upper_capacity_threshold_percent: 40
-    taint_lower_capacity_threshold_percent: 10
-    slow_node_removal_rate: 2
-    fast_node_removal_rate: 5
-    scale_up_threshold_percent: 70
-    scale_up_cool_down_period: 2m
-    soft_delete_grace_period: 1m
-    hard_delete_grace_period: 10m
+# Create deployment
+kubectl create -f docs/deployment/escalator-deployment.yaml
 ```
 
 ## Configuring

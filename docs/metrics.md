@@ -6,7 +6,8 @@ These metrics can be scraped by a monitoring system such as [Prometheus](https:/
 It is highly recommended to collect the metrics exposed by Escalator, as it can provide helpful insight into how
 it is operating as well as when you need to debug it's operation.
 
-You can change which address:port combination the `/metrics` endpoint serves at using the `--address` flag. 
+You can change which address:port combination the `/metrics` endpoint serves at using the `--address` flag. By default
+it serves the metrics at `0.0.0.0:8080/metrics`.
 
 Below is an example of a [Grafana](https://grafana.com/) dashboard that provides insight into the overall utilisation 
 of the node group, as well as the total tainted/untainted nodes.

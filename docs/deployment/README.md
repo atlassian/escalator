@@ -38,7 +38,7 @@ example, `--kubeconfig=~/.kube/config`.
 To be able to function correctly, Escalator needs a service account with the following permissions:
 
 - **pods**: watch, list, get
-- **nodes**: update, patch, watch, list, get
+- **nodes**: update, patch, watch, list, get, delete
     
 To create the service account, cluster role and cluster role binding, run the following:
 

@@ -73,7 +73,7 @@ node_groups:
 
 ## More information
 
- - More information on node labels, node selectors and node affinity can be found 
-[here](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/).
- - More information on Labels and Selectors can be found 
-[here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
+- More information on node labels, node selectors and node affinity can be found 
+  [here](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/).
+- More information on Labels and Selectors can be found 
+  [here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/).
