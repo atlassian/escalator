@@ -46,7 +46,7 @@ func (b cloudProviderBuilder) Build() (cloudprovider.CloudProvider, error) {
 		}.Build()
 	default:
 		err := fmt.Errorf("provider %v does not exist", b.ProviderOpts.ProviderID)
-		log.Fatalln(err)
+		log.Fatal(err)
 		return nil, err
 	}
 }
@@ -82,13 +82,13 @@ func setupNodeGroups() []controller.NodeGroupOptions {
 	for _, nodegroup := range nodegroups {
 		errs := controller.ValidateNodeGroup(nodegroup)
 		if len(errs) > 0 {
-			log.WithField("nodegroup", nodegroup.Name).Errorln("Validating options: [FAIL]")
+			log.WithField("nodegroup", nodegroup.Name).Error("Validating options: [FAIL]")
 			for _, err := range errs {
-				log.WithError(err).Errorln("failed check")
+				log.WithError(err).Error("failed check")
 			}
 			log.WithField("nodegroup", nodegroup.Name).Fatalf("There are %v problems when validating the options. Please check %v", len(errs), *nodegroupConfigFile)
 		}
-		log.WithField("nodegroup", nodegroup.Name).Infoln("Validating options: [PASS]")
+		log.WithField("nodegroup", nodegroup.Name).Info("Validating options: [PASS]")
 		log.WithField("nodegroup", nodegroup.Name).Infof("Registered with drymode %v", nodegroup.DryMode || *drymode)
 	}
 
@@ -101,10 +101,10 @@ func setupK8SClient() kubernetes.Interface {
 
 	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
 	if kubeConfigFile != nil && len(*kubeConfigFile) > 0 {
-		log.Infoln("Using out of cluster config")
+		log.Info("Using out of cluster config")
 		k8sClient = k8s.NewOutOfClusterClient(*kubeConfigFile)
 	} else {
-		log.Infoln("Using in cluster config")
+		log.Info("Using in cluster config")
 		k8sClient = k8s.NewInClusterClient()
 	}
 
@@ -118,7 +118,7 @@ func awaitStopSignal(stopChan chan struct{}) {
 	sig := <-signalChan
 
 	log.Infof("Signal received: %v", sig)
-	log.Infoln("Stopping autoscaler gracefully")
+	log.Info("Stopping autoscaler gracefully")
 	close(stopChan)
 }
 
@@ -135,7 +135,7 @@ func main() {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 
-	log.Infoln("Starting with log level", log.GetLevel())
+	log.Info("Starting with log level", log.GetLevel())
 
 	nodegroups := setupNodeGroups()
 	k8sClient := setupK8SClient()
