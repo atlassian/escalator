@@ -161,7 +161,7 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 		return fmt.Errorf("increasing size will breach maximum node size")
 	}
 
-	log.WithField("asg", n.id).Debugln("IncreaseSize=", delta)
+	log.WithField("asg", n.id).Debug("IncreaseSize=", delta)
 	return n.setASGDesiredSize(n.TargetSize() + delta)
 }
 
@@ -204,7 +204,7 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to terminate instance. err: %v", err)
 		}
-		log.Debugln(*result.Activity.Description)
+		log.Debug(*result.Activity.Description)
 	}
 
 	return nil
@@ -237,7 +237,7 @@ func (n *NodeGroup) DecreaseTargetSize(delta int64) error {
 		return fmt.Errorf("decreasing target size will breach minimum node size")
 	}
 
-	log.WithField("asg", n.id).Debugln("DecreaseTargetSize=", delta)
+	log.WithField("asg", n.id).Debug("DecreaseTargetSize=", delta)
 	return n.setASGDesiredSize(n.TargetSize() + delta)
 }
 
@@ -260,9 +260,9 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 		HonorCooldown:        awsapi.Bool(true),
 	}
 
-	log.WithField("asg", n.id).Debugln("SetDesiredCapacity=", newSize)
-	log.WithField("asg", n.id).Debugln("CurrentSize=", n.Size())
-	log.WithField("asg", n.id).Debugln("CurrentTargetSize=", n.TargetSize())
+	log.WithField("asg", n.id).Debug("SetDesiredCapacity=", newSize)
+	log.WithField("asg", n.id).Debug("CurrentSize=", n.Size())
+	log.WithField("asg", n.id).Debug("CurrentTargetSize=", n.TargetSize())
 	_, err := n.provider.service.SetDesiredCapacity(input)
 	return err
 }

@@ -16,10 +16,10 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	removed, err := c.TryRemoveTaintedNodes(opts)
 	if err != nil {
 		// continue instead of exiting, because reaping nodes is separate than tainting
-		log.Warningln("Reaping nodes failed", err)
+		log.Warning("Reaping nodes failed", err)
 
 	}
-	log.Infoln("Reaper: There were", removed, "empty nodes deleted this round")
+	log.Info("Reaper: There were", removed, "empty nodes deleted this round")
 	return c.scaleDownTaint(opts)
 }
 
@@ -139,7 +139,7 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 
 		// only actually taint in dry mode
 		if !c.dryMode(nodeGroup) {
-			log.WithField("drymode", "off").Infoln("Tainting node", bundle.node.Name)
+			log.WithField("drymode", "off").Info("Tainting node", bundle.node.Name)
 
 			// Taint the node
 			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
@@ -153,7 +153,7 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
 			k8s.IncrementTaintCount()
 			taintedIndices = append(taintedIndices, bundle.index)
-			log.WithField("drymode", "on").Infoln("Tainting node", bundle.node.Name)
+			log.WithField("drymode", "on").Info("Tainting node", bundle.node.Name)
 		}
 	}
 

@@ -67,7 +67,7 @@ type scaleOpts struct {
 func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	client := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
 	if client == nil {
-		log.Fatalln("Failed to create controller client")
+		log.Fatal("Failed to create controller client")
 		return nil
 	}
 
@@ -165,11 +165,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	untaintedNodes, taintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
-	log.WithField("nodegroup", nodegroup).Infoln("pods total:", len(pods))
-	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining total:", len(allNodes))
-	log.WithField("nodegroup", nodegroup).Infoln("cordoned nodes remaining total:", len(cordonedNodes))
-	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining untainted:", len(untaintedNodes))
-	log.WithField("nodegroup", nodegroup).Infoln("nodes remaining tainted:", len(taintedNodes))
+	log.WithField("nodegroup", nodegroup).Info("pods total:", len(pods))
+	log.WithField("nodegroup", nodegroup).Info("nodes remaining total:", len(allNodes))
+	log.WithField("nodegroup", nodegroup).Info("cordoned nodes remaining total:", len(cordonedNodes))
+	log.WithField("nodegroup", nodegroup).Info("nodes remaining untainted:", len(untaintedNodes))
+	log.WithField("nodegroup", nodegroup).Info("nodes remaining tainted:", len(taintedNodes))
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
 	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
@@ -180,7 +180,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// We assume it is a config error or something bad has gone wrong in the cluster
 	if len(allNodes) == 0 {
 		err = errors.New("no nodes remaining")
-		log.WithField("nodegroup", nodegroup).Warningln(err.Error())
+		log.WithField("nodegroup", nodegroup).Warning(err.Error())
 		return 0, err
 	}
 	if len(allNodes) < nodeGroup.Opts.MinNodes {
@@ -258,7 +258,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// don't do anything else until we're unlocked again
 		lockVal = 1.0
 		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
-		log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
+		log.WithField("nodegroup", nodegroup).Info("Waiting for scale to finish")
 		return nodeGroup.scaleUpLock.requestedNodes, nil
 	}
 	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
@@ -289,7 +289,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		}
 	}
 
-	log.WithField("nodegroup", nodegroup).Debugln("Delta=", nodesDelta)
+	log.WithField("nodegroup", nodegroup).Debug("Delta=", nodesDelta)
 
 	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
@@ -316,16 +316,16 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	default:
-		log.WithField("nodegroup", nodegroup).Infoln("No need to scale")
+		log.WithField("nodegroup", nodegroup).Info("No need to scale")
 		// reap any expired nodes
 		removed, err := c.TryRemoveTaintedNodes(scaleOptions)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-		log.WithField("nodegroup", nodegroup).Infoln("Reaper: There were", removed, "empty nodes deleted this round")
+		log.WithField("nodegroup", nodegroup).Info("Reaper: There were", removed, "empty nodes deleted this round")
 	}
 
-	log.WithField("nodegroup", nodegroup).Debugln("DeltaScaled=", nodesDeltaResult)
+	log.WithField("nodegroup", nodegroup).Debug("DeltaScaled=", nodesDeltaResult)
 	return nodesDelta, err
 }
 
@@ -341,7 +341,7 @@ func (c *Controller) RunOnce() {
 		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
 		c.cloudProvider, err = c.Opts.CloudProviderBuilder.Build()
 		if err != nil {
-			log.Fatalln(err)
+			log.Fatal(err)
 		}
 		err = c.cloudProvider.Refresh()
 	}
@@ -364,7 +364,7 @@ func (c *Controller) RunOnce() {
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
 func (c *Controller) RunForever(runImmediately bool) {
 	if runImmediately {
-		log.Debugln("**********[AUTOSCALER FIRST LOOP]**********")
+		log.Debug("**********[AUTOSCALER FIRST LOOP]**********")
 		c.RunOnce()
 	}
 
@@ -373,7 +373,7 @@ func (c *Controller) RunForever(runImmediately bool) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Debugln("**********[AUTOSCALER MAIN LOOP]**********")
+			log.Debug("**********[AUTOSCALER MAIN LOOP]**********")
 			c.RunOnce()
 		case <-c.stopChan:
 			log.Debugf("Stopping main loop")

@@ -34,12 +34,12 @@ func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, st
 	// once it's received, send the stop signal to the cache informers
 	go func() {
 		<-stopCache
-		log.Infoln("Stop signal received. Stopping cache watchers")
+		log.Info("Stop signal received. Stopping cache watchers")
 		close(podStopChan)
 		close(nodeStopChan)
 	}()
 
-	log.Infoln("Waiting for cache to sync...")
+	log.Info("Waiting for cache to sync...")
 	startTime := time.Now()
 
 	synced := k8s.WaitForSync(3, stopCache, podSync, nodeSync)

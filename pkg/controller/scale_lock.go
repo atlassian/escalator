@@ -25,7 +25,7 @@ func (l *scaleLock) locked() bool {
 
 // lock locks the scale lock
 func (l *scaleLock) lock(nodes int) {
-	log.Debugln("Locking scale lock")
+	log.Debug("Locking scale lock")
 	l.isLocked = true
 	l.requestedNodes = nodes
 	l.lockTime = time.Now()
@@ -33,7 +33,7 @@ func (l *scaleLock) lock(nodes int) {
 
 // unlock unlocks the scale lock
 func (l *scaleLock) unlock() {
-	log.Debugln("Unlocking scale lock")
+	log.Debug("Unlocking scale lock")
 	l.isLocked = false
 	l.requestedNodes = 0
 }
