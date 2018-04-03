@@ -26,6 +26,7 @@
     - More Information
 - [**Metrics**](./metrics.md)
     - Exposed Metrics
+    - Grafana
     - Recommendations
 - [**Glossary**](./glossary.md)
         
