@@ -33,7 +33,7 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
-	NodeInfos map[string]*schedulercache.NodeInfo
+	NodeInfoMap map[string]*schedulercache.NodeInfo
 
 	CloudProviderNodeGroup cloudprovider.NodeGroup
 
@@ -204,7 +204,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	// update the map of node to nodeinfo
 	// for working out which pods are on which nodes
-	nodeGroup.NodeInfos = k8s.CreateNodeNameToInfoMap(pods, allNodes)
+	nodeGroup.NodeInfoMap = k8s.CreateNodeNameToInfoMap(pods, allNodes)
 
 	// Calc capacity for untainted nodes
 	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
@@ -259,7 +259,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		lockVal = 1.0
 		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
 		log.WithField("nodegroup", nodegroup).Infoln("Waiting for scale to finish")
-		return 0, nil
+		return nodeGroup.scaleUpLock.requestedNodes, nil
 	}
 	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
 
@@ -279,9 +279,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// --- Scale Up conditions ---
 	// Need to scale up so capacity can handle requests
 	case maxPercent > float64(nodeGroup.Opts.ScaleUpThresholdPercent):
-		// if ScaleUpThreshholdPercent is our "max target" or "slack capacity"
+		// if ScaleUpThresholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
-		// drops back below ScaleUpThreshholdPercent
+		// drops back below ScaleUpThresholdPercent
 		nodesDelta, err = calcScaleUpDelta(untaintedNodes, cpuPercent, memPercent, nodeGroup)
 		if err != nil {
 			log.Errorf("Failed to calculate node delta: %v", err)
@@ -337,7 +337,7 @@ func (c *Controller) RunOnce() {
 	// rebuild will create a new session from the metadata on the box
 	err := c.cloudProvider.Refresh()
 	for i := 0; i < 2 && err != nil; i++ {
-		log.Warnf("cloudprovider failed to refresh. trying to refetch credentials. tries = %v", i+1)
+		log.Warnf("cloud provider failed to refresh. trying to re-fetch credentials. tries = %v", i+1)
 		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
 		c.cloudProvider = c.Opts.CloudProviderBuilder.Build()
 		err = c.cloudProvider.Refresh()
@@ -346,7 +346,11 @@ func (c *Controller) RunOnce() {
 	for _, nodeGroupOpts := range c.Opts.NodeGroups {
 		log.Debugf("**********[START NODEGROUP %v]**********", nodeGroupOpts.Name)
 		state := c.nodeGroups[nodeGroupOpts.Name]
-		c.scaleNodeGroup(nodeGroupOpts.Name, state)
+		delta, err := c.scaleNodeGroup(nodeGroupOpts.Name, state)
+		metrics.NodeGroupScaleDelta.WithLabelValues(nodeGroupOpts.Name).Set(float64(delta))
+		if err != nil {
+			log.Warn(err)
+		}
 	}
 
 	metrics.RunCount.Add(1)

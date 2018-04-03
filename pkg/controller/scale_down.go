@@ -15,14 +15,12 @@ import (
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	removed, err := c.TryRemoveTaintedNodes(opts)
 	if err != nil {
-		// TODO(jgonzalez): elaborate
-		log.Warningln("Reaping nodes went bad", err)
 		// continue instead of exiting, because reaping nodes is separate than tainting
+		log.Warningln("Reaping nodes failed", err)
+
 	}
 	log.Infoln("Reaper: There were", removed, "empty nodes deleted this round")
-
-	tainted, err := c.scaleDownTaint(opts)
-	return tainted, err
+	return c.scaleDownTaint(opts)
 }
 
 // TryRemoveTaintedNodes attempts to remove nodes are tainted and empty or have passed their grace period
@@ -39,7 +37,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 
 		now := time.Now()
 		if now.Sub(*taintedTime) > opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
-			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfos) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
+			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfoMap) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
 				drymode := c.dryMode(opts.nodeGroup)
 				log.WithField("drymode", drymode).Infof("Node %v, %v ready to be deleted", candidate.Name, candidate.Spec.ProviderID)
 				if !drymode {
@@ -78,7 +76,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
 	}
 
-	return len(toBeDeleted), nil
+	return -len(toBeDeleted), nil
 }
 
 func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
@@ -105,17 +103,17 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	log.WithField("nodegroup", nodegroupName).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
 	metrics.NodeGroupTaintEvent.WithLabelValues(nodegroupName).Add(float64(nodesToRemove))
 
-	// Lock the taintinf to a maximum on 10 nodes
+	// Lock the tainting to a maximum on 10 nodes
 	if err := k8s.BeginTaintFailSafe(nodesToRemove); err != nil {
 		// Don't taint if there was an error on the lock
-		log.Errorf("Failed to get safetly lock on tainter: %v", err)
+		log.Errorf("Failed to get safety lock on tainter: %v", err)
 		return 0, err
 	}
 	// Perform the tainting loop with the fail safe around it
 	tainted := c.taintOldestN(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
-	// Validate the Failsafe worked
+	// Validate the fail-safe worked
 	if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
-		log.Errorf("Failed to validate safetly lock on tainter: %v", err)
+		log.Errorf("Failed to validate safety lock on tainter: %v", err)
 		return len(tainted), err
 	}
 
