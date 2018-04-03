@@ -79,7 +79,7 @@ type NodeGroup interface {
 
 // Builder interface provides a method to build a cloudprovider
 type Builder interface {
-	Build() CloudProvider
+	Build() (CloudProvider, error)
 }
 
 // BuildOpts providers all options to create your cloud provider
