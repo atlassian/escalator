@@ -19,7 +19,7 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 		log.Warning("Reaping nodes failed", err)
 
 	}
-	log.Info("Reaper: There were", removed, "empty nodes deleted this round")
+	log.Infof("Reaper: There were %v empty nodes deleted this round", removed)
 	return c.scaleDownTaint(opts)
 }
 

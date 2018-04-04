@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/atlassian/escalator/pkg/health"
 )
 
 var (
@@ -141,7 +142,7 @@ func main() {
 	k8sClient := setupK8SClient()
 	cloudBuilder := setupCloudProvider(nodegroups)
 
-	// global stop channel. Close signal will be sent to broadvast a shutdown to everything waiting for it to stop
+	// global stop channel. Close signal will be sent to broadcast a shutdown to everything waiting for it to stop
 	stopChan := make(chan struct{}, 1)
 	go awaitStopSignal(stopChan)
 
@@ -157,5 +158,10 @@ func main() {
 		CloudProviderBuilder: cloudBuilder,
 	}
 	c := controller.NewController(opts, stopChan)
+
+	// Create the health service
+	healthService := health.NewHealthService(*addr, c)
+	healthService.Start()
+
 	c.RunForever(true)
 }

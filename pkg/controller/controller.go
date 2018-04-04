@@ -103,6 +103,11 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	}
 }
 
+// GetNodeGroups returns the nodegroups for the controller
+func (c *Controller) GetNodeGroups() map[string]*NodeGroupState {
+	return c.nodeGroups
+}
+
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
 func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 	return c.Opts.DryMode || nodeGroup.Opts.DryMode
@@ -165,11 +170,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	untaintedNodes, taintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
-	log.WithField("nodegroup", nodegroup).Info("pods total:", len(pods))
-	log.WithField("nodegroup", nodegroup).Info("nodes remaining total:", len(allNodes))
-	log.WithField("nodegroup", nodegroup).Info("cordoned nodes remaining total:", len(cordonedNodes))
-	log.WithField("nodegroup", nodegroup).Info("nodes remaining untainted:", len(untaintedNodes))
-	log.WithField("nodegroup", nodegroup).Info("nodes remaining tainted:", len(taintedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("pods total: %v", len(pods))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining total: %v", len(allNodes))
+	log.WithField("nodegroup", nodegroup).Infof("cordoned nodes remaining total: %v", len(cordonedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining untainted: %v", len(untaintedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining tainted: %v", len(taintedNodes))
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
 	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
