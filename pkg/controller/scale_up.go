@@ -120,7 +120,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 		// only actually taint in dry mode
 		if !c.dryMode(nodeGroup) {
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
-				log.WithField("drymode", "off").Info("Untainting node", bundle.node.Name)
+				log.WithField("drymode", "off").Infof("Untainting node %v", bundle.node.Name)
 
 				// Remove the taint from the node
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
@@ -143,7 +143,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 				// Delete from tracker
 				nodeGroup.taintTracker = append(nodeGroup.taintTracker[:deleteIndex], nodeGroup.taintTracker[deleteIndex+1:]...)
 				untaintedIndices = append(untaintedIndices, bundle.index)
-				log.WithField("drymode", "on").Info("Untainting node", bundle.node.Name)
+				log.WithField("drymode", "on").Infof("Untainting node %v", bundle.node.Name)
 			}
 		}
 	}

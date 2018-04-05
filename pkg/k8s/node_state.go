@@ -43,7 +43,7 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*sched
 func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*schedulercache.NodeInfo) bool {
 	nodeInfo, ok := nodeInfoMap[node.Name]
 	if !ok {
-		log.Warning("could not find node %v in the nodeinfo map", node.Name)
+		log.Warningf("could not find node %v in the nodeinfo map", node.Name)
 		return false
 	}
 

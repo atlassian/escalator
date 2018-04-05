@@ -165,11 +165,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	untaintedNodes, taintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
-	log.WithField("nodegroup", nodegroup).Info("pods total:", len(pods))
-	log.WithField("nodegroup", nodegroup).Info("nodes remaining total:", len(allNodes))
-	log.WithField("nodegroup", nodegroup).Info("cordoned nodes remaining total:", len(cordonedNodes))
-	log.WithField("nodegroup", nodegroup).Info("nodes remaining untainted:", len(untaintedNodes))
-	log.WithField("nodegroup", nodegroup).Info("nodes remaining tainted:", len(taintedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("pods total: %v", len(pods))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining total: %v", len(allNodes))
+	log.WithField("nodegroup", nodegroup).Infof("cordoned nodes remaining total: %v", len(cordonedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining untainted: %v", len(untaintedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining tainted: %v", len(taintedNodes))
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
 	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
@@ -289,7 +289,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		}
 	}
 
-	log.WithField("nodegroup", nodegroup).Debug("Delta=", nodesDelta)
+	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
 
 	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
@@ -322,10 +322,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-		log.WithField("nodegroup", nodegroup).Info("Reaper: There were", removed, "empty nodes deleted this round")
+		log.WithField("nodegroup", nodegroup).Infof("Reaper: There were %v empty nodes deleted this round", removed)
 	}
 
-	log.WithField("nodegroup", nodegroup).Debug("DeltaScaled=", nodesDeltaResult)
+	log.WithField("nodegroup", nodegroup).Debugf("DeltaScaled: %v", nodesDeltaResult)
 	return nodesDelta, err
 }
 
