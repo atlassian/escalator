@@ -155,11 +155,6 @@ func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 			return false
 		}
 
-		// filter out static pods
-		if k8s.PodIsStatic(pod) {
-			return false
-		}
-
 		// check the node selector
 		if value, ok := pod.Spec.NodeSelector[labelKey]; ok {
 			if value == labelValue {
