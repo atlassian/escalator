@@ -53,6 +53,9 @@ Escalator includes an option to include pods into the utilisation calculations f
 or a `nodeAffinity` specified. This is useful when running a "shared" node group that picks up any pods that don't run
 on a specific node. 
 
+It also filters out DaemonSet pods and Static pods from the calculations as it may pick up ones that are not running in
+the shared node group.
+
 When this option is used, a different pod filtering method is utilised:
 
 ```go
