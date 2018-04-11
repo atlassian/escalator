@@ -150,7 +150,7 @@ type NodeGroupLister struct {
 // NewPodAffinityFilterFunc creates a new PodFilterFunc based on filtering by label selectors
 func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 	return func(pod *v1.Pod) bool {
-		// Filter out DaemonSets in our calcuation
+		// filter out daemonsets
 		if k8s.PodIsDaemonSet(pod) {
 			return false
 		}
@@ -187,13 +187,18 @@ func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 func NewPodDefaultFilterFunc() k8s.PodFilterFunc {
 	return func(pod *v1.Pod) bool {
 		// filter out daemonsets
-		for _, ownerReference := range pod.ObjectMeta.OwnerReferences {
-			if ownerReference.Kind == "DaemonSet" {
-				return false
-			}
+		if k8s.PodIsDaemonSet(pod) {
+			return false
 		}
 
-		// allow pods without a node selector and without a pod affinity
+		// filter out static pods
+		if k8s.PodIsStatic(pod) {
+			return false
+		}
+
+		// Only include pods that pass the following:
+		// - Don't have a nodeSelector
+		// - Don't have an affinity
 		return len(pod.Spec.NodeSelector) == 0 && pod.Spec.Affinity == nil
 	}
 }

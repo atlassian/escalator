@@ -294,7 +294,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		}
 	}
 
-	log.WithField("nodegroup", nodegroup).Debug("Delta=", nodesDelta)
+	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
 
 	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
@@ -327,10 +327,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
-		log.WithField("nodegroup", nodegroup).Info("Reaper: There were", removed, "empty nodes deleted this round")
+		log.WithField("nodegroup", nodegroup).Infof("Reaper: There were %v empty nodes deleted this round", removed)
 	}
 
-	log.WithField("nodegroup", nodegroup).Debug("DeltaScaled=", nodesDeltaResult)
+	log.WithField("nodegroup", nodegroup).Debugf("DeltaScaled: %v", nodesDeltaResult)
 	return nodesDelta, err
 }
 

@@ -70,7 +70,7 @@ The utilisation would then be calculated as follows:
 ## Daemonsets
 
 [Daemonsets](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/) are copies of pods that run on all 
-nodes in a cluster. Daemonsets are purposely factored out out of the utilisation calculations that Escalator performs.
+nodes in a cluster. Daemonsets are purposely factored out of the utilisation calculations that Escalator performs.
 This is done for a variety of reasons, these being:
 
  - Keeping the calculations for utilisation simple by only looking at the pods that have the appropriate node selector
@@ -81,4 +81,3 @@ This is done for a variety of reasons, these being:
  
  **To mitigate this caveat, it is highly recommended that slack space is configured for the node group to cater for 
  daemonsets. [More information on slack space](./configuration/advanced-configuration.md).**
-

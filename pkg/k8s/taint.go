@@ -65,7 +65,7 @@ func EndTaintFailSafe(actualTainted int) error {
 // returns the most recent update of the node that is successful
 func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
 	if tainted > targetTaints {
-		log.Warningf("Taint count exceeds the target set by the lock")
+		log.Warning("Taint count exceeds the target set by the lock")
 	}
 	if tainted > MaximumTaints {
 		IncrementTaintCount()

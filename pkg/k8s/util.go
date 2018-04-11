@@ -7,12 +7,18 @@ import (
 
 // PodIsDaemonSet returns if the pod is a daemonset or not
 func PodIsDaemonSet(pod *v1.Pod) bool {
-	for _, ownerrefence := range pod.ObjectMeta.OwnerReferences {
-		if ownerrefence.Kind == "DaemonSet" {
+	for _, ownerReference := range pod.ObjectMeta.OwnerReferences {
+		if ownerReference.Kind == "DaemonSet" {
 			return true
 		}
 	}
 	return false
+}
+
+// PodIsStatic returns if the pod is static or not
+func PodIsStatic(pod *v1.Pod) bool {
+	configSource, ok := pod.ObjectMeta.Annotations["kubernetes.io/config.source"]
+	return ok && configSource == "file"
 }
 
 // CalculatePodsRequestsTotal returns the total capacity of all pods
