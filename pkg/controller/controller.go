@@ -108,6 +108,11 @@ func (c *Controller) GetNodeGroups() map[string]*NodeGroupState {
 	return c.nodeGroups
 }
 
+// GetCloudProvider returns the cloud provider for the controller
+func (c *Controller) GetCloudProvider() cloudprovider.CloudProvider {
+	return c.cloudProvider
+}
+
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
 func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 	return c.Opts.DryMode || nodeGroup.Opts.DryMode
