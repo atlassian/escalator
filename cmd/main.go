@@ -14,8 +14,8 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 	"k8s.io/client-go/kubernetes"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/atlassian/escalator/pkg/health"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

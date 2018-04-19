@@ -2,12 +2,12 @@ package aws
 
 import (
 	"github.com/atlassian/escalator/pkg/cloudprovider"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
-	log "github.com/sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
+	log "github.com/sirupsen/logrus"
 )
 
 // Builder builds the aws cloudprovider

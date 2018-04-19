@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
+	"github.com/atlassian/escalator/pkg/metrics"
 	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
-	"github.com/atlassian/escalator/pkg/metrics"
 )
 
 // ProviderName identifies this module as aws
