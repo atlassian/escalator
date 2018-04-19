@@ -6,7 +6,7 @@ on a number of components. These include:
  - **Cloud Provider**
     - Checks whether Escalator is able to refresh or describe the node group using the Cloud Provider's API
  - **Kubernetes API Server**
-    - Checks whether Escalator has connectivity with the Kubernetes API server
+    - Checks whether Escalator has connectivity with the Kubernetes API server by listing nodes
     
 ## Usage
 
