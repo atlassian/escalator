@@ -23,7 +23,7 @@ type Controller struct {
 	Opts     Opts
 	stopChan <-chan struct{}
 
-	cloudProvider cloudprovider.CloudProvider
+	CloudProvider cloudprovider.CloudProvider
 
 	nodeGroups map[string]*NodeGroupState
 }
@@ -98,19 +98,9 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		Client:        client,
 		Opts:          opts,
 		stopChan:      stopChan,
-		cloudProvider: cloud,
+		CloudProvider: cloud,
 		nodeGroups:    nodegroupMap,
 	}
-}
-
-// GetNodeGroups returns the nodegroups for the controller
-func (c *Controller) GetNodeGroups() map[string]*NodeGroupState {
-	return c.nodeGroups
-}
-
-// GetCloudProvider returns the cloud provider for the controller
-func (c *Controller) GetCloudProvider() cloudprovider.CloudProvider {
-	return c.cloudProvider
 }
 
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
@@ -345,15 +335,15 @@ func (c *Controller) RunOnce() {
 
 	// try refresh cred a few times if they go stale
 	// rebuild will create a new session from the metadata on the box
-	err := c.cloudProvider.Refresh()
+	err := c.CloudProvider.Refresh()
 	for i := 0; i < 2 && err != nil; i++ {
 		log.Warnf("cloud provider failed to refresh. trying to re-fetch credentials. tries = %v", i+1)
 		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
-		c.cloudProvider, err = c.Opts.CloudProviderBuilder.Build()
+		c.CloudProvider, err = c.Opts.CloudProviderBuilder.Build()
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = c.cloudProvider.Refresh()
+		err = c.CloudProvider.Refresh()
 	}
 	// Perform the ScaleUp/Taint logic
 	for _, nodeGroupOpts := range c.Opts.NodeGroups {

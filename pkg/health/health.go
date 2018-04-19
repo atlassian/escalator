@@ -21,8 +21,7 @@ func NewHealthService(addr string, controller *controller.Controller) *Service {
 
 func (s *Service) handler(w http.ResponseWriter, r *http.Request) {
 	// Ensure we can refresh the cloud provider
-	cloudProvider := s.controller.GetCloudProvider()
-	err := cloudProvider.Refresh()
+	err := s.controller.CloudProvider.Refresh()
 	if err != nil {
 		w.WriteHeader(500)
 		w.Write([]byte(fmt.Sprintf("error: %v", err)))
