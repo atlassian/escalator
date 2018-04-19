@@ -30,6 +30,12 @@ spec:
         - name: escalator-nodegroups
           mountPath: /opt/conf/nodegroups
           readOnly: true
+        livenessProbe:
+          httpGet:
+            port: 8080
+            path: /healthz
+          initialDelaySeconds: 5
+          periodSeconds: 5
       volumes:
       - name: escalator-nodegroups
         configMap:
