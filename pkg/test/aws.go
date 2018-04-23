@@ -6,14 +6,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 )
 
-type AutoscalingMockedDescribeAutoScalingGroups struct {
+type MockAutoscalingService struct {
 	autoscalingiface.AutoScalingAPI
 	*client.Client
 
-	Resp  autoscaling.DescribeAutoScalingGroupsOutput
-	Error error
+	DescribeAutoScalingGroupsOutput *autoscaling.DescribeAutoScalingGroupsOutput
+	DescribeAutosCalingGroupsErr    error
 }
 
-func (a AutoscalingMockedDescribeAutoScalingGroups) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
-	return &a.Resp, a.Error
+func (m MockAutoscalingService) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
+	return m.DescribeAutoScalingGroupsOutput, m.DescribeAutosCalingGroupsErr
 }

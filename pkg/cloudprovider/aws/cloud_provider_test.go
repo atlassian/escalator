@@ -90,7 +90,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 	tests := []struct {
 		name       string
 		nodeGroups map[string]bool
-		response   autoscaling.DescribeAutoScalingGroupsOutput
+		response   *autoscaling.DescribeAutoScalingGroupsOutput
 		err        error
 	}{
 		{
@@ -98,7 +98,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 			map[string]bool{
 				"1": false,
 			},
-			autoscaling.DescribeAutoScalingGroupsOutput{},
+			&autoscaling.DescribeAutoScalingGroupsOutput{},
 			nil,
 		},
 		{
@@ -107,7 +107,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				"1": true,
 				"2": true,
 			},
-			autoscaling.DescribeAutoScalingGroupsOutput{
+			&autoscaling.DescribeAutoScalingGroupsOutput{
 				AutoScalingGroups: []*autoscaling.Group{
 					{
 						AutoScalingGroupName: aws.String("1"),
@@ -125,7 +125,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				"1": true,
 				"2": false,
 			},
-			autoscaling.DescribeAutoScalingGroupsOutput{
+			&autoscaling.DescribeAutoScalingGroupsOutput{
 				AutoScalingGroups: []*autoscaling.Group{
 					{
 						AutoScalingGroupName: aws.String("1"),
@@ -137,7 +137,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 		{
 			"register no node groups",
 			map[string]bool{},
-			autoscaling.DescribeAutoScalingGroupsOutput{},
+			&autoscaling.DescribeAutoScalingGroupsOutput{},
 			fmt.Errorf("no groups"),
 		},
 	}
@@ -145,10 +145,9 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock autoscaling service
-			service := test.AutoscalingMockedDescribeAutoScalingGroups{Resp: tt.response, Error: tt.err}
-			awsCloudProvider := CloudProvider{
-				service:    service,
-				nodeGroups: make(map[string]*NodeGroup, len(tt.nodeGroups)),
+			service := test.MockAutoscalingService{
+				DescribeAutoScalingGroupsOutput: tt.response,
+				DescribeAutosCalingGroupsErr:    tt.err,
 			}
 
 			var ids []string
@@ -156,8 +155,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				ids = append(ids, id)
 			}
 
-			// Register the node groups
-			err := awsCloudProvider.RegisterNodeGroups(ids...)
+			awsCloudProvider, err := newMockCloudProvider(ids, service)
 			assert.Equal(t, tt.err, err)
 
 			// Ensure that the node groups that are supposed to exist have been fetched and registered properly
@@ -187,16 +185,12 @@ func TestCloudProvider_Refresh(t *testing.T) {
 	}
 
 	// Create the initial response
-	resp := autoscaling.DescribeAutoScalingGroupsOutput{AutoScalingGroups: autoscalingGroups}
+	resp := &autoscaling.DescribeAutoScalingGroupsOutput{AutoScalingGroups: autoscalingGroups}
 
-	// Create a mock autoscaling service
-	awsCloudProvider := CloudProvider{
-		service:    test.AutoscalingMockedDescribeAutoScalingGroups{Resp: resp, Error: nil},
-		nodeGroups: make(map[string]*NodeGroup, len(nodeGroups)),
-	}
-
-	// Register the node groups
-	err := awsCloudProvider.RegisterNodeGroups(nodeGroups...)
+	awsCloudProvider, err := newMockCloudProvider(nodeGroups, test.MockAutoscalingService{
+		DescribeAutoScalingGroupsOutput: resp,
+		DescribeAutosCalingGroupsErr:    nil,
+	})
 	assert.Nil(t, err)
 
 	// Ensure the node group is registered
