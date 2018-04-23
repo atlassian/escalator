@@ -53,6 +53,7 @@
     "private/protocol/rest",
     "private/protocol/xml/xmlutil",
     "service/autoscaling",
+    "service/autoscaling/autoscalingiface",
     "service/sts"
   ]
   revision = "85827b2b68100949cf995e269f74a151e408fb42"
@@ -575,6 +576,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d86e5142b54f5abc03e3e708be6588054e18e2f5b21d7d8741a689884688da97"
+  inputs-digest = "2cd388de4f4c9e02489142c1ae14e635ee417b3a3d64b52971743686e53094fc"
   solver-name = "gps-cdcl"
   solver-version = 1

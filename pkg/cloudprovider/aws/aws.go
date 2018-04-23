@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
+	"github.com/atlassian/escalator/pkg/metrics"
 	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
-	"github.com/atlassian/escalator/pkg/metrics"
 )
 
 // ProviderName identifies this module as aws
@@ -18,9 +19,9 @@ func instanceToProviderID(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
 }
 
-// CloudProvider providers an aws cloudprovider implementation
+// CloudProvider providers an aws cloud provider implementation
 type CloudProvider struct {
-	service    *autoscaling.AutoScaling
+	service    autoscalingiface.AutoScalingAPI
 	nodeGroups map[string]*NodeGroup
 }
 
@@ -39,7 +40,7 @@ func (c *CloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 	return ngs
 }
 
-// GetNodeGroup gets the node group from the coudprovider. Returns if it exists or not
+// GetNodeGroup gets the node group from the cloud provider. Returns if it exists or not
 func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) {
 	if ng, ok := c.nodeGroups[id]; ok {
 		return ng, ok
