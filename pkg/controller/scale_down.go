@@ -23,6 +23,7 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 }
 
 // TryRemoveTaintedNodes attempts to remove nodes are tainted and empty or have passed their grace period
+// TODO(aprice): clean up this method (lots of IF statements)
 func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	var toBeDeleted []*v1.Node
 	for _, candidate := range opts.taintedNodes {
@@ -36,17 +37,35 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 
 		now := time.Now()
 		if now.Sub(*taintedTime) > opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
-			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfoMap) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
+			// If draining is enabled, attempt to drain the node
+			if opts.nodeGroup.Opts.DrainBeforeTermination && !k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfoMap) {
+				podsForDeletion, err := k8s.NodeGetPodsForDeletion(candidate, opts.nodeGroup.NodeInfoMap)
+				if err != nil {
+					return 0, err
+				}
+
+				err = k8s.DrainPods(podsForDeletion, c.Client)
+				if err != nil {
+					return 0, err
+				}
+			}
+
+			shouldHardDelete := opts.nodeGroup.Opts.ShouldHardDelete()
+			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfoMap) || (shouldHardDelete && now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration()) {
 				drymode := c.dryMode(opts.nodeGroup)
 				log.WithField("drymode", drymode).Infof("Node %v, %v ready to be deleted", candidate.Name, candidate.Spec.ProviderID)
 				if !drymode {
 					toBeDeleted = append(toBeDeleted, candidate)
 				}
 			} else {
-				log.Debugf("node %v not ready for deletion. Hard delete time remaining %v",
-					candidate.Name,
-					opts.nodeGroup.Opts.HardDeleteGracePeriodDuration()-now.Sub(*taintedTime),
-				)
+				if shouldHardDelete {
+					log.Debugf("node %v not ready for deletion. Hard delete time remaining %v",
+						candidate.Name,
+						opts.nodeGroup.Opts.HardDeleteGracePeriodDuration()-now.Sub(*taintedTime),
+					)
+				} else {
+					log.Debugf("node %v not ready for deletion. Won't hard delete.", candidate.Name)
+				}
 			}
 		} else {
 			log.Debugf("node %v not ready for deletion yet. Time remaining %v",

@@ -1,11 +1,11 @@
 package k8s
 
 import (
-	"testing"
-	"k8s.io/api/core/v1"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"testing"
 )
 
 func TestCreateNodeNameToInfoMap(t *testing.T) {

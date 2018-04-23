@@ -39,7 +39,9 @@ The following is documentation on the process that Escalator follows for scaling
 1. Determine whether we need to perform a "fast" scale down or "slow" scale down
     1. Fast and slow node removal is configured per node group, documentation [here](./configuration/nodegroup.md)
 1. Scale down the node group by the amount of nodes needed
-    1. Remove any nodes that have already been tainted and have exceed the grace period and are considered empty
+    1. If draining is enabled, attempt to drain tainted nodes
+        1. Evict or delete pods from the nodes that are being drained
+    1. Remove any nodes that have already been tainted and have exceeded the grace period and are considered empty
         1. Tell the cloud provider to delete the node from the node group
         1. Delete the node from Kubernetes
     1. Taint nodes, based on the "fast" or "slow" scale down amounts
@@ -75,5 +77,7 @@ Escalator taints are given the `atlassian.com/escalator` key.
 Escalator does not use the cordoning command anywhere in it's process. This is done to preserve the cordoning command
 for system administrators to filter the cordoned node out of calculations. This way, a faulty or misbehaving node
 can be cordoned by the system administrator to be debugged or troubleshooted without worrying about the node being 
-tainted and then terminated by Escalator. 
+tainted and then terminated by Escalator.
+
+To cordon a node and have it ignored by Escalator: `kubectl cordon <node name>`
 

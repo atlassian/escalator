@@ -154,6 +154,23 @@ Take consideration when setting `soft_delete_grace_period`, as a low value will 
 possible, but if there is a sudden spike in pods there may not be an available pool of tainted nodes to untaint.
 
 It is highly recommended to have the `hard_delete_grace_period` option set to a large value to give pods running on 
-nodes enough time to finish before the node is terminated. 
+nodes enough time to finish before the node is terminated.
+
+`hard_delete_grace_period` supports being set to `0` - which disables hard deletion of nodes after a certain amount of
+time. This is useful when using `drain_before_termination` and draining is unable to completely evict or delete pods
+from the node.
 
 Logic for determining if a node is empty can be found in `pkg/k8s` `NodeEmpty()`
+
+### `drain_before_termination`
+
+Whether or not to perform a "drain" before terminating the node. This allows Escalator to run with service-based
+pods that can be deleted and then re-scheduled to another node before the original node is terminated.
+
+When using `drain_before_termination`, it is highly recommended to set `hard_delete_grace_period` to 0, i.e. the node
+will not be hard deleted after a certain amount of time. This is useful when drain is unable to completely evict or
+delete pods from the node.
+
+Further reading on draining can be found in the following:
+- [Safely Drain a Node while Respecting Application SLOs](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)
+- [Drain command](https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#drain)

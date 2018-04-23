@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -41,19 +42,37 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*sched
 
 // NodeEmpty returns if the node is empty of pods, except for daemonsets
 func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*schedulercache.NodeInfo) bool {
-	nodeInfo, ok := nodeInfoMap[node.Name]
-	if !ok {
-		log.Warningf("could not find node %v in the nodeinfo map", node.Name)
+	podsForDeletion, err := NodeGetPodsForDeletion(node, nodeInfoMap)
+	if err != nil {
+		log.Warn(err.Error())
 		return false
 	}
 
 	// check all the pods and make sure they're daemonsets
 	// otherwise there are sacred pods still on the node
-	for _, pod := range nodeInfo.Pods() {
-		if !PodIsDaemonSet(pod) {
-			return false
-		}
+	return len(podsForDeletion) == 0
+}
+
+// NodeGetPodsForDeletion gets pods for deletion from a node with a nodeinfomap
+func NodeGetPodsForDeletion(node *v1.Node, nodeInfoMap map[string]*schedulercache.NodeInfo) ([]*v1.Pod, error) {
+	var pods []*v1.Pod
+
+	nodeInfo, ok := nodeInfoMap[node.Name]
+	if !ok {
+		return pods, fmt.Errorf("could not find node %v in the nodeinfo map", node.Name)
 	}
 
-	return true
+	return GetPodsForDeletion(nodeInfo), nil
+}
+
+// GetPodsForDeletion gets all pods on a node that can be deleted/evicted
+// i.e. anything that isn't a daemonset
+func GetPodsForDeletion(nodeInfo *schedulercache.NodeInfo) []*v1.Pod {
+	var pods []*v1.Pod
+	for _, pod := range nodeInfo.Pods() {
+		if !PodIsDaemonSet(pod) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods
 }

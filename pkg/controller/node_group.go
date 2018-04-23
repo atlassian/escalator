@@ -39,12 +39,14 @@ type NodeGroupOptions struct {
 	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 
-	ScaleUpCoolDownPeriod  string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
+	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
+
+	DrainBeforeTermination bool `json:"drain_before_termination,omitempty" yaml:"drain_before_termination,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
-	softDeleteGracePeriodDuration  time.Duration
-	hardDeleteGracePeriodDuration  time.Duration
-	scaleUpCoolDownPeriodDuration  time.Duration
+	softDeleteGracePeriodDuration time.Duration
+	hardDeleteGracePeriodDuration time.Duration
+	scaleUpCoolDownPeriodDuration time.Duration
 }
 
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct
@@ -87,11 +89,11 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow_node_removal_rate must be less than fast_node_removal_rate")
 
 	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft_delete_grace_period must not be empty")
-	checkThat(len(nodegroup.HardDeleteGracePeriod) > 0, "hard_delete_grace_period must not be empty")
+	checkThat(len(nodegroup.HardDeleteGracePeriod) >= 0, "hard_delete_grace_period must not be empty")
 
 	checkThat(nodegroup.SoftDeleteGracePeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
-	checkThat(nodegroup.HardDeleteGracePeriodDuration() > 0, "hard_delete_grace_period failed to parse into a time.Duration. check your formatting.")
-	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft_delete_grace_period must be less than hard_delete_grace_period")
+	checkThat(nodegroup.HardDeleteGracePeriodDuration() >= 0, "hard_delete_grace_period failed to parse into a time.Duration. check your formatting.")
+	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration() || nodegroup.HardDeleteGracePeriodDuration() == 0, "hard_delete_grace_period must be greater than soft_delete_grace_period or 0")
 
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
@@ -136,6 +138,12 @@ func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
 	}
 
 	return n.scaleUpCoolDownPeriodDuration
+}
+
+// ShouldHardDelete returns whether nodes in the node group should be hard deleted
+// when the hard delete grace period ends or kept forever
+func (n *NodeGroupOptions) ShouldHardDelete() bool {
+	return n.HardDeleteGracePeriodDuration() > 0
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister

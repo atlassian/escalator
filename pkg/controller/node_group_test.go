@@ -417,7 +417,7 @@ func TestValidateNodeGroup(t *testing.T) {
 				controller.NodeGroupOptions{
 					Name:                               "test",
 					LabelKey:                           "customer",
-					LabelValue:                         "buileng",
+					LabelValue:                         "buildeng",
 					CloudProviderGroupName:             "somegroup",
 					TaintUpperCapacityThresholdPercent: 70,
 					TaintLowerCapacityThresholdPercent: 60,
@@ -434,12 +434,35 @@ func TestValidateNodeGroup(t *testing.T) {
 			nil,
 		},
 		{
+			"valid nodegroup",
+			args{
+				controller.NodeGroupOptions{
+					Name:                               "test",
+					LabelKey:                           "customer",
+					LabelValue:                         "buildeng",
+					CloudProviderGroupName:             "somegroup",
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "0",
+					ScaleUpCoolDownPeriod:              "55m",
+					DrainBeforeTermination:             true,
+				},
+			},
+			nil,
+		},
+		{
 			"invalid nodegroup",
 			args{
 				controller.NodeGroupOptions{
 					Name:                               "",
 					LabelKey:                           "customer",
-					LabelValue:                         "buileng",
+					LabelValue:                         "buildeng",
 					CloudProviderGroupName:             "somegroup",
 					TaintUpperCapacityThresholdPercent: 70,
 					TaintLowerCapacityThresholdPercent: 90,
