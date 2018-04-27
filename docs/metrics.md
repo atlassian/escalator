@@ -63,5 +63,5 @@ Below is a screenshot of the included dashboard:
 ## Recommendations
  
 It is highly recommended to monitor and graph the two utilisation metrics 
-(`node_group_mem_percent` and `node_group_cpu_percent`) as this will let you see the utilisation that Escalator
+(`escalator_node_group_mem_percent` and `escalator_node_group_cpu_percent`) as this will let you see the utilisation that Escalator
 calculates. Ideally these values should stay below your scale up threshold.
