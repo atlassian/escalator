@@ -1,4 +1,4 @@
-.PHONY: build setup test test-race
+.PHONY: build setup test test-race test-vet docker
 
 build:
 	CGO_ENABLED=1 go build -o escalator cmd/main.go
@@ -11,3 +11,9 @@ test:
 
 test-race:
 	go test ./... -cover -race
+
+test-vet:
+	go vet ./...
+
+docker:
+	docker build -t atlassian/escalator .
