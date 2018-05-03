@@ -11,9 +11,23 @@ type MockAutoscalingService struct {
 	*client.Client
 
 	DescribeAutoScalingGroupsOutput *autoscaling.DescribeAutoScalingGroupsOutput
-	DescribeAutosCalingGroupsErr    error
+	DescribeAutoScalingGroupsErr    error
+
+	SetDesiredCapacityOutput *autoscaling.SetDesiredCapacityOutput
+	SetDesiredCapacityErr    error
+
+	TerminateInstanceInAutoScalingGroupOutput *autoscaling.TerminateInstanceInAutoScalingGroupOutput
+	TerminateInstanceInAutoScalingGroupErr    error
 }
 
 func (m MockAutoscalingService) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
-	return m.DescribeAutoScalingGroupsOutput, m.DescribeAutosCalingGroupsErr
+	return m.DescribeAutoScalingGroupsOutput, m.DescribeAutoScalingGroupsErr
+}
+
+func (m MockAutoscalingService) SetDesiredCapacity(*autoscaling.SetDesiredCapacityInput) (*autoscaling.SetDesiredCapacityOutput, error) {
+	return m.SetDesiredCapacityOutput, m.SetDesiredCapacityErr
+}
+
+func (m MockAutoscalingService) TerminateInstanceInAutoScalingGroup(*autoscaling.TerminateInstanceInAutoScalingGroupInput) (*autoscaling.TerminateInstanceInAutoScalingGroupOutput, error) {
+	return m.TerminateInstanceInAutoScalingGroupOutput, m.TerminateInstanceInAutoScalingGroupErr
 }

@@ -42,10 +42,8 @@ func (c *CloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 
 // GetNodeGroup gets the node group from the cloud provider. Returns if it exists or not
 func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) {
-	if ng, ok := c.nodeGroups[id]; ok {
-		return ng, ok
-	}
-	return nil, false
+	ng, ok := c.nodeGroups[id]
+	return ng, ok
 }
 
 // RegisterNodeGroups adds the nodegroup to the list of nodes groups
@@ -190,10 +188,6 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 				instanceID = instance.InstanceId
 				break
 			}
-		}
-
-		if instanceID == nil {
-			return fmt.Errorf("failed to match node id (%v) to an aws instance id", node.Spec.ProviderID)
 		}
 
 		input := &autoscaling.TerminateInstanceInAutoScalingGroupInput{

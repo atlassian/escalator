@@ -17,7 +17,7 @@ func TestInstanceToProviderID(t *testing.T) {
 	assert.Equal(t, "aws:///us-east-1b/abc123", res)
 }
 
-func newMockCloudProvider(nodeGroups []string, service test.MockAutoscalingService) (*CloudProvider, error) {
+func newMockCloudProvider(nodeGroups []string, service *test.MockAutoscalingService) (*CloudProvider, error) {
 	cloudProvider := &CloudProvider{
 		service:    service,
 		nodeGroups: make(map[string]*NodeGroup, len(nodeGroups)),
