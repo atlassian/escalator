@@ -382,3 +382,82 @@ func TestNodeGroup_DeleteNodes(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeGroup_DecreaseSize(t *testing.T) {
+	tests := []struct {
+		name              string
+		decreaseSize      int64
+		autoScalingGroups []*autoscaling.Group
+		err               error
+	}{
+		{
+			"normal decrease",
+			int64(-5),
+			[]*autoscaling.Group{
+				{
+					AutoScalingGroupName: aws.String("asg-1"),
+					MinSize:              aws.Int64(int64(1)),
+					DesiredCapacity:      aws.Int64(int64(10)),
+				},
+			},
+			nil,
+		},
+		{
+			"positive decrease",
+			int64(5),
+			[]*autoscaling.Group{
+				{
+					AutoScalingGroupName: aws.String("asg-2"),
+					MinSize:              aws.Int64(int64(1)),
+					DesiredCapacity:      aws.Int64(int64(10)),
+				},
+			},
+			errors.New("size decrease delta must be negative"),
+		},
+		{
+			"zero decrease",
+			int64(0),
+			[]*autoscaling.Group{
+				{
+					AutoScalingGroupName: aws.String("asg-3"),
+					MinSize:              aws.Int64(int64(0)),
+					DesiredCapacity:      aws.Int64(int64(10)),
+				},
+			},
+			errors.New("size decrease delta must be negative"),
+		},
+		{
+			"breach min size decrease",
+			int64(-20),
+			[]*autoscaling.Group{
+				{
+					AutoScalingGroupName: aws.String("asg-4"),
+					MinSize:              aws.Int64(int64(1)),
+					DesiredCapacity:      aws.Int64(int64(10)),
+				},
+			},
+			errors.New("decreasing target size will breach minimum node size"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var nodeGroupNames []string
+			for _, asg := range tt.autoScalingGroups {
+				nodeGroupNames = append(nodeGroupNames, aws.StringValue(asg.AutoScalingGroupName))
+			}
+
+			awsCloudProvider, err := newMockCloudProvider(nodeGroupNames, &test.MockAutoscalingService{
+				DescribeAutoScalingGroupsOutput: &autoscaling.DescribeAutoScalingGroupsOutput{
+					AutoScalingGroups: tt.autoScalingGroups,
+				},
+			})
+			assert.Nil(t, err)
+
+			for _, nodeGroup := range awsCloudProvider.NodeGroups() {
+				err = nodeGroup.DecreaseTargetSize(tt.decreaseSize)
+				assert.Equal(t, tt.err, err)
+			}
+		})
+	}
+}
