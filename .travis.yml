@@ -14,8 +14,6 @@ cache:
 go_import_path: github.com/atlassian/escalator
 go:
   - master
-  - "1.8.x"
-  - "1.9.x"
   - "1.10.x"
 
 before_install:
