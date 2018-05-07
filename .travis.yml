@@ -32,4 +32,3 @@ script:
   - make test-race
   - make test-vet
   - make build
-  - make docker
