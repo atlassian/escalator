@@ -2,8 +2,8 @@ package k8s
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // DeleteNode deletes a single node from Kubernetes

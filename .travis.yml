@@ -1,4 +1,8 @@
 language: go
+sudo: required
+
+services:
+  - docker
 
 env:
   - DEP_VERSION="0.4.1"
