@@ -6,9 +6,6 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// ErrorNotImplemented indicates that a method or function has not been implemented yet
-var ErrorNotImplemented = fmt.Errorf("method not implemented")
-
 // CloudProvider contains configuration info and functions for interacting with
 // cloud provider (GCE, AWS, etc).
 type CloudProvider interface {
@@ -18,7 +15,7 @@ type CloudProvider interface {
 	// NodeGroups returns all node groups configured for this cloud provider.
 	NodeGroups() []NodeGroup
 
-	// GetNodeGroup gets the node group from the coudprovider. Returns if it exists or not
+	// GetNodeGroup gets the node group from the cloud provider. Returns if it exists or not
 	GetNodeGroup(string) (NodeGroup, bool)
 
 	// RegisterNodeGroup adds the nodegroup to the list of nodes groups
@@ -77,7 +74,7 @@ type NodeGroup interface {
 	Nodes() []string
 }
 
-// Builder interface provides a method to build a cloudprovider
+// Builder interface provides a method to build a cloud provider
 type Builder interface {
 	Build() (CloudProvider, error)
 }

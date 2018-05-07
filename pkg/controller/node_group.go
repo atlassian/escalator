@@ -39,12 +39,12 @@ type NodeGroupOptions struct {
 	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 
-	ScaleUpCoolDownPeriod  string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
+	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
-	softDeleteGracePeriodDuration  time.Duration
-	hardDeleteGracePeriodDuration  time.Duration
-	scaleUpCoolDownPeriodDuration  time.Duration
+	softDeleteGracePeriodDuration time.Duration
+	hardDeleteGracePeriodDuration time.Duration
+	scaleUpCoolDownPeriodDuration time.Duration
 }
 
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct

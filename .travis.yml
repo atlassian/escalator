@@ -1,4 +1,8 @@
 language: go
+sudo: required
+
+services:
+  - docker
 
 env:
   - DEP_VERSION="0.4.1"
@@ -10,8 +14,6 @@ cache:
 go_import_path: github.com/atlassian/escalator
 go:
   - master
-  - "1.8.x"
-  - "1.9.x"
   - "1.10.x"
 
 before_install:
@@ -23,16 +25,8 @@ before_install:
 install:
   - make setup
 
-jobs:
-  include:
-    - stage: test
-      script: make test
-    - stage: test
-      script: make test-race
-    - stage: test
-      script: make test-vet
-    - stage: build
-      script: make build
-    - state: docker
-      script: make docker
-      go: master
+script:
+  - make test
+  - make test-race
+  - make test-vet
+  - make build
