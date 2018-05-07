@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"github.com/google/uuid"
 )
 
 // NodeOpts minimal options for configuring a node object in testing
