@@ -12,12 +12,12 @@ import (
 )
 
 func TestPodIsDaemonSet(t *testing.T) {
-	deamon := test.BuildTestPod(test.PodOpts{
+	daemon := test.BuildTestPod(test.PodOpts{
 		Owner: "DaemonSet",
 	})
 	pod := test.BuildTestPod(test.PodOpts{})
 
-	assert.True(t, k8s.PodIsDaemonSet(deamon))
+	assert.True(t, k8s.PodIsDaemonSet(daemon))
 	assert.False(t, k8s.PodIsDaemonSet(pod))
 }
 
@@ -231,4 +231,15 @@ func TestCalculateNodesCapacityTotal(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestPodIsStatic(t *testing.T) {
+	staticPod := test.BuildTestPod(test.PodOpts{})
+	staticPod.ObjectMeta.Annotations = map[string]string{}
+	staticPod.ObjectMeta.Annotations["kubernetes.io/config.source"] = "file"
+
+	pod := test.BuildTestPod(test.PodOpts{})
+
+	assert.True(t, k8s.PodIsStatic(staticPod))
+	assert.False(t, k8s.PodIsStatic(pod))
 }
