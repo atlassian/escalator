@@ -13,7 +13,6 @@ scaling up the cluster as fast as possible to ensure pods are not left in a pend
 
 ## Key Features
 
-- Utilisation based node scaling
 - Calculate requests and capacity to determine whether to scale up, down or to stay at the current scale
 - Waits until non-daemonset pods on nodes have completed before terminating the node
 - Designed to work on selected auto-scaling groups to allow the default
