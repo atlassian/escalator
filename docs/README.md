@@ -19,6 +19,8 @@
     - Scale up
     - Scale down
     - Scale lock
+- [**Node Termination**](./node-termination.md)
+    - Node selection method for termination
 - [**Pod and Node Selectors**](./pod-node-selectors.md)
     - Nodes
     - Pods

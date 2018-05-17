@@ -7,7 +7,7 @@ label, e.g. customer: shared
 
 ## cloud provider
 
-A service that provides compute resources, e.g. AWS, GCP.
+A service that provides compute resources, e.g. AWS, GCP, Azure.
 
 ## auto scaling group or ASG
 
@@ -16,7 +16,7 @@ AWS service that groups EC2 instances so that they can be scaled and managed tog
 
 ## tainting
 
-When we refer to "tainting" a node, we refer to apply a Kubernetes taint to the node that prevents scheduling of pods
+When we refer to "tainting" a node, we refer to applying a Kubernetes taint to the node that prevents scheduling of pods
 to that node. We apply the "NoSchedule" effect when we taint a node. More information on tainting of nodes can be found 
 [here](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/).
 
