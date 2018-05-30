@@ -1,5 +1,10 @@
 # Escalator
 
+[![Godoc](https://godoc.org/github.com/atlassian/escalator?status.svg)](https://godoc.org/github.com/atlassian/escalator)
+[![Build Status](https://travis-ci.org/atlassian/escalator.svg?branch=master)](https://travis-ci.org/atlassian/escalator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/escalator)](https://goreportcard.com/report/github.com/atlassian/escalator)
+[![license](https://img.shields.io/github/license/atlassian/escalator.svg)](LICENSE)
+
 **Escalator is a batch or job optimized horizontal autoscaler for Kubernetes**
 
 It is designed for large batch or job based workloads that cannot be force-drained and moved when the cluster needs to 
@@ -8,7 +13,6 @@ scaling up the cluster as fast as possible to ensure pods are not left in a pend
 
 ## Key Features
 
-- Utilisation based node scaling
 - Calculate requests and capacity to determine whether to scale up, down or to stay at the current scale
 - Waits until non-daemonset pods on nodes have completed before terminating the node
 - Designed to work on selected auto-scaling groups to allow the default

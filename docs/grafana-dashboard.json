@@ -115,7 +115,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "node_group_cpu_percent{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_cpu_percent{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "refId": "A"
@@ -197,7 +197,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "node_group_mem_percent{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_mem_percent{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "refId": "A"
@@ -254,14 +254,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_group_cpu_percent{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_cpu_percent{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "cpu %",
           "refId": "A"
         },
         {
-          "expr": "node_group_mem_percent{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_mem_percent{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "mem %",
@@ -358,21 +358,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_group_cordoned_nodes{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_cordoned_nodes{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "cordoned",
           "refId": "A"
         },
         {
-          "expr": "node_group_tainted_nodes{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_tainted_nodes{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "tainted",
           "refId": "B"
         },
         {
-          "expr": "node_group_untainted_nodes{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_untainted_nodes{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "untainted",
@@ -625,14 +625,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "cloud_provider_size{cloud_provider=\"$cloud_provider\", id=\"$cloud_provider_group\"}",
+          "expr": "escalator_cloud_provider_size{cloud_provider=\"$cloud_provider\", id=\"$cloud_provider_group\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Size",
           "refId": "A"
         },
         {
-          "expr": "node_group_nodes{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_nodes{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
@@ -715,14 +715,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "cloud_provider_target_size{cloud_provider=\"$cloud_provider\", id=\"$cloud_provider_group\"}",
+          "expr": "escalator_cloud_provider_target_size{cloud_provider=\"$cloud_provider\", id=\"$cloud_provider_group\"}",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Target Size",
           "refId": "A"
         },
         {
-          "expr": "node_group_nodes{node_group=\"$nodegroup\"}",
+          "expr": "escalator_node_group_nodes{node_group=\"$nodegroup\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,

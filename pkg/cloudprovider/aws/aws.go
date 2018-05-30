@@ -7,6 +7,7 @@ import (
 	"github.com/atlassian/escalator/pkg/metrics"
 	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 )
@@ -20,7 +21,7 @@ func instanceToProviderID(instance *autoscaling.Instance) string {
 
 // CloudProvider providers an aws cloud provider implementation
 type CloudProvider struct {
-	service    *autoscaling.AutoScaling
+	service    autoscalingiface.AutoScalingAPI
 	nodeGroups map[string]*NodeGroup
 }
 
@@ -41,10 +42,8 @@ func (c *CloudProvider) NodeGroups() []cloudprovider.NodeGroup {
 
 // GetNodeGroup gets the node group from the cloud provider. Returns if it exists or not
 func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) {
-	if ng, ok := c.nodeGroups[id]; ok {
-		return ng, ok
-	}
-	return nil, false
+	ng, ok := c.nodeGroups[id]
+	return ng, ok
 }
 
 // RegisterNodeGroups adds the nodegroup to the list of nodes groups
@@ -189,10 +188,6 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 				instanceID = instance.InstanceId
 				break
 			}
-		}
-
-		if instanceID == nil {
-			return fmt.Errorf("failed to match node id (%v) to an aws instance id", node.Spec.ProviderID)
 		}
 
 		input := &autoscaling.TerminateInstanceInAutoScalingGroupInput{
