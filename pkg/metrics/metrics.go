@@ -187,8 +187,8 @@ var (
 		[]string{"cloud_provider", "id"},
 	)
 	// NodeGroupPodsEvicted counts the amount of pods deleted in a node group
-	NodeGroupPodsEvicted = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	NodeGroupPodsEvicted = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
 			Name:      "node_group_pods_evicted",
 			Namespace: NAMESPACE,
 			Help:      "count of pods evicted in a node group",
