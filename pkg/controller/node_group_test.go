@@ -429,6 +429,7 @@ func TestValidateNodeGroup(t *testing.T) {
 					SoftDeleteGracePeriod:              "10m",
 					HardDeleteGracePeriod:              "1h10m",
 					ScaleUpCoolDownPeriod:              "55m",
+					TaintSelectionMethods:              []string{"oldest"},
 				},
 			},
 			nil,
@@ -452,6 +453,7 @@ func TestValidateNodeGroup(t *testing.T) {
 					HardDeleteGracePeriod:              "0",
 					ScaleUpCoolDownPeriod:              "55m",
 					DrainBeforeTermination:             true,
+					TaintSelectionMethods:              []string{"drainable"},
 				},
 			},
 			nil,
@@ -482,6 +484,7 @@ func TestValidateNodeGroup(t *testing.T) {
 				"min_nodes must be less than max_nodes",
 				"max_nodes must be larger than 0",
 				"soft_delete_grace_period failed to parse into a time.Duration. check your formatting.",
+				"taint_selection_methods can only have 1 value",
 			},
 		},
 	}

@@ -186,6 +186,24 @@ var (
 		},
 		[]string{"cloud_provider", "id"},
 	)
+	// NodeGroupPodsEvicted counts the amount of pods deleted in a node group
+	NodeGroupPodsEvicted = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_pods_evicted",
+			Namespace: NAMESPACE,
+			Help:      "count of pods evicted in a node group",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupPodsDeleted counts the amount of pods deleted in a node group
+	NodeGroupPodsDeleted = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      "node_group_pods_deleted",
+			Namespace: NAMESPACE,
+			Help:      "count of pods deleted in a node group",
+		},
+		[]string{"node_group"},
+	)
 )
 
 func init() {
@@ -209,6 +227,8 @@ func init() {
 	prometheus.MustRegister(CloudProviderMaxSize)
 	prometheus.MustRegister(CloudProviderTargetSize)
 	prometheus.MustRegister(CloudProviderSize)
+	prometheus.MustRegister(NodeGroupPodsEvicted)
+	prometheus.MustRegister(NodeGroupPodsDeleted)
 }
 
 // Start starts the metrics endpoint on a new thread

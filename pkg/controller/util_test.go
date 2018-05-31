@@ -268,3 +268,21 @@ func TestCalcPercentUsage(t *testing.T) {
 		})
 	}
 }
+
+func Test_stringsInSlice(t *testing.T) {
+	assert.False(t, stringsInSlice([]string{"foo", "bar"}, []string{}))
+	assert.False(t, stringsInSlice([]string{"foo", "bar"}, []string{"baz"}))
+	assert.True(t, stringsInSlice([]string{"foo", "bar"}, []string{"foo", "bar"}))
+	assert.True(t, stringsInSlice([]string{"foo"}, []string{"foo", "bar"}))
+	assert.True(t, stringsInSlice([]string{}, []string{"foo", "bar"}))
+}
+
+func Test_stringInSlice(t *testing.T) {
+	assert.False(t, stringInSlice("", []string{}))
+	assert.False(t, stringInSlice("foo", []string{}))
+	assert.False(t, stringInSlice("foo", []string{"bar"}))
+	assert.False(t, stringInSlice("foo", []string{"bar", "baz"}))
+	assert.True(t, stringInSlice("", []string{""}))
+	assert.True(t, stringInSlice("foo", []string{"foo"}))
+	assert.True(t, stringInSlice("foo", []string{"foo", "bar"}))
+}

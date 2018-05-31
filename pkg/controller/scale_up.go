@@ -107,7 +107,7 @@ func (c *Controller) scaleUpUntaint(opts scaleOpts) (int, error) {
 func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByNewestCreationTime, 0, len(nodes))
 	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i})
+		sorted = append(sorted, nodeIndexBundle{node, i, []*v1.Pod{}})
 	}
 	sort.Sort(sorted)
 

@@ -36,3 +36,23 @@ func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float6
 	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
 	return cpuPercent, memPercent, nil
 }
+
+// stringsInSlice returns whether all strings in a slice are in a slice of strings
+func stringsInSlice(a, list []string) bool {
+	for _, b := range a {
+		if !stringInSlice(b, list) {
+			return false
+		}
+	}
+	return true
+}
+
+// stringInSlice returns whether a string is in a slice
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}

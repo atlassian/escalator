@@ -15,6 +15,12 @@ import (
 // DefaultNodeGroup is used for any pods that don't have a node selector defined
 const DefaultNodeGroup = "default"
 
+// TaintSelectionMethods are the allowed methods for selecting which nodes to taint
+// oldest = selects the oldest nodes in the node group and taints them first
+// drainable = selects the nodes that are easily drainable and taints them first. The cluster-autoscaler drain simulator
+// is used to determine if the node is easily drainable.
+var TaintSelectionMethods = []string{"oldest", "drainable"}
+
 // NodeGroupOptions represents a nodegroup running on our cluster
 // We differentiate nodegroups by their node label
 type NodeGroupOptions struct {
@@ -41,7 +47,8 @@ type NodeGroupOptions struct {
 
 	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
 
-	DrainBeforeTermination bool `json:"drain_before_termination,omitempty" yaml:"drain_before_termination,omitempty"`
+	DrainBeforeTermination bool     `json:"drain_before_termination,omitempty" yaml:"drain_before_termination,omitempty"`
+	TaintSelectionMethods  []string `json:"taint_selection_methods,omitempty" yaml:"taint_selection_methods,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration time.Duration
@@ -57,7 +64,19 @@ func UnmarshalNodeGroupOptions(reader io.Reader) ([]NodeGroupOptions, error) {
 	if err := yaml.NewYAMLOrJSONDecoder(reader, 4096).Decode(&wrapper); err != nil {
 		return []NodeGroupOptions{}, err
 	}
+	for i, option := range wrapper.NodeGroups {
+		wrapper.NodeGroups[i] = NodeGroupOptionsDefaults(option)
+	}
 	return wrapper.NodeGroups, nil
+}
+
+// NodeGroupOptionsDefaults sets the default values if they haven't been set in the config
+func NodeGroupOptionsDefaults(options NodeGroupOptions) NodeGroupOptions {
+	// Set the default TaintSelectionMethod
+	if len(options.TaintSelectionMethods) == 0 {
+		options.TaintSelectionMethods = []string{"oldest"}
+	}
+	return options
 }
 
 // ValidateNodeGroup is a safety check to validate that a nodegroup has valid options
@@ -97,6 +116,9 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
+
+	checkThat(len(nodegroup.TaintSelectionMethods) == 1, "taint_selection_methods can only have 1 value")
+	checkThat(stringsInSlice(nodegroup.TaintSelectionMethods, TaintSelectionMethods), fmt.Sprintf("taint_selection_methods can only contain values in %v", TaintSelectionMethods))
 
 	return problems
 }

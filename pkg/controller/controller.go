@@ -59,8 +59,21 @@ type scaleOpts struct {
 	nodes          []*v1.Node
 	taintedNodes   []*v1.Node
 	untaintedNodes []*v1.Node
+	pods           []*v1.Pod
 	nodeGroup      *NodeGroupState
 	nodesDelta     int
+}
+
+// newScaleOpts returns a new instance of scaleOpts
+func newScaleOpts(nodes, taintedNodes, untaintedNodes []*v1.Node, pods []*v1.Pod, nodeGroup *NodeGroupState, nodesDelta int) scaleOpts {
+	return scaleOpts{
+		nodes,
+		taintedNodes,
+		untaintedNodes,
+		pods,
+		nodeGroup,
+		nodesDelta,
+	}
 }
 
 // NewController creates a new controller with the specified options
@@ -229,15 +242,8 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// If we ever get into a state where we have less nodes than the minimum
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
 		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
-		result, err := c.ScaleUp(scaleOpts{
-			nodes:      allNodes,
-			nodesDelta: nodeGroup.Opts.MinNodes - len(untaintedNodes),
-			nodeGroup:  nodeGroup,
-		})
-		if err != nil {
-			log.WithField("nodegroup", nodegroup).Error(err)
-		}
-		return result, err
+		scaleOpts := newScaleOpts(allNodes, taintedNodes, untaintedNodes, pods, nodeGroup, nodeGroup.Opts.MinNodes-len(untaintedNodes))
+		return c.ScaleUp(scaleOpts)
 	}
 
 	// Calc %
@@ -292,12 +298,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
 
 	var nodesDeltaResult int
-	scaleOptions := scaleOpts{
-		nodes:          allNodes,
-		taintedNodes:   taintedNodes,
-		untaintedNodes: untaintedNodes,
-		nodeGroup:      nodeGroup,
-	}
+	scaleOptions := newScaleOpts(allNodes, taintedNodes, untaintedNodes, pods, nodeGroup, nodesDeltaResult)
 
 	// Perform a scale up, do nothing or scale down based on the nodes delta
 	switch {

@@ -42,10 +42,11 @@ func TestControllerScaleDownTaint(t *testing.T) {
 
 	nodeGroups := []NodeGroupOptions{
 		{
-			Name:     "buildeng",
-			MinNodes: 3,
-			MaxNodes: 6,
-			DryMode:  false,
+			Name:                  "buildeng",
+			MinNodes:              3,
+			MaxNodes:              6,
+			DryMode:               false,
+			TaintSelectionMethods: []string{"oldest"},
 		},
 	}
 
@@ -77,13 +78,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 		{
 			"test valid taint 2",
 			args{
-				scaleOpts{
-					nodes,
-					[]*v1.Node{},
-					nodes,
-					nodeGroupsState["buildeng"],
-					2,
-				},
+				newScaleOpts(nodes, []*v1.Node{}, nodes, []*v1.Pod{}, nodeGroupsState["buildeng"], 2),
 			},
 			2,
 			false,
@@ -92,13 +87,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 		{
 			"test try taint 4, min nodes = 3",
 			args{
-				scaleOpts{
-					nodes,
-					[]*v1.Node{},
-					nodes,
-					nodeGroupsState["buildeng"],
-					4,
-				},
+				newScaleOpts(nodes, []*v1.Node{}, nodes, []*v1.Pod{}, nodeGroupsState["buildeng"], 4),
 			},
 			3,
 			false,
@@ -107,13 +96,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 		{
 			"test try taint 4, min nodes = 3",
 			args{
-				scaleOpts{
-					nodes[:2],
-					[]*v1.Node{},
-					nodes[:2],
-					nodeGroupsState["buildeng"],
-					4,
-				},
+				newScaleOpts(nodes[:2], []*v1.Node{}, nodes[:2], []*v1.Pod{}, nodeGroupsState["buildeng"], 4),
 			},
 			0,
 			true,
@@ -149,7 +132,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 	}
 }
 
-func TestControllerTaintOldestN(t *testing.T) {
+func TestControllerTaintOldest(t *testing.T) {
 
 	nodes := []*v1.Node{
 		0: test.BuildTestNode(test.NodeOpts{
@@ -295,7 +278,8 @@ func TestControllerTaintOldestN(t *testing.T) {
 			// test wet mode
 			c.Opts.DryMode = false
 			assert.NoError(t, k8s.BeginTaintFailSafe(len(tt.want)))
-			got := c.taintOldestN(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
+			got, err := c.taintOldest(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
+			assert.NoError(t, err)
 			assert.NoError(t, k8s.EndTaintFailSafe(len(got)))
 			eq := assert.Equal(t, tt.want, got)
 			if eq {
@@ -314,7 +298,8 @@ func TestControllerTaintOldestN(t *testing.T) {
 			// test dry mode
 			assert.NoError(t, k8s.BeginTaintFailSafe(len(tt.want)))
 			c.Opts.DryMode = true
-			got = c.taintOldestN(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
+			got, err = c.taintOldest(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
+			assert.NoError(t, err)
 			assert.NoError(t, k8s.EndTaintFailSafe(len(got)))
 			assert.Equal(t, tt.want, got)
 

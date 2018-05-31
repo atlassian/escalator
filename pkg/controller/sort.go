@@ -6,6 +6,7 @@ import "k8s.io/api/core/v1"
 type nodeIndexBundle struct {
 	node  *v1.Node
 	index int
+	pods  []*v1.Pod
 }
 
 // nodesByOldestCreationTime Sort functions for sorting by creation time
@@ -35,5 +36,20 @@ func (n nodesByNewestCreationTime) Less(i, j int) bool {
 }
 
 func (n nodesByNewestCreationTime) Swap(i, j int) {
+	n[i], n[j] = n[j], n[i]
+}
+
+// nodesByPodsToRescheduleLeast Sort functions for sorting by the amount of pods to reschedule on a node
+type nodesByPodsToRescheduleLeast []nodeIndexBundle
+
+func (n nodesByPodsToRescheduleLeast) Len() int {
+	return len(n)
+}
+
+func (n nodesByPodsToRescheduleLeast) Less(i, j int) bool {
+	return len(n[i].pods) < len(n[j].pods)
+}
+
+func (n nodesByPodsToRescheduleLeast) Swap(i, j int) {
 	n[i], n[j] = n[j], n[i]
 }

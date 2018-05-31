@@ -99,6 +99,12 @@
   revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/golang/groupcache"
+  packages = ["lru"]
+  revision = "24b0969c4cb722950103eed87108c8d291a8df00"
+
+[[projects]]
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -257,7 +263,11 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "ed25519",
+    "ed25519/internal/edwards25519",
+    "ssh/terminal"
+  ]
   revision = "ab813273cd59e1333f7ae7bff5d027d4aadf528c"
 
 [[projects]]
@@ -270,7 +280,7 @@
     "http2/hpack",
     "idna"
   ]
-  revision = "dfa909b99c79129e1100513e5cd36307665e5723"
+  revision = "89e543239a64caf31d3a6865872ea120b41446df"
 
 [[projects]]
   branch = "master"
@@ -319,6 +329,17 @@
   packages = ["."]
   revision = "d2d2541c53f18d2a059457998ce2876cc8e67cbf"
   version = "v0.9.1"
+
+[[projects]]
+  name = "gopkg.in/square/go-jose.v2"
+  packages = [
+    ".",
+    "cipher",
+    "json",
+    "jwt"
+  ]
+  revision = "76dd09796242edb5b897103a75df2645c028c960"
+  version = "v2.1.6"
 
 [[projects]]
   name = "gopkg.in/yaml.v2"
@@ -371,15 +392,18 @@
   branch = "release-1.10"
   name = "k8s.io/apimachinery"
   packages = [
+    "pkg/api/equality",
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
+    "pkg/api/validation",
     "pkg/apimachinery",
     "pkg/apimachinery/announced",
     "pkg/apimachinery/registered",
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
+    "pkg/apis/meta/v1/validation",
     "pkg/apis/meta/v1beta1",
     "pkg/conversion",
     "pkg/conversion/queryparams",
@@ -402,15 +426,19 @@
     "pkg/util/framer",
     "pkg/util/intstr",
     "pkg/util/json",
+    "pkg/util/mergepatch",
     "pkg/util/net",
+    "pkg/util/rand",
     "pkg/util/runtime",
     "pkg/util/sets",
+    "pkg/util/strategicpatch",
     "pkg/util/validation",
     "pkg/util/validation/field",
     "pkg/util/wait",
     "pkg/util/yaml",
     "pkg/version",
     "pkg/watch",
+    "third_party/forked/golang/json",
     "third_party/forked/golang/reflect"
   ]
   revision = "31dade610c053669d8054bfd847da657251e8c1a"
@@ -419,16 +447,73 @@
   branch = "master"
   name = "k8s.io/apiserver"
   packages = [
+    "pkg/authentication/authenticator",
+    "pkg/authentication/serviceaccount",
+    "pkg/authentication/user",
     "pkg/features",
-    "pkg/util/feature"
+    "pkg/util/feature",
+    "pkg/util/trace"
   ]
   revision = "26d8520c41c195deccdd8632a350c1cdaff01c0c"
+
+[[projects]]
+  branch = "cluster-autoscaler-release-1.2"
+  name = "k8s.io/autoscaler"
+  packages = [
+    "cluster-autoscaler/simulator",
+    "cluster-autoscaler/utils/drain",
+    "cluster-autoscaler/utils/errors",
+    "cluster-autoscaler/utils/glogx",
+    "cluster-autoscaler/utils/kubernetes",
+    "cluster-autoscaler/utils/scheduler"
+  ]
+  revision = "a909d0cc3695148f097b56e62f052063d354ee99"
 
 [[projects]]
   name = "k8s.io/client-go"
   packages = [
     "discovery",
     "discovery/fake",
+    "informers",
+    "informers/admissionregistration",
+    "informers/admissionregistration/v1alpha1",
+    "informers/admissionregistration/v1beta1",
+    "informers/apps",
+    "informers/apps/v1",
+    "informers/apps/v1beta1",
+    "informers/apps/v1beta2",
+    "informers/autoscaling",
+    "informers/autoscaling/v1",
+    "informers/autoscaling/v2beta1",
+    "informers/batch",
+    "informers/batch/v1",
+    "informers/batch/v1beta1",
+    "informers/batch/v2alpha1",
+    "informers/certificates",
+    "informers/certificates/v1beta1",
+    "informers/core",
+    "informers/core/v1",
+    "informers/events",
+    "informers/events/v1beta1",
+    "informers/extensions",
+    "informers/extensions/v1beta1",
+    "informers/internalinterfaces",
+    "informers/networking",
+    "informers/networking/v1",
+    "informers/policy",
+    "informers/policy/v1beta1",
+    "informers/rbac",
+    "informers/rbac/v1",
+    "informers/rbac/v1alpha1",
+    "informers/rbac/v1beta1",
+    "informers/scheduling",
+    "informers/scheduling/v1alpha1",
+    "informers/settings",
+    "informers/settings/v1alpha1",
+    "informers/storage",
+    "informers/storage/v1",
+    "informers/storage/v1alpha1",
+    "informers/storage/v1beta1",
     "kubernetes",
     "kubernetes/fake",
     "kubernetes/scheme",
@@ -488,7 +573,30 @@
     "kubernetes/typed/storage/v1alpha1/fake",
     "kubernetes/typed/storage/v1beta1",
     "kubernetes/typed/storage/v1beta1/fake",
+    "listers/admissionregistration/v1alpha1",
+    "listers/admissionregistration/v1beta1",
+    "listers/apps/v1",
+    "listers/apps/v1beta1",
+    "listers/apps/v1beta2",
+    "listers/autoscaling/v1",
+    "listers/autoscaling/v2beta1",
+    "listers/batch/v1",
+    "listers/batch/v1beta1",
+    "listers/batch/v2alpha1",
+    "listers/certificates/v1beta1",
     "listers/core/v1",
+    "listers/events/v1beta1",
+    "listers/extensions/v1beta1",
+    "listers/networking/v1",
+    "listers/policy/v1beta1",
+    "listers/rbac/v1",
+    "listers/rbac/v1alpha1",
+    "listers/rbac/v1beta1",
+    "listers/scheduling/v1alpha1",
+    "listers/settings/v1alpha1",
+    "listers/storage/v1",
+    "listers/storage/v1alpha1",
+    "listers/storage/v1beta1",
     "pkg/apis/clientauthentication",
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/version",
@@ -504,6 +612,7 @@
     "tools/clientcmd/api/v1",
     "tools/metrics",
     "tools/pager",
+    "tools/record",
     "tools/reference",
     "transport",
     "util/buffer",
@@ -511,37 +620,94 @@
     "util/flowcontrol",
     "util/homedir",
     "util/integer",
-    "util/retry"
+    "util/retry",
+    "util/workqueue"
   ]
   revision = "23781f4d6632d88e869066eaebb743857aa1ef9b"
   version = "v7.0.0"
 
 [[projects]]
+  branch = "master"
+  name = "k8s.io/kube-openapi"
+  packages = ["pkg/util/proto"]
+  revision = "98b5c3f6a62e3f879d7017752989c925732b6c7d"
+
+[[projects]]
   name = "k8s.io/kubernetes"
   packages = [
     "pkg/api/legacyscheme",
+    "pkg/api/service",
+    "pkg/api/v1/pod",
     "pkg/apis/autoscaling",
     "pkg/apis/core",
     "pkg/apis/core/helper",
     "pkg/apis/core/install",
+    "pkg/apis/core/pods",
     "pkg/apis/core/v1",
     "pkg/apis/core/v1/helper",
+    "pkg/apis/core/v1/helper/qos",
+    "pkg/apis/core/validation",
     "pkg/apis/extensions",
     "pkg/apis/networking",
     "pkg/apis/scheduling",
+    "pkg/capabilities",
+    "pkg/cloudprovider",
+    "pkg/controller",
+    "pkg/controller/volume/events",
+    "pkg/controller/volume/persistentvolume",
+    "pkg/controller/volume/persistentvolume/metrics",
     "pkg/features",
+    "pkg/fieldpath",
+    "pkg/kubelet/apis",
+    "pkg/kubelet/types",
+    "pkg/master/ports",
+    "pkg/scheduler",
+    "pkg/scheduler/algorithm",
+    "pkg/scheduler/algorithm/predicates",
+    "pkg/scheduler/algorithm/priorities",
     "pkg/scheduler/algorithm/priorities/util",
+    "pkg/scheduler/algorithmprovider",
+    "pkg/scheduler/algorithmprovider/defaults",
+    "pkg/scheduler/api",
+    "pkg/scheduler/api/validation",
+    "pkg/scheduler/core",
+    "pkg/scheduler/factory",
+    "pkg/scheduler/metrics",
     "pkg/scheduler/schedulercache",
     "pkg/scheduler/util",
+    "pkg/scheduler/volumebinder",
+    "pkg/security/apparmor",
+    "pkg/serviceaccount",
+    "pkg/util/file",
+    "pkg/util/goroutinemap",
+    "pkg/util/goroutinemap/exponentialbackoff",
+    "pkg/util/hash",
+    "pkg/util/io",
+    "pkg/util/mount",
+    "pkg/util/net/sets",
+    "pkg/util/node",
+    "pkg/util/nsenter",
     "pkg/util/parsers",
-    "pkg/util/pointer"
+    "pkg/util/pointer",
+    "pkg/util/taints",
+    "pkg/volume",
+    "pkg/volume/util",
+    "pkg/volume/util/fs",
+    "pkg/volume/util/recyclerclient",
+    "pkg/volume/util/types"
   ]
   revision = "2bba0127d85d5a46ab4b778548be28623b32d0b0"
   version = "v1.10.3"
 
+[[projects]]
+  branch = "master"
+  name = "k8s.io/utils"
+  packages = ["exec"]
+  revision = "258e2a2fa64568210fbd6267cf1d8fd87c3cb86e"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "68a22e4730fe256e2b5906957c60aa0136854e48c81426b40e3769860741972d"
+  inputs-digest = "a558a6c5a9a66608e97fd979eb09714c863e75f4befb9d097d15bf4839cb63de"
   solver-name = "gps-cdcl"
   solver-version = 1

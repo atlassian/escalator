@@ -44,7 +44,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 					return 0, err
 				}
 
-				err = k8s.DrainPods(podsForDeletion, c.Client)
+				err = k8s.DrainPods(podsForDeletion, c.Client, opts.nodeGroup.Opts.Name)
 				if err != nil {
 					return 0, err
 				}
@@ -118,8 +118,16 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 		}
 	}
 
-	log.WithField("nodegroup", nodegroupName).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
+	log.WithFields(log.Fields{
+		"nodegroup":               nodegroupName,
+		"taint_selection_methods": fmt.Sprintf("%v", opts.nodeGroup.Opts.TaintSelectionMethods),
+	}).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
 	metrics.NodeGroupTaintEvent.WithLabelValues(nodegroupName).Add(float64(nodesToRemove))
+
+	// Don't bother selecting nodes to taint if we aren't removing any
+	if nodesToRemove == 0 {
+		return 0, nil
+	}
 
 	// Lock the tainting to a maximum on 10 nodes
 	if err := k8s.BeginTaintFailSafe(nodesToRemove); err != nil {
@@ -127,8 +135,21 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 		log.Errorf("Failed to get safety lock on tainter: %v", err)
 		return 0, err
 	}
+
 	// Perform the tainting loop with the fail safe around it
-	tainted := c.taintOldestN(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
+	var tainted []int
+	var err error
+	taintSelectionMethods := opts.nodeGroup.Opts.TaintSelectionMethods
+	if taintSelectionMethods[0] == "oldest" {
+		tainted, err = c.taintOldest(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
+	} else if taintSelectionMethods[0] == "drainable" {
+		tainted, err = c.taintDrainable(opts.untaintedNodes, opts.nodes, opts.pods, opts.nodeGroup, nodesToRemove)
+	}
+
+	if err != nil {
+		log.Errorf("Failed to select and taint nodes: %v", err)
+	}
+
 	// Validate the fail-safe worked
 	if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
 		log.Errorf("Failed to validate safety lock on tainter: %v", err)
@@ -139,15 +160,42 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	return len(tainted), nil
 }
 
-// taintOldestN sorts nodes by creation time and taints the oldest N. It will return an array of indices of the nodes it tainted
-// indices are from the parameter nodes indexes, not the sorted index
-func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
-	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
-	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i})
+func (c *Controller) taintDrainable(untaintedNodes []*v1.Node, allNodes []*v1.Node, pods []*v1.Pod, nodeGroup *NodeGroupState, n int) ([]int, error) {
+	// Perform a drain simulation on all the nodes to determine which nodes can be removed
+	nodesToBeRemoved, err := k8s.CalculateMostDrainableNodes(untaintedNodes, allNodes, pods, c.Client)
+	if err != nil {
+		return []int{}, err
+	}
+
+	// Sort the nodes to be removed by the least amount of pods to be removed
+	sorted := make(nodesByPodsToRescheduleLeast, 0, len(nodesToBeRemoved))
+	for i, nodeToBeRemoved := range nodesToBeRemoved {
+		sorted = append(sorted, nodeIndexBundle{
+			nodeToBeRemoved.Node,
+			i,
+			nodeToBeRemoved.PodsToReschedule,
+		})
 	}
 	sort.Sort(sorted)
 
+	return c.taintNodes(sorted, nodeGroup, n), nil
+}
+
+// taintOldest sorts nodes by creation time and then taints the oldest nodes.
+func (c *Controller) taintOldest(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) ([]int, error) {
+	// Add each node to the sort struct
+	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
+	for i, node := range nodes {
+		sorted = append(sorted, nodeIndexBundle{node, i, []*v1.Pod{}})
+	}
+	sort.Sort(sorted)
+	return c.taintNodes(sorted, nodeGroup, n), nil
+}
+
+// taintNodes taints nodes in the order of the nodes parameter.
+// It will return an array of indices of the nodes it tainted.
+// Indices are from the parameter nodes indexes, not the sorted index.
+func (c *Controller) taintNodes(sorted []nodeIndexBundle, nodeGroup *NodeGroupState, n int) []int {
 	taintedIndices := make([]int, 0, n)
 	for i, bundle := range sorted {
 		// stop at N (or when array is fully iterated)

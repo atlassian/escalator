@@ -1,11 +1,12 @@
 package k8s
 
 import (
+	"github.com/atlassian/escalator/pkg/metrics"
+	log "github.com/sirupsen/logrus"
 	apiV1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"log"
 )
 
 const (
@@ -14,24 +15,23 @@ const (
 )
 
 // EvictPod evicts a single pod from Kubernetes
-func EvictPod(pod *apiV1.Pod, apiVersion string, client kubernetes.Interface) error {
-	deleteOptions := &v1.DeleteOptions{}
-	evictionPolicy := &v1beta1.Eviction{
+func EvictPod(pod *apiV1.Pod, apiVersion string, client kubernetes.Interface, nodeGroupName string) error {
+	log.Warnf("Evicting pod: %v/%v", pod.Namespace, pod.Name)
+	metrics.NodeGroupPodsEvicted.WithLabelValues(nodeGroupName).Inc()
+	return client.CoreV1().Pods(pod.Namespace).Evict(&v1beta1.Eviction{
 		TypeMeta: v1.TypeMeta{
 			APIVersion: apiVersion,
 			Kind:       EvictionKind,
 		},
 		ObjectMeta:    pod.ObjectMeta,
-		DeleteOptions: deleteOptions,
-	}
-	log.Println("EvictPod", evictionPolicy)
-	return client.CoreV1().Pods(pod.Namespace).Evict(evictionPolicy)
+		DeleteOptions: &v1.DeleteOptions{},
+	})
 }
 
 // EvictPods evicts multiple pods from Kubernetes
-func EvictPods(pods []*apiV1.Pod, apiVersion string, client kubernetes.Interface) error {
+func EvictPods(pods []*apiV1.Pod, apiVersion string, client kubernetes.Interface, nodeGroupName string) error {
 	for _, pod := range pods {
-		err := EvictPod(pod, apiVersion, client)
+		err := EvictPod(pod, apiVersion, client, nodeGroupName)
 		if err != nil {
 			return err
 		}
@@ -40,16 +40,17 @@ func EvictPods(pods []*apiV1.Pod, apiVersion string, client kubernetes.Interface
 }
 
 // DeletePod deletes a single Pod from Kubernetes
-func DeletePod(pod *apiV1.Pod, client kubernetes.Interface) error {
+func DeletePod(pod *apiV1.Pod, client kubernetes.Interface, nodeGroupName string) error {
 	deleteOptions := &v1.DeleteOptions{}
-	log.Println("DeletePod", pod.Name)
+	log.Warnf("Deleting pod: %v/%v", pod.Namespace, pod.Name)
+	metrics.NodeGroupPodsDeleted.WithLabelValues(nodeGroupName).Inc()
 	return client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 }
 
 // DeletePods deletes multiple Pods from Kubernetes
-func DeletePods(pods []*apiV1.Pod, client kubernetes.Interface) error {
+func DeletePods(pods []*apiV1.Pod, client kubernetes.Interface, nodeGroupName string) error {
 	for _, pod := range pods {
-		err := DeletePod(pod, client)
+		err := DeletePod(pod, client, nodeGroupName)
 		if err != nil {
 			return err
 		}
@@ -57,8 +58,8 @@ func DeletePods(pods []*apiV1.Pod, client kubernetes.Interface) error {
 	return nil
 }
 
-// SupportEviction uses Discovery API to find out if the server support eviction subresource
-// If support, it will return its groupVersion; Otherwise, it will return ""
+// SupportEviction uses Discovery API to find out if the API server supports the eviction subresource
+// If there is support, it will return its groupVersion; Otherwise, it will return ""
 func SupportEviction(clientset kubernetes.Interface) (string, error) {
 	discoveryClient := clientset.Discovery()
 	groupList, err := discoveryClient.ServerGroups()
