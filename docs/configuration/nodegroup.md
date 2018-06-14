@@ -94,7 +94,7 @@ This option defines the threshold at which Escalator will quickly/fast start tai
 occur when the utilisation of the node group goes below this value. For example:
 
 If the node group utilisation is **5%**, and `taint_upper_capacity_threshold_percent` is configured as **10**,
-Escalator will taint nodes at the rate defined in `taint_lower_capacity_threshold_percent`.
+Escalator will taint nodes at the rate defined in `fast_node_removal_rate`.
 
 ### `slow_node_removal_rate`
 
