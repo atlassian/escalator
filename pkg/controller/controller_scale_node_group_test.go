@@ -62,6 +62,73 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 	return client, opts
 }
 
+//Test if when the cluster has nodes = MaxNodes but some of these nodes are tainted
+// it will untaint them before trying to scale up the cloud provider
+func TestUntaintNodeGroupMaxNodes(t *testing.T) {
+	t.Run("10 maxNodes, 5 tainted, 5 untainted - scale up", func(t *testing.T) {
+		nodeGroupName := "default"
+		minNodes := 2
+		maxNodes := 10
+		nodeGroups := []NodeGroupOptions{{
+			Name:                    nodeGroupName,
+			MinNodes:                minNodes,
+			MaxNodes:                maxNodes,
+			ScaleUpThresholdPercent: 70,
+		}}
+
+		nodes := test.BuildTestNodes(5, test.NodeOpts{
+			CPU: 1000,
+			Mem: 1000,
+			Tainted: true,
+		})
+
+		nodes = append(nodes, test.BuildTestNodes(5, test.NodeOpts{
+			CPU: 1000,
+			Mem: 1000,
+		}) ... )
+
+		client, opts := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
+
+		// For these test cases we only use 1 node group/cloud provider node group
+		nodeGroupSize := 1
+
+		// Create a test (mock) cloud provider
+		testCloudProvider := test.NewCloudProvider(nodeGroupSize)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupName,
+			int64(minNodes),
+			int64(maxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		// Create a node group state with the mapping of node groups to the cloud providers node groups
+		cloudProviderNodeGroupMap := make(map[string]cloudprovider.NodeGroup, nodeGroupSize)
+		cloudProviderNodeGroupMap[nodeGroupName] = testNodeGroup
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups:             nodeGroups,
+			client:                 *client,
+			cloudProviderNodeGroup: cloudProviderNodeGroupMap,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		controller.scaleNodeGroup(nodeGroupName, nodeGroupsState[nodeGroupName])
+
+		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroupName], nodes)
+		// Ensure that the tainted nodes where untainted
+		assert.Equal(t, maxNodes, len(untainted))
+		assert.Equal(t, 0, len(tainted))
+
+	})
+}
+
 func TestScaleNodeGroup(t *testing.T) {
 	type nodeArgs struct {
 		initialAmount int
