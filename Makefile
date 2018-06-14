@@ -1,10 +1,10 @@
 .PHONY: build setup test test-race test-vet docker
 
 build:
-	CGO_ENABLED=1 go build -o escalator cmd/main.go
+	go build -o escalator cmd/main.go
 
 setup:
-	dep ensure
+	dep ensure -vendor-only
 
 test:
 	go test ./... -cover

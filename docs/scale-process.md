@@ -39,6 +39,8 @@ The following is documentation on the process that Escalator follows for scaling
 1. Determine whether we need to perform a "fast" scale down or "slow" scale down
     1. Fast and slow node removal is configured per node group, documentation [here](./configuration/nodegroup.md)
 1. Scale down the node group by the amount of nodes needed
+    1. Select nodes for termination - see [Node Termination](./node-termination.md) for the method we use for selecting
+       which nodes to terminate
     1. Remove any nodes that have already been tainted and have exceed the grace period and are considered empty
         1. Tell the cloud provider to delete the node from the node group
         1. Delete the node from Kubernetes
