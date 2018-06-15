@@ -84,7 +84,7 @@ func TestSortNewestNode(t *testing.T) {
 	// Shuffle with the nodesByNewestCreationTime bundle
 	shuffled := make(nodesByNewestCreationTime, 0, len(nodesOrdered))
 	for i, node := range nodesOrdered {
-		shuffled = append(shuffled, nodeIndexBundle{node, i, []*v1.Pod{}})
+		shuffled = append(shuffled, nodeIndexBundle{node: node, index: i})
 	}
 	shuffleNewest(shuffled)
 

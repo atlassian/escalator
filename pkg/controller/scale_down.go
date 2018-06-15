@@ -2,12 +2,10 @@ package controller
 
 import (
 	"fmt"
-	time "github.com/stephanos/clock"
-	"sort"
-
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	log "github.com/sirupsen/logrus"
+	time "github.com/stephanos/clock"
 	"k8s.io/api/core/v1"
 )
 
@@ -136,20 +134,13 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 		return 0, err
 	}
 
-	// Perform the tainting loop with the fail safe around it
-	var tainted []int
-	var err error
-	taintSelectionMethods := opts.nodeGroup.Opts.TaintSelectionMethods
-	if taintSelectionMethods[0] == "oldest" {
-		tainted, err = c.taintOldest(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
-	} else if taintSelectionMethods[0] == "drainable" {
-		tainted, err = c.taintDrainable(opts.untaintedNodes, opts.nodes, opts.pods, opts.nodeGroup, nodesToRemove)
-	}
-
+	sorted, err := c.selectNodesToTaint(opts.untaintedNodes, opts.nodes, opts.pods, opts.nodeGroup)
 	if err != nil {
-		log.Errorf("Failed to select and taint nodes: %v", err)
+		log.Errorf("Failed to select nodes to taint: %v", err)
+		return 0, nil
 	}
 
+	tainted := c.taintNodes(sorted, opts.nodeGroup, nodesToRemove)
 	// Validate the fail-safe worked
 	if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
 		log.Errorf("Failed to validate safety lock on tainter: %v", err)
@@ -158,38 +149,6 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 
 	log.Infof("Tainted a total of %v nodes", len(tainted))
 	return len(tainted), nil
-}
-
-func (c *Controller) taintDrainable(untaintedNodes []*v1.Node, allNodes []*v1.Node, pods []*v1.Pod, nodeGroup *NodeGroupState, n int) ([]int, error) {
-	// Perform a drain simulation on all the nodes to determine which nodes can be removed
-	nodesToBeRemoved, err := k8s.CalculateMostDrainableNodes(untaintedNodes, allNodes, pods, c.Client)
-	if err != nil {
-		return []int{}, err
-	}
-
-	// Sort the nodes to be removed by the least amount of pods to be removed
-	sorted := make(nodesByPodsToRescheduleLeast, 0, len(nodesToBeRemoved))
-	for i, nodeToBeRemoved := range nodesToBeRemoved {
-		sorted = append(sorted, nodeIndexBundle{
-			nodeToBeRemoved.Node,
-			i,
-			nodeToBeRemoved.PodsToReschedule,
-		})
-	}
-	sort.Sort(sorted)
-
-	return c.taintNodes(sorted, nodeGroup, n), nil
-}
-
-// taintOldest sorts nodes by creation time and then taints the oldest nodes.
-func (c *Controller) taintOldest(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) ([]int, error) {
-	// Add each node to the sort struct
-	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
-	for i, node := range nodes {
-		sorted = append(sorted, nodeIndexBundle{node, i, []*v1.Pod{}})
-	}
-	sort.Sort(sorted)
-	return c.taintNodes(sorted, nodeGroup, n), nil
 }
 
 // taintNodes taints nodes in the order of the nodes parameter.

@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"errors"
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"k8s.io/api/core/v1"
@@ -47,8 +48,8 @@ type NodeGroupOptions struct {
 
 	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
 
-	DrainBeforeTermination bool     `json:"drain_before_termination,omitempty" yaml:"drain_before_termination,omitempty"`
-	TaintSelectionMethods  []string `json:"taint_selection_methods,omitempty" yaml:"taint_selection_methods,omitempty"`
+	DrainBeforeTermination bool               `json:"drain_before_termination,omitempty" yaml:"drain_before_termination,omitempty"`
+	TaintSelectionMethods  map[string]float64 `json:"taint_selection_methods,omitempty" yaml:"taint_selection_methods,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration time.Duration
@@ -74,15 +75,15 @@ func UnmarshalNodeGroupOptions(reader io.Reader) ([]NodeGroupOptions, error) {
 func NodeGroupOptionsDefaults(options NodeGroupOptions) NodeGroupOptions {
 	// Set the default TaintSelectionMethod
 	if len(options.TaintSelectionMethods) == 0 {
-		options.TaintSelectionMethods = []string{"oldest"}
+		options.TaintSelectionMethods = map[string]float64{
+			"oldest": float64(1),
+		}
 	}
 	return options
 }
 
 // ValidateNodeGroup is a safety check to validate that a nodegroup has valid options
-func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
-	var problems []error
-
+func ValidateNodeGroup(nodegroup NodeGroupOptions) (problems []error) {
 	checkThat := func(cond bool, format string, output ...interface{}) {
 		if !cond {
 			problems = append(problems, fmt.Errorf(format, output...))
@@ -117,8 +118,35 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
 
-	checkThat(len(nodegroup.TaintSelectionMethods) == 1, "taint_selection_methods can only have 1 value")
-	checkThat(stringsInSlice(nodegroup.TaintSelectionMethods, TaintSelectionMethods), fmt.Sprintf("taint_selection_methods can only contain values in %v", TaintSelectionMethods))
+	// We use a custom validation function for taint_selection_method as it is a bit more of a complex option
+	problems = append(problems, validateTaintSelectionMethods(nodegroup.TaintSelectionMethods)...)
+
+	return problems
+}
+
+func validateTaintSelectionMethods(methods map[string]float64) (problems []error) {
+	// Validate length
+	if len(methods) == 0 {
+		problems = append(problems, errors.New("taint_selection_methods must have at least 1 value"))
+	}
+
+	// Validate keys
+	keys := make([]string, 0, len(methods))
+	for key := range methods {
+		keys = append(keys, key)
+	}
+	if !stringsInSlice(keys, TaintSelectionMethods) {
+		problems = append(problems, fmt.Errorf("taint_selection_methods can only contain keys in %v", TaintSelectionMethods))
+	}
+
+	// Validate values
+	total := float64(0)
+	for _, value := range methods {
+		total += value
+	}
+	if total != float64(1) {
+		problems = append(problems, errors.New("taint_selection_methods weights should add up to 1.0"))
+	}
 
 	return problems
 }

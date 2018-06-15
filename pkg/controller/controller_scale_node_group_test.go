@@ -388,7 +388,9 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 					FastNodeRemovalRate:                4,
 					SlowNodeRemovalRate:                2,
 					SoftDeleteGracePeriod:              "1m",
-					TaintSelectionMethods:              []string{"oldest"},
+					TaintSelectionMethods:              map[string]float64{
+						"oldest": 1,
+					},
 				},
 				ListerOptions{},
 			},
@@ -412,7 +414,9 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 					FastNodeRemovalRate:                4,
 					SlowNodeRemovalRate:                2,
 					SoftDeleteGracePeriod:              "5m",
-					TaintSelectionMethods:              []string{"oldest"},
+					TaintSelectionMethods:              map[string]float64{
+						"oldest": 1,
+					},
 				},
 				ListerOptions{},
 			},
