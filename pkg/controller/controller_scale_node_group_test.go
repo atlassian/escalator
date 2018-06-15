@@ -390,7 +390,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				Opts:          opts,
 				stopChan:      nil,
 				nodeGroups:    nodeGroupsState,
-				cloudProvider: testCloudProvider,
+				CloudProvider: testCloudProvider,
 			}
 
 			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
@@ -520,7 +520,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				Opts:          opts,
 				stopChan:      nil,
 				nodeGroups:    nodeGroupsState,
-				cloudProvider: testCloudProvider,
+				CloudProvider: testCloudProvider,
 			}
 
 			// Create a new mock clock

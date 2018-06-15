@@ -30,6 +30,7 @@
     - Exposed Metrics
     - Grafana
     - Recommendations
+- [**Healthcheck**](./healthcheck.md)
 - [**Glossary**](./glossary.md)
         
 ## Package Layout and Usage
