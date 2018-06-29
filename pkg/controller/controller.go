@@ -145,7 +145,7 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 	return
 }
 
-// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
+// scaleNodeGroup performs the core logic of calculating util and selecting a scaling action for a node group
 func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) (int, error) {
 	// list all pods
 	pods, err := nodeGroup.Pods.List()
