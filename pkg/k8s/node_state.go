@@ -3,7 +3,7 @@ package k8s
 import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
 // CreateNodeNameToInfoMap creates a map of schedulercache.NodeInfo which maps node names to nodes and pods to nodes

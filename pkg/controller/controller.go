@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
