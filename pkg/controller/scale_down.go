@@ -43,8 +43,16 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 					toBeDeleted = append(toBeDeleted, candidate)
 				}
 			} else {
-				log.Debugf("node %v not ready for deletion. Hard delete time remaining %v",
+				nodePodsRemaining, ok := k8s.NodePodsRemaining(candidate, opts.nodeGroup.NodeInfoMap)
+				podsRemainingMessage := ""
+				if ok {
+					podsRemainingMessage = fmt.Sprintf("%d pods remaining", nodePodsRemaining)
+				} else {
+					podsRemainingMessage = "unknown number of pods remaining"
+				}
+				log.Debugf("node %v not ready for deletion (%s). Hard delete time remaining %v",
 					candidate.Name,
+					podsRemainingMessage,
 					opts.nodeGroup.Opts.HardDeleteGracePeriodDuration()-now.Sub(*taintedTime),
 				)
 			}

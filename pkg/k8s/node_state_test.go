@@ -178,3 +178,116 @@ func TestNodeEmpty(t *testing.T) {
 	}
 
 }
+
+func TestNodePodsRemaining(t *testing.T) {
+	type args struct {
+		nodes         []*v1.Node
+		pods          []*v1.Pod
+		targetNode    string
+		emptyNodeInfo bool
+	}
+
+	tests := []struct {
+		name string
+		args args
+		wantCount int
+		wantOk bool
+	}{
+		{
+			"empty node",
+			args{
+				[]*v1.Node{
+					test.BuildTestNode(test.NodeOpts{Name: "node-1"}),
+				},
+				[]*v1.Pod{},
+				"node-1",
+				false,
+			},
+			0,
+			true,
+		},
+		{
+			"node missing from nodeinfo map",
+			args{
+				[]*v1.Node{
+					test.BuildTestNode(test.NodeOpts{Name: "node-1"}),
+				},
+				[]*v1.Pod{},
+				"node-1",
+				true,
+			},
+			0,
+			false,
+		},
+		{
+			"node with pods",
+			args{
+				[]*v1.Node{
+					test.BuildTestNode(test.NodeOpts{Name: "node-1"}),
+				},
+				[]*v1.Pod{
+					test.BuildTestPod(test.PodOpts{NodeName: "node-1"}),
+					test.BuildTestPod(test.PodOpts{NodeName: "node-1"}),
+				},
+				"node-1",
+				false,
+			},
+			2,
+			true,
+		},
+		{
+			"node with just daemon sets",
+			args{
+				[]*v1.Node{
+					test.BuildTestNode(test.NodeOpts{Name: "node-1"}),
+				},
+				[]*v1.Pod{
+					test.BuildTestPod(test.PodOpts{NodeName: "node-1", Owner: "DaemonSet"}),
+					test.BuildTestPod(test.PodOpts{NodeName: "node-1", Owner: "DaemonSet"}),
+				},
+				"node-1",
+				false,
+			},
+			0,
+			true,
+		},
+		{
+			"node with daemon sets and pods",
+			args{
+				[]*v1.Node{
+					test.BuildTestNode(test.NodeOpts{Name: "node-1"}),
+				},
+				[]*v1.Pod{
+					test.BuildTestPod(test.PodOpts{NodeName: "node-1", Owner: "DaemonSet"}),
+					test.BuildTestPod(test.PodOpts{NodeName: "node-1"}),
+				},
+				"node-1",
+				false,
+			},
+			1,
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var nodeInfo map[string]*schedulercache.NodeInfo
+			if !tt.args.emptyNodeInfo {
+				nodeInfo = CreateNodeNameToInfoMap(tt.args.pods, tt.args.nodes)
+			}
+
+			var targetNode *v1.Node
+			for _, node := range tt.args.nodes {
+				if node.Name == tt.args.targetNode {
+					targetNode = node
+					break
+				}
+			}
+
+			nodePodsRemaining, ok := NodePodsRemaining(targetNode, nodeInfo)
+			assert.Equal(t, tt.wantCount, nodePodsRemaining)
+			assert.Equal(t, tt.wantOk, ok)
+		})
+	}
+
+}

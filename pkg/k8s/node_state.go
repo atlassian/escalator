@@ -41,19 +41,26 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*sched
 
 // NodeEmpty returns if the node is empty of pods, except for daemonsets
 func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*schedulercache.NodeInfo) bool {
+	nodePodsRemaining, ok := NodePodsRemaining(node, nodeInfoMap)
+	return ok && nodePodsRemaining == 0
+}
+
+// NodeEmpty returns the number of pods on the node, except for daemonset pods
+func NodePodsRemaining(node *v1.Node, nodeInfoMap map[string]*schedulercache.NodeInfo) (int, bool) {
 	nodeInfo, ok := nodeInfoMap[node.Name]
 	if !ok {
 		log.Warningf("could not find node %v in the nodeinfo map", node.Name)
-		return false
+		return 0, false
 	}
 
 	// check all the pods and make sure they're daemonsets
 	// otherwise there are sacred pods still on the node
+	pods := 0
 	for _, pod := range nodeInfo.Pods() {
 		if !PodIsDaemonSet(pod) {
-			return false
+			pods++
 		}
 	}
 
-	return true
+	return pods, true
 }
