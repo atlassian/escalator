@@ -60,6 +60,15 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupsPodEvicted pods evicted during a scale down
+	NodeGroupPodsEvicted = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "node_group_pods_evicted",
+			Namespace: NAMESPACE,
+			Help: "pods evicted during a scale down",
+		},
+		[]string{"node_group"},
+	)
 	// NodeGroupsMemPercent percentage of util of memory
 	NodeGroupsMemPercent = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -194,6 +203,7 @@ func init() {
 	prometheus.MustRegister(NodeGroupNodesUntainted)
 	prometheus.MustRegister(NodeGroupNodesTainted)
 	prometheus.MustRegister(NodeGroupPods)
+	prometheus.MustRegister(NodeGroupPodsEvicted)
 	prometheus.MustRegister(NodeGroupsMemPercent)
 	prometheus.MustRegister(NodeGroupsCPUPercent)
 	prometheus.MustRegister(NodeGroupCPURequest)

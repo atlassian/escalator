@@ -65,6 +65,16 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	}
 
 	if len(toBeDeleted) > 0 {
+		podsRemaining := 0
+		for _, nodeToBeDeleted := range toBeDeleted {
+			nodePodsRemaining, ok := k8s.NodePodsRemaining(nodeToBeDeleted, opts.nodeGroup.NodeInfoMap)
+			if !ok {
+				continue
+			}
+
+			podsRemaining += nodePodsRemaining
+		}
+
 		// Terminate the nodes in the cloud provider
 		err := opts.nodeGroup.CloudProviderNodeGroup.DeleteNodes(toBeDeleted...)
 		if err != nil {
@@ -81,6 +91,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 			return 0, err
 		}
 		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
+		metrics.NodeGroupPodsEvicted.WithLabelValues(opts.nodeGroup.Opts.Name).Add(float64(podsRemaining))
 	}
 
 	return -len(toBeDeleted), nil
