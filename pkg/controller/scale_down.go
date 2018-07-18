@@ -43,8 +43,16 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 					toBeDeleted = append(toBeDeleted, candidate)
 				}
 			} else {
-				log.Debugf("node %v not ready for deletion. Hard delete time remaining %v",
+				nodePodsRemaining, ok := k8s.NodePodsRemaining(candidate, opts.nodeGroup.NodeInfoMap)
+				podsRemainingMessage := ""
+				if ok {
+					podsRemainingMessage = fmt.Sprintf("%d pods remaining", nodePodsRemaining)
+				} else {
+					podsRemainingMessage = "unknown number of pods remaining"
+				}
+				log.Debugf("node %v not ready for deletion (%s). Hard delete time remaining %v",
 					candidate.Name,
+					podsRemainingMessage,
 					opts.nodeGroup.Opts.HardDeleteGracePeriodDuration()-now.Sub(*taintedTime),
 				)
 			}
@@ -57,6 +65,16 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	}
 
 	if len(toBeDeleted) > 0 {
+		podsRemaining := 0
+		for _, nodeToBeDeleted := range toBeDeleted {
+			nodePodsRemaining, ok := k8s.NodePodsRemaining(nodeToBeDeleted, opts.nodeGroup.NodeInfoMap)
+			if !ok {
+				continue
+			}
+
+			podsRemaining += nodePodsRemaining
+		}
+
 		// Terminate the nodes in the cloud provider
 		err := opts.nodeGroup.CloudProviderNodeGroup.DeleteNodes(toBeDeleted...)
 		if err != nil {
@@ -73,6 +91,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 			return 0, err
 		}
 		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
+		metrics.NodeGroupPodsEvicted.WithLabelValues(opts.nodeGroup.Opts.Name).Add(float64(podsRemaining))
 	}
 
 	return -len(toBeDeleted), nil
