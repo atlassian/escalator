@@ -221,17 +221,8 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
 	metrics.NodeGroupCPUCapacity.WithLabelValues(nodegroup).Set(float64(cpuCapacity.MilliValue()))
-
-	bytesMemCap, ok := memCapacity.AsInt64()
-	if !ok {
-		log.Error("unable to get memCapacity as int64")
-	}
-	bytesMemReq, ok := memRequest.AsInt64()
-	if !ok {
-		log.Error("unable to get memRequest as int64")
-	}
-	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(bytesMemCap))
-	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(bytesMemReq))
+	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(memCapacity.MilliValue() / 1000))
+	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(memRequest.MilliValue() / 1000))
 
 	// If we ever get into a state where we have less nodes than the minimum
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
