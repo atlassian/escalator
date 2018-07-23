@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -33,7 +33,7 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
-	NodeInfoMap map[string]*schedulercache.NodeInfo
+	NodeInfoMap map[string]*cache.NodeInfo
 
 	CloudProviderNodeGroup cloudprovider.NodeGroup
 
