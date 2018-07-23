@@ -28,7 +28,7 @@ func TestPodIsStatic(t *testing.T) {
 	pod := test.BuildTestPod(test.PodOpts{})
 
 	assert.True(t, k8s.PodIsStatic(staticPod))
-	assert.False(t, k8s.PodIsDaemonSet(pod))
+	assert.False(t, k8s.PodIsStatic(pod))
 }
 
 func TestCalculatePodsRequestTotal(t *testing.T) {
