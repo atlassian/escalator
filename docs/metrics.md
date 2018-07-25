@@ -30,9 +30,9 @@ These are the metrics that Escalator exposes, and are subject to change:
  
  - **`escalator_node_group_mem_percent`**: percentage of util of memory
  - **`escalator_node_group_cpu_percent`**: percentage of util of cpu
- - **`escalator_node_group_mem_request`**: milli value of node request mem
+ - **`escalator_node_group_mem_request`**: byte value of node request mem
  - **`escalator_node_group_cpu_request`**: milli value of node request cpu
- - **`escalator_node_group_mem_capacity`**: milli value of node Capacity mem
+ - **`escalator_node_group_mem_capacity`**: byte value of node capacity mem
  - **`escalator_node_group_cpu_capacity`**: milli value of node capacity cpu
 
 ### Node Group Scaling

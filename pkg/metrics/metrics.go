@@ -87,12 +87,12 @@ var (
 		},
 		[]string{"node_group"},
 	)
-	// NodeGroupMemRequest milli value of node request mem
+	// NodeGroupMemRequest byte value of node request mem
 	NodeGroupMemRequest = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_group_mem_request",
 			Namespace: NAMESPACE,
-			Help: "milli value of node request mem",
+			Help: "byte value of node request mem",
 		},
 		[]string{"node_group"},
 	)
@@ -105,12 +105,12 @@ var (
 		},
 		[]string{"node_group"},
 	)
-	// NodeGroupMemCapacity milli value of node Capacity mem
+	// NodeGroupMemCapacity byte value of node capacity mem
 	NodeGroupMemCapacity = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_group_mem_capacity",
 			Namespace: NAMESPACE,
-			Help: "milli value of node Capacity mem",
+			Help: "byte value of node capacity mem",
 		},
 		[]string{"node_group"},
 	)
