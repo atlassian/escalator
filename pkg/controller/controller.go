@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -33,7 +33,7 @@ type NodeGroupState struct {
 	Opts NodeGroupOptions
 	*NodeGroupLister
 
-	NodeInfoMap map[string]*schedulercache.NodeInfo
+	NodeInfoMap map[string]*cache.NodeInfo
 
 	CloudProviderNodeGroup cloudprovider.NodeGroup
 
@@ -145,7 +145,7 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 	return
 }
 
-// scaleNodeGroup performs the core logic of calculating util and choosig a scaling action for a node group
+// scaleNodeGroup performs the core logic of calculating util and selecting a scaling action for a node group
 func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState) (int, error) {
 	// list all pods
 	pods, err := nodeGroup.Pods.List()
@@ -220,11 +220,18 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	// Metrics
 	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
-	bytesMemReq, _ := memRequest.AsInt64()
-	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(bytesMemReq))
 	metrics.NodeGroupCPUCapacity.WithLabelValues(nodegroup).Set(float64(cpuCapacity.MilliValue()))
-	bytesMemCap, _ := memCapacity.AsInt64()
+
+	bytesMemCap, ok := memCapacity.AsInt64()
+	if !ok {
+		log.Error("unable to get memCapacity as int64")
+	}
+	bytesMemReq, ok := memRequest.AsInt64()
+	if !ok {
+		log.Error("unable to get memRequest as int64")
+	}
 	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(bytesMemCap))
+	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(bytesMemReq))
 
 	// If we ever get into a state where we have less nodes than the minimum
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {

@@ -178,7 +178,8 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 
 	for _, node := range nodes {
 		if !n.Belongs(node) {
-			return fmt.Errorf("node %v belongs in a different asg than %v", node.Name, n.ID())
+			log.Debugf("instances in ASG: %v", n.Nodes())
+			return fmt.Errorf("node %v, %v belongs in a different asg than %v", node.Name, node.Spec.ProviderID, n.ID())
 		}
 
 		// find which instance this is

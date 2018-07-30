@@ -24,6 +24,7 @@ These are the metrics that Escalator exposes, and are subject to change:
  - **`escalator_node_group_cordoned_nodes`**: nodes considered by specific node groups that are cordoned
  - **`escalator_node_group_nodes`**: nodes considered by specific node groups
  - **`escalator_node_group_pods`**: pods considered by specific node groups
+ - **`escalator_node_group_pods_evicted`**: pods evicted during a scale down
 
 ### Node Group CPU and Memory
  

@@ -12,29 +12,6 @@ import (
 
 // ScaleUp performs the untaint and increase cloud provider node group logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
-	nodesToAdd := opts.nodesDelta
-
-	// check that untainting the nodes doesn't do bring us over max nodes
-	if len(opts.nodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
-		// Clamp it to the max we can untaint
-		nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.nodes)
-		log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
-		if nodesToAdd < 0 {
-			err := fmt.Errorf(
-				"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
-				len(opts.nodes),
-				opts.nodeGroup.Opts.MaxNodes,
-			)
-			log.WithError(err).Error("Cancelling scaleup")
-			return 0, err
-		}
-		opts.nodesDelta = nodesToAdd
-	}
-
-	if opts.nodesDelta <= 0 {
-		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v", opts.nodesDelta)
-		return 0, nil
-	}
 
 	untainted, err := c.scaleUpUntaint(opts)
 	// No nodes were untainted, so we need to scale up cloud provider node group
@@ -45,14 +22,41 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 
 	// remove the number of nodes that were just untainted and the remaining is how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
-	if opts.nodesDelta > 0 {
-		added, err := c.scaleUpCloudProviderNodeGroup(opts)
-		if err != nil {
-			log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
-			return 0, err
+
+	nodesToAdd := opts.nodesDelta
+
+	if nodesToAdd > 0 {
+		// check that untainting the nodes doesn't do bring us over max nodes
+		if len(opts.nodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
+			// Clamp it to the max we can untaint
+			nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.nodes)
+			log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
+			if nodesToAdd < 0 {
+				err := fmt.Errorf(
+					"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
+					len(opts.nodes),
+					opts.nodeGroup.Opts.MaxNodes,
+				)
+				log.WithError(err).Error("Cancelling scaleup")
+				return 0, err
+			}
+			opts.nodesDelta = nodesToAdd
 		}
-		opts.nodeGroup.scaleUpLock.lock(added)
-		return untainted + added, nil
+
+		if opts.nodesDelta <= 0 {
+			log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
+			return 0, nil
+		}
+
+		if opts.nodesDelta > 0 {
+			added, err := c.scaleUpCloudProviderNodeGroup(opts)
+			if err != nil {
+				log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
+				return 0, err
+			}
+			opts.nodeGroup.scaleUpLock.lock(added)
+			return untainted + added, nil
+		}
 	}
 
 	return untainted, nil
