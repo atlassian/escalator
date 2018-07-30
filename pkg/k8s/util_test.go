@@ -21,6 +21,16 @@ func TestPodIsDaemonSet(t *testing.T) {
 	assert.False(t, k8s.PodIsDaemonSet(pod))
 }
 
+func TestPodIsStatic(t *testing.T) {
+	staticPod := test.BuildTestPod(test.PodOpts{})
+	staticPod.ObjectMeta.Annotations = make(map[string]string)
+	staticPod.ObjectMeta.Annotations["kubernetes.io/config.source"] = "file"
+	pod := test.BuildTestPod(test.PodOpts{})
+
+	assert.True(t, k8s.PodIsStatic(staticPod))
+	assert.False(t, k8s.PodIsStatic(pod))
+}
+
 func TestCalculatePodsRequestTotal(t *testing.T) {
 	p1 := test.BuildTestPod(test.PodOpts{
 		CPU: []int64{1000},
