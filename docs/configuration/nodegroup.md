@@ -72,6 +72,16 @@ clamp/adjust the scale up amount to create **2** nodes. The new current node cou
 `min_nodes` and `max_nodes` to be larger/smaller than the cloud provider's, the cloud provider may still block the scale
 activity if the activity exceeds the cloud provider's limits.
 
+#### Auto Discovery
+
+`min_nodes` and `max_nodes` can be auto-discovered by Escalator and set to the min and max node values that are
+configured for the node group in the cloud provider. These values are populated only when Escalator starts for the first
+time. If the values in the cloud provider have changed, you will have to stop and restart Escalator for it to pick up
+the new values.
+
+To enable this, set `min_nodes` and `max_nodes` to `0` for the node group in `nodegroups_config.yaml` or simply remove
+the two options from `nodegroups_config.yaml`.
+
 ### `dry_mode`
 
 This flag allows running a specific node group in dry mode. This will ensure Escalator doesn't taint, cordon or modify

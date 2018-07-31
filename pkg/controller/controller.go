@@ -83,6 +83,15 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		if !ok {
 			log.Fatalf("could not find node group \"%v\" on cloud provider", nodeGroupOpts.CloudProviderGroupName)
 		}
+
+		// Set the node group min_nodes and max_nodes options based on the values in the cloud provider
+		if nodeGroupOpts.autoDiscoverMinMaxNodeOptions() {
+			nodeGroupOpts.MinNodes = int(cloudProviderNodeGroup.MinSize())
+			log.Debugf("auto discovered min_nodes = %v for node group %v", nodeGroupOpts.MinNodes, nodeGroupOpts.Name)
+			nodeGroupOpts.MaxNodes = int(cloudProviderNodeGroup.MaxSize())
+			log.Debugf("auto discovered max_nodes = %v for node group %v", nodeGroupOpts.MaxNodes, nodeGroupOpts.Name)
+		}
+
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:                   nodeGroupOpts,
 			NodeGroupLister:        client.Listers[nodeGroupOpts.Name],
