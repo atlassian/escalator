@@ -16,8 +16,19 @@ Flags:
       --nodegroups=NODEGROUPS  Config file for nodegroups
       --drymode                master drymode argument. If true, forces drymode on all nodegroups
       --cloud-provider=aws     Cloud provider to use. Available options: (aws)
-      --aws-assume-role-arn=AWS-ASSUME-ROLE-ARN  
+      --aws-assume-role-arn=AWS-ASSUME-ROLE-ARN
                                AWS role arn to assume. Only usable when using the aws cloud provider. Example: arn:aws:iam::111111111111:role/escalator
+      --leader-elect           Enable leader election
+      --leader-elect-lease-duration=15s
+                               Leader election lease duration
+      --leader-elect-renew-deadline=10s
+                               Leader election renew deadline
+      --leader-elect-retry-period=2s
+                               Leader election retry period
+      --leader-elect-config-namespace="kube-system"
+                               Leader election config map namespace
+      --leader-elect-config-name="escalator-leader-elect"
+                               Leader election config map name
 ```
 
 ## Options
@@ -91,3 +102,27 @@ The cloud provider to use. Cloud provider configuration can be found [here](../d
 ### `--aws-assume-role-arn`
 
 Provides an option to specify an AWS IAM role to assume when Escalator starts. **Only works with AWS Cloud Provider.**
+
+### `--leader-elect`
+
+Enable leader election behaviour. Note that Escalator uses a ConfigMap for the leader lock, not an Endpoint.
+
+### `--leader-elect-lease-duration`
+
+Sets how long a nonleader will wait before it attempts to require the leadership. Measured against time of last observed ack.
+
+### `--leader-elect-renew-deadline`
+
+Sets how long an acting leader will retry refreshing leadership before giving up.
+
+### `--leader-elect-retry-period`
+
+Sets how long all the clients will wait in between attempts of any action.
+
+### `--leader-elect-config-namespace`
+
+Sets the namespace where the configmap used for locking will be created or looked for.
+
+### `--leader-elect-config-name`
+
+Sets the name of the configmap used for locking.

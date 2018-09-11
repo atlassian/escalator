@@ -22,6 +22,7 @@ scaling up the cluster as fast as possible to ensure pods are not left in a pend
 - Does not terminate or factor cordoned nodes into calculations - allows cordoned nodes to persist for debugging 
 - Support for different cloud providers - AWS only at the moment
 - Scaling and utilisation metrics
+- Leader election so you can run a HA Deployment inside a cluster.
 
 The need for this autoscaler is derived from our own experiences with very large batch workloads being scheduled and the
 default autoscaler not scaling up the cluster fast enough. These workloads can't be force-drained by the default 
