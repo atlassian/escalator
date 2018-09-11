@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,21 +14,30 @@ import (
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"gopkg.in/alecthomas/kingpin.v2"
+	coreV1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	loglevel            = kingpin.Flag("loglevel", "Logging level passed into logrus. 4 for info, 5 for debug.").Short('v').Default(fmt.Sprintf("%d", log.InfoLevel)).Int()
-	logfmt              = kingpin.Flag("logfmt", "Set the format of logging output. (json, ascii)").Default("ascii").Enum("ascii", "json")
-	addr                = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
-	scanInterval        = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
-	kubeConfigFile      = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
-	nodegroupConfigFile = kingpin.Flag("nodegroups", "Config file for nodegroups").Required().String()
-	drymode             = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
-	cloudProviderID     = kingpin.Flag("cloud-provider", "Cloud provider to use. Available options: (aws)").Default("aws").Enum("aws")
-	awsAssumeRoleARN    = kingpin.Flag("aws-assume-role-arn", "AWS role arn to assume. Only usable when using the aws cloud provider. Example: arn:aws:iam::111111111111:role/escalator").String()
+	loglevel                   = kingpin.Flag("loglevel", "Logging level passed into logrus. 4 for info, 5 for debug.").Short('v').Default(fmt.Sprintf("%d", log.InfoLevel)).Int()
+	logfmt                     = kingpin.Flag("logfmt", "Set the format of logging output. (json, ascii)").Default("ascii").Enum("ascii", "json")
+	addr                       = kingpin.Flag("address", "Address to listen to for /metrics").Default(":8080").String()
+	scanInterval               = kingpin.Flag("scaninterval", "How often cluster is reevaluated for scale up or down").Default("60s").Duration()
+	kubeConfigFile             = kingpin.Flag("kubeconfig", "Kubeconfig file location").String()
+	nodegroupConfigFile        = kingpin.Flag("nodegroups", "Config file for nodegroups").Required().String()
+	drymode                    = kingpin.Flag("drymode", "master drymode argument. If true, forces drymode on all nodegroups").Bool()
+	cloudProviderID            = kingpin.Flag("cloud-provider", "Cloud provider to use. Available options: (aws)").Default("aws").Enum("aws")
+	awsAssumeRoleARN           = kingpin.Flag("aws-assume-role-arn", "AWS role arn to assume. Only usable when using the aws cloud provider. Example: arn:aws:iam::111111111111:role/escalator").String()
+	leaderElect                = kingpin.Flag("leader-elect", "Enable leader election").Default("false").Bool()
+	leaderElectLeaseDuration   = kingpin.Flag("leader-elect-lease-duration", "Leader election lease duration").Default("15s").Duration()
+	leaderElectRenewDeadline   = kingpin.Flag("leader-elect-renew-deadline", "Leader election renew deadline").Default("10s").Duration()
+	leaderElectRetryPeriod     = kingpin.Flag("leader-elect-retry-period", "Leader election retry period").Default("2s").Duration()
+	leaderElectConfigNamespace = kingpin.Flag("leader-elect-config-namespace", "Leader election config map namespace").Default("kube-system").String()
+	leaderElectConfigName      = kingpin.Flag("leader-elect-config-name", "Leader election config map name").Default("escalator-leader-elect").String()
 )
 
 // cloudProviderBuilder builds the requested cloud provider. aws, gce, etc
@@ -96,12 +107,15 @@ func setupNodeGroups() []controller.NodeGroupOptions {
 }
 
 // setupK8SClient creates the incluster or out of cluster kubernetes config
-func setupK8SClient() kubernetes.Interface {
+func setupK8SClient(kubeConfigFile *string, leaderElect *bool) kubernetes.Interface {
 	var k8sClient kubernetes.Interface
 
 	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
 	if kubeConfigFile != nil && len(*kubeConfigFile) > 0 {
 		log.Info("Using out of cluster config")
+		if *leaderElect {
+			log.Warn("Doing leader election out of cluster is not recommended.")
+		}
 		k8sClient = k8s.NewOutOfClusterClient(*kubeConfigFile)
 	} else {
 		log.Info("Using in cluster config")
@@ -122,7 +136,34 @@ func awaitStopSignal(stopChan chan struct{}) {
 	close(stopChan)
 }
 
+// startLeaderElection creates and starts the leader election
+func startLeaderElection(client kubernetes.Interface, config k8s.LeaderElectConfig) error {
+	eventsScheme := runtime.NewScheme()
+	if err := coreV1.AddToScheme(eventsScheme); err != nil {
+		return err
+	}
+
+	// Start events recorder
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(eventsScheme, coreV1.EventSource{Component: "escalator"})
+
+	// Create leader elector
+	leaderElector, ctx, startedLeading, err := k8s.GetLeaderElector(context.Background(), config, client.CoreV1(), recorder)
+	if err != nil {
+		return err
+	}
+
+	go leaderElector.Run()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-startedLeading:
+		return nil
+	}
+}
+
 func main() {
+
 	kingpin.Parse()
 
 	// setup logging
@@ -138,10 +179,35 @@ func main() {
 	log.Info("Starting with log level", log.GetLevel())
 
 	nodegroups := setupNodeGroups()
-	k8sClient := setupK8SClient()
+	k8sClient := setupK8SClient(kubeConfigFile, leaderElect)
 	cloudBuilder := setupCloudProvider(nodegroups)
 
-	// global stop channel. Close signal will be sent to broadvast a shutdown to everything waiting for it to stop
+	// Thanks to the Kube client's use of glog, and glog's requirement to run
+	// flag.Parse() before logging anything, we need to run flag.Parse here.
+	// But, it will conflict with the Kingpin flag parsing unless we mess with
+	// os.Args. So, we'll save it out, run flag.Parse() and then put it back in case
+	// else needs it. Yeah, I feel as dirty writing this as you do reading it.
+	// Suggestions on how to avoid this problem welcomed.
+	tempArgs := os.Args
+	os.Args = []string{"escalator"}
+	flag.Parse()
+	os.Args = tempArgs
+
+	// If leader election is enabled, do leader election or die
+	if *leaderElect {
+		err := startLeaderElection(k8sClient, k8s.LeaderElectConfig{
+			LeaseDuration: *leaderElectLeaseDuration,
+			RenewDeadline: *leaderElectRenewDeadline,
+			RetryPeriod:   *leaderElectRetryPeriod,
+			Namespace:     *leaderElectConfigNamespace,
+			Name:          *leaderElectConfigName,
+		})
+		if err != nil {
+			log.WithError(err).Fatal("Leader election returned an error")
+		}
+	}
+
+	// global stop channel. Close signal will be sent to broadcast a shutdown to everything waiting for it to stop
 	stopChan := make(chan struct{}, 1)
 	go awaitStopSignal(stopChan)
 
