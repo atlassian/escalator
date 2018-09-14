@@ -5,7 +5,7 @@ metadata:
   name: escalator
   namespace: kube-system
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: escalator
@@ -23,6 +23,7 @@ spec:
         - ./main
         - --nodegroups
         - /opt/conf/nodegroups/nodegroups_config.yaml
+        - --leader-elect
         name: escalator
         ports:
         - containerPort: 8080
