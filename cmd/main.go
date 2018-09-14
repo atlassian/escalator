@@ -136,11 +136,20 @@ func awaitStopSignal(stopChan chan struct{}) {
 	close(stopChan)
 }
 
+func awaitLeaderDeposed(leaderContext context.Context) {
+	// If the leader Context is finished, that's because we stopped leading.
+	// so we will crash.
+	<-leaderContext.Done()
+
+	log.Fatal("Was deposed as leader, exiting.")
+
+}
+
 // startLeaderElection creates and starts the leader election
-func startLeaderElection(client kubernetes.Interface, config k8s.LeaderElectConfig) error {
+func startLeaderElection(client kubernetes.Interface, config k8s.LeaderElectConfig) (context.Context, error) {
 	eventsScheme := runtime.NewScheme()
 	if err := coreV1.AddToScheme(eventsScheme); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Start events recorder
@@ -150,15 +159,15 @@ func startLeaderElection(client kubernetes.Interface, config k8s.LeaderElectConf
 	// Create leader elector
 	leaderElector, ctx, startedLeading, err := k8s.GetLeaderElector(context.Background(), config, client.CoreV1(), recorder)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	go leaderElector.Run()
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return ctx, ctx.Err()
 	case <-startedLeading:
-		return nil
+		return ctx, nil
 	}
 }
 
@@ -195,7 +204,7 @@ func main() {
 
 	// If leader election is enabled, do leader election or die
 	if *leaderElect {
-		err := startLeaderElection(k8sClient, k8s.LeaderElectConfig{
+		leaderContext, err := startLeaderElection(k8sClient, k8s.LeaderElectConfig{
 			LeaseDuration: *leaderElectLeaseDuration,
 			RenewDeadline: *leaderElectRenewDeadline,
 			RetryPeriod:   *leaderElectRetryPeriod,
@@ -205,6 +214,7 @@ func main() {
 		if err != nil {
 			log.WithError(err).Fatal("Leader election returned an error")
 		}
+		go awaitLeaderDeposed(leaderContext)
 	}
 
 	// global stop channel. Close signal will be sent to broadcast a shutdown to everything waiting for it to stop

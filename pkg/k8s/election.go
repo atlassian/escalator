@@ -44,7 +44,8 @@ func GetLeaderElector(ctx context.Context, config LeaderElectConfig, client v1.C
 				close(startedLeading)
 			},
 			OnStoppedLeading: func() {
-				log.Warn("Leader status lost")
+				// The context being cancelled will trigger a handler that will
+				// deal with being deposed.
 				cancel()
 			},
 		},
