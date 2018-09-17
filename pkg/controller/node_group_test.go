@@ -1,11 +1,9 @@
-package controller_test
+package controller
 
 import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
@@ -123,7 +121,7 @@ func TestNewPodLabelFilterFunc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := controller.NewPodAffinityFilterFunc(tt.args.labelKey, tt.args.labelValue)
+			f := NewPodAffinityFilterFunc(tt.args.labelKey, tt.args.labelValue)
 			got := f(tt.args.pod)
 			assert.Equal(t, tt.want, got)
 		})
@@ -214,7 +212,7 @@ func TestNewPodDefaultFilterFunc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := controller.NewPodDefaultFilterFunc()
+			f := NewPodDefaultFilterFunc()
 			got := f(tt.args.pod)
 			assert.Equal(t, tt.want, got)
 		})
@@ -297,7 +295,7 @@ func TestNewNodeLabelFilterFunc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := controller.NewNodeLabelFilterFunc(tt.args.labelKey, tt.args.labelValue)
+			f := NewNodeLabelFilterFunc(tt.args.labelKey, tt.args.labelValue)
 			got := f(tt.args.node)
 			assert.Equal(t, tt.want, got)
 		})
@@ -306,8 +304,8 @@ func TestNewNodeLabelFilterFunc(t *testing.T) {
 
 func TestUnmarshalNodeGroupOptions(t *testing.T) {
 	t.Run("test yaml unmarshal good", func(t *testing.T) {
-		yamlReader := strings.NewReader(yaml)
-		opts, err := controller.UnmarshalNodeGroupOptions(yamlReader)
+		yamlReader := strings.NewReader(yamlValid)
+		opts, err := UnmarshalNodeGroupOptions(yamlReader)
 
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(opts))
@@ -333,7 +331,7 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 
 	t.Run("test yaml unmarshal bad", func(t *testing.T) {
 		yamlReader := strings.NewReader(yamlErr)
-		opts, err := controller.UnmarshalNodeGroupOptions(yamlReader)
+		opts, err := UnmarshalNodeGroupOptions(yamlReader)
 
 		assert.Error(t, err)
 		assert.Empty(t, opts)
@@ -341,7 +339,7 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 
 	t.Run("test yaml unmarshal Buildeng good", func(t *testing.T) {
 		yamlReader := strings.NewReader(yamlBE)
-		opts, err := controller.UnmarshalNodeGroupOptions(yamlReader)
+		opts, err := UnmarshalNodeGroupOptions(yamlReader)
 
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(opts))
@@ -360,7 +358,7 @@ var yamlErr = `
 node_groups:
 `
 
-var yaml = `
+var yamlValid = `
 node_groups:
   - name: "buildeng"
     label_key: "customer"
@@ -404,7 +402,7 @@ var yamlBE = `node_groups:
 
 func TestValidateNodeGroup(t *testing.T) {
 	type args struct {
-		nodegroup controller.NodeGroupOptions
+		nodegroup NodeGroupOptions
 	}
 	tests := []struct {
 		name string
@@ -414,7 +412,7 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"valid nodegroup",
 			args{
-				controller.NodeGroupOptions{
+				NodeGroupOptions{
 					Name:                               "test",
 					LabelKey:                           "customer",
 					LabelValue:                         "buileng",
@@ -436,7 +434,7 @@ func TestValidateNodeGroup(t *testing.T) {
 		{
 			"invalid nodegroup",
 			args{
-				controller.NodeGroupOptions{
+				NodeGroupOptions{
 					Name:                               "",
 					LabelKey:                           "customer",
 					LabelValue:                         "buileng",
@@ -464,7 +462,7 @@ func TestValidateNodeGroup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errs := controller.ValidateNodeGroup(tt.args.nodegroup)
+			errs := ValidateNodeGroup(tt.args.nodegroup)
 			eq := assert.Equal(t, len(tt.want), len(errs))
 			if eq && errs != nil {
 				for i, err := range errs {
@@ -473,4 +471,12 @@ func TestValidateNodeGroup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodeGroupOptions_autoDiscoverMinMaxNodeOptions(t *testing.T) {
+	options := NodeGroupOptions{MinNodes: 1, MaxNodes: 6}
+	assert.False(t, options.autoDiscoverMinMaxNodeOptions())
+
+	optionsAutoDiscover := NodeGroupOptions{MinNodes: 0, MaxNodes: 0}
+	assert.True(t, optionsAutoDiscover.autoDiscoverMinMaxNodeOptions())
 }

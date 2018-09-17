@@ -82,8 +82,13 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(nodegroup.TaintUpperCapacityThresholdPercent < nodegroup.ScaleUpThresholdPercent,
 		"taint_upper_capacity_threshold_percent must be less than scale_up_threshold_percent")
 
-	checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min_nodes must be less than max_nodes")
-	checkThat(nodegroup.MaxNodes > 0, "max_nodes must be larger than 0")
+	// Allow exclusion of the MinNodes and MaxNodes options so that we can "auto discover" them from the cloud provider
+	if !nodegroup.autoDiscoverMinMaxNodeOptions() {
+		checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min_nodes must be less than max_nodes")
+		checkThat(nodegroup.MaxNodes > 0, "max_nodes must be larger than 0")
+		checkThat(nodegroup.MinNodes > 0, "min_nodes must be larger than 0")
+	}
+
 	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow_node_removal_rate must be less than fast_node_removal_rate")
 
 	checkThat(len(nodegroup.SoftDeleteGracePeriod) > 0, "soft_delete_grace_period must not be empty")
@@ -136,6 +141,11 @@ func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
 	}
 
 	return n.scaleUpCoolDownPeriodDuration
+}
+
+// autoDiscoverMinMaxNodeOptions returns whether the min_nodes and max_nodes options should be "auto-discovered" from the cloud provider
+func (n *NodeGroupOptions) autoDiscoverMinMaxNodeOptions() bool {
+	return n.MinNodes == 0 && n.MaxNodes == 0
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister
