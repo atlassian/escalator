@@ -13,10 +13,12 @@ import (
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
+	"github.com/google/uuid"
 	"gopkg.in/alecthomas/kingpin.v2"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	clientcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 
 	log "github.com/sirupsen/logrus"
@@ -146,18 +148,20 @@ func awaitLeaderDeposed(leaderContext context.Context) {
 }
 
 // startLeaderElection creates and starts the leader election
-func startLeaderElection(client kubernetes.Interface, config k8s.LeaderElectConfig) (context.Context, error) {
+func startLeaderElection(client kubernetes.Interface, resourceLockID string, config k8s.LeaderElectConfig) (context.Context, error) {
 	eventsScheme := runtime.NewScheme()
 	if err := coreV1.AddToScheme(eventsScheme); err != nil {
 		return nil, err
 	}
 
-	// Start events recorder
+	// Start events recorder and get it logging and recording.
 	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(log.Infof)
+	eventBroadcaster.StartRecordingToSink(&clientcorev1.EventSinkImpl{Interface: clientcorev1.New(client.CoreV1().RESTClient()).Events("")})
 	recorder := eventBroadcaster.NewRecorder(eventsScheme, coreV1.EventSource{Component: "escalator"})
 
 	// Create leader elector
-	leaderElector, ctx, startedLeading, err := k8s.GetLeaderElector(context.Background(), config, client.CoreV1(), recorder)
+	leaderElector, ctx, startedLeading, err := k8s.GetLeaderElector(context.Background(), config, client.CoreV1(), recorder, resourceLockID)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +208,15 @@ func main() {
 
 	// If leader election is enabled, do leader election or die
 	if *leaderElect {
-		leaderContext, err := startLeaderElection(k8sClient, k8s.LeaderElectConfig{
+		// Having the resource lock ID be the pod name makes the configmap more human-readable.
+		// Use a UUID as the failure case.
+		var resourceLockID string
+		resourceLockID, isPodNameEnvSet := os.LookupEnv("POD_NAME")
+		if !isPodNameEnvSet {
+			resourceLockID = uuid.New().String()
+		}
+
+		leaderContext, err := startLeaderElection(k8sClient, resourceLockID, k8s.LeaderElectConfig{
 			LeaseDuration: *leaderElectLeaseDuration,
 			RenewDeadline: *leaderElectRenewDeadline,
 			RetryPeriod:   *leaderElectRetryPeriod,

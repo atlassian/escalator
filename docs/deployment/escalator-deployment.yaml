@@ -39,6 +39,14 @@ spec:
           items:
           - key: nodegroups_config.yaml
             path: nodegroups_config.yaml
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: AWS_REGION
+          value: INSERT_A_REGION_HERE
 ---
 apiVersion: v1
 kind: Service
