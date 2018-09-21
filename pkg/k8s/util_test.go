@@ -12,12 +12,12 @@ import (
 )
 
 func TestPodIsDaemonSet(t *testing.T) {
-	deamon := test.BuildTestPod(test.PodOpts{
+	daemon := test.BuildTestPod(test.PodOpts{
 		Owner: "DaemonSet",
 	})
 	pod := test.BuildTestPod(test.PodOpts{})
 
-	assert.True(t, k8s.PodIsDaemonSet(deamon))
+	assert.True(t, k8s.PodIsDaemonSet(daemon))
 	assert.False(t, k8s.PodIsDaemonSet(pod))
 }
 
