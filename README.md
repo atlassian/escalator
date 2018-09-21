@@ -31,8 +31,6 @@ autoscaler and must complete before the node can be terminated.
 ## Planned Features & Development Roadmap
 
 - [#93](https://github.com/atlassian/escalator/issues/93) - Add option to perform a drain before terminating a node
-- [#56](https://github.com/atlassian/escalator/issues/56) - Implement leader election mechanism
-- [#57](https://github.com/atlassian/escalator/issues/57) - Implement healthcheck endpoint
 - [#60](https://github.com/atlassian/escalator/issues/60) - Add additional metrics
 - [#71](https://github.com/atlassian/escalator/issues/71) - Generate unique ID for each scale activity
 
