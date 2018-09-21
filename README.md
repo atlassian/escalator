@@ -22,6 +22,7 @@ scaling up the cluster as fast as possible to ensure pods are not left in a pend
 - Does not terminate or factor cordoned nodes into calculations - allows cordoned nodes to persist for debugging 
 - Support for different cloud providers - AWS only at the moment
 - Scaling and utilisation metrics
+- Leader election so you can run a HA Deployment inside a cluster.
 
 The need for this autoscaler is derived from our own experiences with very large batch workloads being scheduled and the
 default autoscaler not scaling up the cluster fast enough. These workloads can't be force-drained by the default 
@@ -30,8 +31,6 @@ autoscaler and must complete before the node can be terminated.
 ## Planned Features & Development Roadmap
 
 - [#93](https://github.com/atlassian/escalator/issues/93) - Add option to perform a drain before terminating a node
-- [#56](https://github.com/atlassian/escalator/issues/56) - Implement leader election mechanism
-- [#57](https://github.com/atlassian/escalator/issues/57) - Implement healthcheck endpoint
 - [#60](https://github.com/atlassian/escalator/issues/60) - Add additional metrics
 - [#71](https://github.com/atlassian/escalator/issues/71) - Generate unique ID for each scale activity
 

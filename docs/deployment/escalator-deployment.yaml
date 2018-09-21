@@ -5,7 +5,7 @@ metadata:
   name: escalator
   namespace: kube-system
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: escalator
@@ -23,6 +23,7 @@ spec:
         - ./main
         - --nodegroups
         - /opt/conf/nodegroups/nodegroups_config.yaml
+        - --leader-elect
         name: escalator
         ports:
         - containerPort: 8080
@@ -30,6 +31,12 @@ spec:
         - name: escalator-nodegroups
           mountPath: /opt/conf/nodegroups
           readOnly: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
       volumes:
       - name: escalator-nodegroups
         configMap:
@@ -38,6 +45,7 @@ spec:
           items:
           - key: nodegroups_config.yaml
             path: nodegroups_config.yaml
+
 ---
 apiVersion: v1
 kind: Service
