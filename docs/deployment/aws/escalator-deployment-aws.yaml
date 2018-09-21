@@ -31,8 +31,13 @@ spec:
         ports:
         - containerPort: 8080
         env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
         - name: AWS_REGION
-          value: us-east-1
+          value: INSERT_A_REGION_HERE
         volumeMounts:
         - name: escalator-nodegroups
           mountPath: /opt/conf/nodegroups

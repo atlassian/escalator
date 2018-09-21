@@ -14,6 +14,11 @@
  - Run Escalator with a low scan interval, for example 30 or 60 seconds. This will ensure Escalator is responsive
    enough during a spike in load or pods.
 
+ - Run Escalator with leader electon enabled, in a HA deployment (that is, >1 replica). Turn this behaviour on with
+   `--leader-elect`, see the [Command line options](./configuration/command-line.md) docs for more info. You can also
+   inspect the leader events with `kubectl describe configmap <configmapname>`, where the default ConfigMap name is
+   `escalator-leader-elect`.
+
 ## Common Issues & Gotchas
 
  - Ensure scale in protection is enabled for the cloud provider node group. This will prevent the cloud provider from
