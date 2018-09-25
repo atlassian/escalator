@@ -206,6 +206,9 @@ func main() {
 	flag.Parse()
 	os.Args = tempArgs
 
+	// start serving metrics endpoint
+	metrics.Start(*addr)
+
 	// If leader election is enabled, do leader election or die
 	if *leaderElect {
 		// Having the resource lock ID be the pod name makes the configmap more human-readable.
@@ -232,9 +235,6 @@ func main() {
 	// global stop channel. Close signal will be sent to broadcast a shutdown to everything waiting for it to stop
 	stopChan := make(chan struct{}, 1)
 	go awaitStopSignal(stopChan)
-
-	// start serving metrics endpoint
-	metrics.Start(*addr)
 
 	// create the controller and run in a loop until the stop signal
 	opts := controller.Opts{
