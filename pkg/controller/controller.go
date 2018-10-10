@@ -99,6 +99,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
+				nodegroup: nodeGroupOpts.Name,
 			},
 		}
 	}
