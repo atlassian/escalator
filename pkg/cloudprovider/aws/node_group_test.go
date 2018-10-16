@@ -115,11 +115,23 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 			nil,
 		},
 		{
+			"ceiling increase",
+			int64(11),
+			[]*autoscaling.Group{
+				{
+					AutoScalingGroupName: aws.String("asg-2"),
+					MaxSize:              aws.Int64(int64(10)),
+					DesiredCapacity:      aws.Int64(int64(9)),
+				},
+			},
+			nil,
+		},
+		{
 			"negative increase",
 			int64(-1),
 			[]*autoscaling.Group{
 				{
-					AutoScalingGroupName: aws.String("asg-2"),
+					AutoScalingGroupName: aws.String("asg-3"),
 					MaxSize:              aws.Int64(int64(10)),
 					DesiredCapacity:      aws.Int64(int64(1)),
 				},
@@ -131,7 +143,7 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 			int64(0),
 			[]*autoscaling.Group{
 				{
-					AutoScalingGroupName: aws.String("asg-3"),
+					AutoScalingGroupName: aws.String("asg-4"),
 					MaxSize:              aws.Int64(int64(10)),
 					DesiredCapacity:      aws.Int64(int64(1)),
 				},
@@ -143,9 +155,9 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 			int64(20),
 			[]*autoscaling.Group{
 				{
-					AutoScalingGroupName: aws.String("asg-4"),
+					AutoScalingGroupName: aws.String("asg-5"),
 					MaxSize:              aws.Int64(int64(10)),
-					DesiredCapacity:      aws.Int64(int64(1)),
+					DesiredCapacity:      aws.Int64(int64(10)),
 				},
 			},
 			errors.New("increasing size will breach maximum node size"),

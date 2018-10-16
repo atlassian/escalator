@@ -156,7 +156,12 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 		return fmt.Errorf("size increase must be positive")
 	}
 
-	if n.TargetSize()+delta > n.MaxSize() {
+	// Eligible for scaling up
+	if n.TargetSize() < n.MaxSize() {
+		if n.TargetSize()+delta > n.MaxSize() {
+			delta = n.MaxSize() - n.TargetSize()
+		}
+	} else {
 		return fmt.Errorf("increasing size will breach maximum node size")
 	}
 
