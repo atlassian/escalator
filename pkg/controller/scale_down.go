@@ -75,8 +75,13 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 			podsRemaining += nodePodsRemaining
 		}
 
+		cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(opts.nodeGroup.Opts.CloudProviderGroupName)
+		if !ok {
+			return 0, fmt.Errorf("cloud provider node group does not exist: %s", opts.nodeGroup.Opts.CloudProviderGroupName)
+		}
+
 		// Terminate the nodes in the cloud provider
-		err := opts.nodeGroup.CloudProviderNodeGroup.DeleteNodes(toBeDeleted...)
+		err := cloudProviderNodeGroup.DeleteNodes(toBeDeleted...)
 		if err != nil {
 			for _, nodeToDelete := range toBeDeleted {
 				log.WithError(err).Errorf("failed to terminate node in cloud provider %v, %v", nodeToDelete.Name, nodeToDelete.Spec.ProviderID)

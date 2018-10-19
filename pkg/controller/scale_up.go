@@ -67,21 +67,26 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 	nodegroupName := opts.nodeGroup.Opts.Name
 	nodesToAdd := int64(opts.nodesDelta)
 
-	if nodesToAdd+opts.nodeGroup.CloudProviderNodeGroup.TargetSize() <= opts.nodeGroup.CloudProviderNodeGroup.MaxSize() {
+	cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(opts.nodeGroup.Opts.CloudProviderGroupName)
+	if !ok {
+		return 0, fmt.Errorf("cloud provider node group does not exist: %s", opts.nodeGroup.Opts.CloudProviderGroupName)
+	}
+
+	if nodesToAdd+cloudProviderNodeGroup.TargetSize() <= cloudProviderNodeGroup.MaxSize() {
 		drymode := c.dryMode(opts.nodeGroup)
 		log.WithField("drymode", drymode).
 			WithField("nodegroup", nodegroupName).
 			Infof("increasing cloud provider node group by %v", nodesToAdd)
 
 		if !drymode {
-			err := opts.nodeGroup.CloudProviderNodeGroup.IncreaseSize(nodesToAdd)
+			err := cloudProviderNodeGroup.IncreaseSize(nodesToAdd)
 			if err != nil {
 				log.Errorf("failed to set cloud provider node group size: %v", err)
 				return 0, err
 			}
 		}
 	} else {
-		return 0, fmt.Errorf("adding %v nodes would breach max cloud provider node group size (%v)", nodesToAdd, opts.nodeGroup.CloudProviderNodeGroup.MaxSize())
+		return 0, fmt.Errorf("adding %v nodes would breach max cloud provider node group size (%v)", nodesToAdd, cloudProviderNodeGroup.MaxSize())
 	}
 
 	return int(nodesToAdd), nil
