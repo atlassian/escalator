@@ -23,26 +23,8 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	// remove the number of nodes that were just untainted and the remaining is how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
 
-	nodesToAdd := opts.nodesDelta
-
-	if nodesToAdd > 0 {
+	if opts.nodesDelta > 0 {
 		// check that untainting the nodes doesn't do bring us over max nodes
-		if len(opts.nodes)+nodesToAdd > opts.nodeGroup.Opts.MaxNodes {
-			// Clamp it to the max we can untaint
-			nodesToAdd = opts.nodeGroup.Opts.MaxNodes - len(opts.nodes)
-			log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", opts.nodeGroup.Opts.MaxNodes, nodesToAdd)
-			if nodesToAdd < 0 {
-				err := fmt.Errorf(
-					"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
-					len(opts.nodes),
-					opts.nodeGroup.Opts.MaxNodes,
-				)
-				log.WithError(err).Error("Cancelling scaleup")
-				return 0, err
-			}
-			opts.nodesDelta = nodesToAdd
-		}
-
 		if opts.nodesDelta <= 0 {
 			log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
 			return 0, nil
@@ -62,17 +44,37 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	return untainted, nil
 }
 
+// Calulates how many new nodes need to be created
+func (c *Controller) calculateNodesToAdd (nodesToAdd int64, TargetSize int64, MaxNodes int64) (int64) {
+	// Clamp it to the max if exceeding max target size
+	if TargetSize + nodesToAdd > MaxNodes {
+		nodesToAdd = MaxNodes - TargetSize
+		log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", MaxNodes, nodesToAdd)
+	}
+	return nodesToAdd
+}
+
 // scaleUpCloudProviderNodeGroup increases the size of the cloud provider node group by opts.nodesDelta
 func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) {
-	nodegroupName := opts.nodeGroup.Opts.Name
-	nodesToAdd := int64(opts.nodesDelta)
 
 	cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(opts.nodeGroup.Opts.CloudProviderGroupName)
 	if !ok {
 		return 0, fmt.Errorf("cloud provider node group does not exist: %s", opts.nodeGroup.Opts.CloudProviderGroupName)
 	}
 
-	if nodesToAdd+cloudProviderNodeGroup.TargetSize() <= cloudProviderNodeGroup.MaxSize() {
+	nodegroupName := opts.nodeGroup.Opts.Name
+	nodesToAdd := c.calculateNodesToAdd(int64(opts.nodesDelta), cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.MaxSize())
+	if nodesToAdd <= 0 {
+		err := fmt.Errorf(
+			"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
+			cloudProviderNodeGroup.TargetSize(),
+			opts.nodeGroup.Opts.MaxNodes,
+		)
+		log.WithError(err).Error("Cancelling scaleup")
+		return 0, err
+	}
+
+	if nodesToAdd > 0 {
 		drymode := c.dryMode(opts.nodeGroup)
 		log.WithField("drymode", drymode).
 			WithField("nodegroup", nodegroupName).
