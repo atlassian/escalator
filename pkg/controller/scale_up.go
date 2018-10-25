@@ -45,9 +45,9 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 }
 
 // Calulates how many new nodes need to be created
-func (c *Controller) calculateNodesToAdd (nodesToAdd int64, TargetSize int64, MaxNodes int64) (int64) {
+func (c *Controller) calculateNodesToAdd(nodesToAdd int64, TargetSize int64, MaxNodes int64) int64 {
 	// Clamp it to the max if exceeding max target size
-	if TargetSize + nodesToAdd > MaxNodes {
+	if TargetSize+nodesToAdd > MaxNodes {
 		nodesToAdd = MaxNodes - TargetSize
 		log.Infof("increasing nodes exceeds maximum (%v). Clamping add amount to (%v)", MaxNodes, nodesToAdd)
 	}
@@ -66,7 +66,7 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 	nodesToAdd := c.calculateNodesToAdd(int64(opts.nodesDelta), cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.MaxSize())
 	if nodesToAdd <= 0 {
 		err := fmt.Errorf(
-			"the number of nodes(%v) is more than specified maximum of %v. Taking no action",
+			"refusing to scaleup up beyond the maximum size of the autoscaling group (TargetSize: %v; MaxNodes: %v). Taking no action",
 			cloudProviderNodeGroup.TargetSize(),
 			opts.nodeGroup.Opts.MaxNodes,
 		)
