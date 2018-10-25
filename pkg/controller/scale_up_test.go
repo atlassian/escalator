@@ -203,48 +203,48 @@ func TestCalculateNodesToAdd(t *testing.T) {
 	type args struct {
 		nodesToAdd int64
 		TargetSize int64
-		MaxNodes int64
+		MaxNodes   int64
 	}
 
 	tests := []struct {
-	    name string
-	    args args
-	    want int64
+		name string
+		args args
+		want int64
 	}{
-	    {
-	        "Regular scale up",
-	        args{
+		{
+			"Regular scale up",
+			args{
 				nodesToAdd: 10,
 				TargetSize: 20,
-				MaxNodes: 50,
+				MaxNodes:   50,
 			},
-	        int64(10),
-	    },
-	    {
-	        "Clamp to ASG ceiling",
-	        args{
+			int64(10),
+		},
+		{
+			"Clamp to ASG ceiling",
+			args{
 				nodesToAdd: 45,
 				TargetSize: 10,
-				MaxNodes: 50,
+				MaxNodes:   50,
 			},
-	        int64(40),
-	    },
+			int64(40),
+		},
 		{
-	        "Already scaled to maximum",
-	        args{
+			"Already scaled to maximum",
+			args{
 				nodesToAdd: 10,
 				TargetSize: 50,
-				MaxNodes: 50,
+				MaxNodes:   50,
 			},
-	        int64(0),
-	    },
+			int64(0),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Controller{}
 			nodesToAdd := c.calculateNodesToAdd(tt.args.nodesToAdd, tt.args.TargetSize, tt.args.MaxNodes)
-            assert.Equal(t, tt.want, nodesToAdd)
-        })
-    }
+			assert.Equal(t, tt.want, nodesToAdd)
+		})
+	}
 }

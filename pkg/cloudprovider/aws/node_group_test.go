@@ -145,7 +145,7 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 				{
 					AutoScalingGroupName: aws.String("asg-4"),
 					MaxSize:              aws.Int64(int64(10)),
-					DesiredCapacity:      aws.Int64(int64(10)),
+					DesiredCapacity:      aws.Int64(int64(1)),
 				},
 			},
 			errors.New("increasing size will breach maximum node size"),
