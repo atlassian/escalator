@@ -35,8 +35,6 @@ type NodeGroupState struct {
 
 	NodeInfoMap map[string]*cache.NodeInfo
 
-	CloudProviderNodeGroup cloudprovider.NodeGroup
-
 	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode
@@ -95,7 +93,6 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
 			Opts:                   nodeGroupOpts,
 			NodeGroupLister:        client.Listers[nodeGroupOpts.Name],
-			CloudProviderNodeGroup: cloudProviderNodeGroup,
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),

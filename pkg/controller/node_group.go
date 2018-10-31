@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -244,7 +243,6 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 type nodeGroupsStateOpts struct {
 	nodeGroups             []NodeGroupOptions
 	client                 Client
-	cloudProviderNodeGroup map[string]cloudprovider.NodeGroup
 }
 
 // BuildNodeGroupsState builds a node group state
@@ -254,7 +252,6 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 		nodeGroupsState[ng.Name] = &NodeGroupState{
 			Opts:                   ng,
 			NodeGroupLister:        opts.client.Listers[ng.Name],
-			CloudProviderNodeGroup: opts.cloudProviderNodeGroup[ng.Name],
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
