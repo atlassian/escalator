@@ -29,6 +29,8 @@ func (l *scaleLock) locked() bool {
 
 // lock locks the scale lock
 func (l *scaleLock) lock(nodes int) {
+	// Using `Add` instead of `Set` to catch locking when already locked
+	metrics.NodeGroupScaleLock.WithLabelValues(l.nodegroup).Add(1.0)
 	if l.isLocked {
 		log.Warn("Scale lock already locked")
 	}
@@ -42,11 +44,13 @@ func (l *scaleLock) lock(nodes int) {
 func (l *scaleLock) unlock() {
 	// Only if it's already locked, otherwise noop; handles frequent forced unlocking from the locked() call to avoid spurious metrics submission
 	if l.isLocked {
-		lockDuration := float64(time.Now().Sub(l.lockTime)) / 1000000000
-		log.Debug(fmt.Sprintf("Unlocking scale lock. Lock Duration: %0.0e Node Group: %s", lockDuration, l.nodegroup))
+		// Recording the lock duration in seconds, if $cloud provider could do scaling in nanosecond resolution; good problem to have.
+		lockDuration := time.Now().Sub(l.lockTime).Seconds()
+		log.Debug(fmt.Sprintf("Unlocking scale lock. Lock Duration: %0.0f s Node Group: %s", lockDuration, l.nodegroup))
 		l.isLocked = false
 		l.requestedNodes = 0
 		metrics.NodeGroupScaleLockDuration.WithLabelValues(l.nodegroup).Observe(lockDuration)
+		metrics.NodeGroupScaleLock.WithLabelValues(l.nodegroup).Set(0.0)
 	}
 }
 

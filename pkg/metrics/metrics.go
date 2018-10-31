@@ -142,8 +142,8 @@ var (
 		[]string{"node_group"},
 	)
 	// NodeGroupScaleLock indicates if the nodegroup is locked from scaling
-	NodeGroupScaleLock = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	NodeGroupScaleLock = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "node_group_scale_lock",
 			Namespace: NAMESPACE,
 			Help: "indicates if the nodegroup is locked from scaling",
@@ -151,11 +151,12 @@ var (
 		[]string{"node_group"},
 	)
 	// NodeGroupScaleLockDuration indicates how long the nodegroup is locked from scaling
-	NodeGroupScaleLockDuration = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	NodeGroupScaleLockDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Name: "node_group_scale_lock_duration",
 			Namespace: NAMESPACE,
 			Help: "indicates how long the nodegroup is locked from scaling",
+			Buckets: []float64{1, 2, 3, 5, 8, 13, 21, 34, 55},
 		},
 		[]string{"node_group"},
 	)
