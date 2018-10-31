@@ -21,6 +21,7 @@ type scaleLock struct {
 // locked returns whether the scale lock is locked
 func (l *scaleLock) locked() bool {
 	if time.Now().Sub(l.lockTime) < l.minimumLockDuration {
+		metrics.NodeGroupScaleLockCheckWasLocked.WithLabelValues(l.nodegroup).Add(1.0)
 		return true
 	}
 	l.unlock()
