@@ -12,7 +12,7 @@ build: $(TARGET)
 
 setup: vendor
 
-vendor: Gopkg.lock Gopkg.toml
+vendor: Gopkg.lock
 	dep ensure -vendor-only $(GOCMDOPTS)
 
 test:
@@ -32,3 +32,9 @@ clean:
 
 distclean: clean
 	rm -rf vendor
+
+Gopkg.lock: Gopkg.toml
+	dep ensure -update $(GOCMDOPTS)
+
+Gopkg.toml: $(SOURCES)
+	@if ! dep check; then touch $@; fi;
