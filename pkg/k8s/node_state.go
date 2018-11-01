@@ -23,6 +23,7 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*cache
 			nodeNameToNodeInfo[node.Name] = cache.NewNodeInfo()
 		}
 		nodeNameToNodeInfo[node.Name].SetNode(node)
+		log.Debugf("Node creation timestamp %v", node.ObjectMeta.CreationTimestamp)
 	}
 
 	// Some pods may be out of sync with node lists. Removing incomplete node infos.
