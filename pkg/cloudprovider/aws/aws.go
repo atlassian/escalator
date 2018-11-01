@@ -2,12 +2,16 @@ package aws
 
 import (
 	"fmt"
+	"time"
+	"strings"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/metrics"
 	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 )
@@ -22,6 +26,7 @@ func instanceToProviderID(instance *autoscaling.Instance) string {
 // CloudProvider providers an aws cloud provider implementation
 type CloudProvider struct {
 	service    autoscalingiface.AutoScalingAPI
+	ec2_service    ec2iface.EC2API
 	nodeGroups map[string]*NodeGroup
 }
 
@@ -191,6 +196,9 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 			}
 		}
 
+		// TODO: Remove hack to test obtaining instance instantiation time via node termiation
+//		log.Debug(n.NodeInstantiationTime(node))
+
 		input := &autoscaling.TerminateInstanceInAutoScalingGroupInput{
 			InstanceId:                     instanceID,
 			ShouldDecrementDesiredCapacity: awsapi.Bool(true),
@@ -217,6 +225,18 @@ func (n *NodeGroup) Belongs(node *v1.Node) bool {
 	}
 
 	return false
+}
+
+// NodeInstantiationTime retrieves the instantiation time of the backing instance for the node
+func (n *NodeGroup) NodeInstantiationTime(node *v1.Node) time.Time {
+	instanceIds := make([]*string, 0, 1)
+	instanceIds = append(instanceIds, &strings.Split(node.Spec.ProviderID, "/")[4])
+	log.Debug(instanceIds)
+	input := &ec2.DescribeInstancesInput{
+		InstanceIds: instanceIds,
+	}
+	log.Debug(n.provider.ec2_service.DescribeInstances(input))
+	return time.Now()
 }
 
 // DecreaseTargetSize decreases the target size of the node group. This function
