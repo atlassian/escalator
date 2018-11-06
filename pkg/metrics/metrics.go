@@ -151,12 +151,11 @@ var (
 		[]string{"node_group"},
 	)
 	// NodeGroupScaleLockDuration indicates how long the nodegroup is locked from scaling
-	NodeGroupScaleLockDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	NodeGroupScaleLockDuration = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
 			Name: "node_group_scale_lock_duration",
 			Namespace: NAMESPACE,
 			Help: "indicates how long the nodegroup is locked from scaling",
-			Buckets: []float64{1, 2, 3, 5, 8, 13, 21, 34, 55},
 		},
 		[]string{"node_group"},
 	)
