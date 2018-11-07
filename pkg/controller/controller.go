@@ -96,6 +96,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
+				nodegroup: nodeGroupOpts.Name,
 			},
 		}
 	}
@@ -257,15 +258,12 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
 
 	locked := nodeGroup.scaleUpLock.locked()
-	lockVal := 0.0
 	if locked {
 		// don't do anything else until we're unlocked again
-		lockVal = 1.0
 		log.WithField("nodegroup", nodegroup).Info(nodeGroup.scaleUpLock)
 		log.WithField("nodegroup", nodegroup).Info("Waiting for scale to finish")
 		return nodeGroup.scaleUpLock.requestedNodes, nil
 	}
-	metrics.NodeGroupScaleLock.WithLabelValues(nodegroup).Observe(lockVal)
 
 	// Perform the scaling decision
 	maxPercent := math.Max(cpuPercent, memPercent)

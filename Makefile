@@ -1,10 +1,19 @@
-.PHONY: build setup test test-race test-vet docker
+.PHONY: build setup test test-race test-vet docker clean distclean
 
-build:
-	go build -o escalator cmd/main.go
+TARGET=escalator
+# E.g. set this to -v (I.e. GOCMDOPTS=-v via shell) to get the go command to be verbose
+GOCMDOPTS?=
+SOURCES=$(shell for dir in pkg cmd; do if [ -d $$dir ]; then find $$dir -type f -iname '*.go'; fi; done)
 
-setup:
-	dep ensure -vendor-only
+$(TARGET): vendor $(SOURCES)
+	go build $(GOCMDOPTS) -o $(TARGET) cmd/main.go
+
+build: $(TARGET)
+
+setup: vendor
+
+vendor: Gopkg.lock
+	dep ensure -vendor-only $(GOCMDOPTS)
 
 test:
 	go test ./... -cover
@@ -15,5 +24,17 @@ test-race:
 test-vet:
 	go vet ./...
 
-docker:
+docker: Dockerfile
 	docker build -t atlassian/escalator .
+
+clean:
+	rm -f $(TARGET)
+
+distclean: clean
+	rm -rf vendor
+
+Gopkg.lock: Gopkg.toml
+	dep ensure -update $(GOCMDOPTS)
+
+Gopkg.toml: $(SOURCES)
+	@if ! dep check; then touch $@; fi;

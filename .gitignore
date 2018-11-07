@@ -5,3 +5,5 @@ escalator
 
 nodegroups-*.yaml
 .idea/
+
+*.swp

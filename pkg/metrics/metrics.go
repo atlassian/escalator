@@ -142,14 +142,34 @@ var (
 		[]string{"node_group"},
 	)
 	// NodeGroupScaleLock indicates if the nodegroup is locked from scaling
-	NodeGroupScaleLock = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	NodeGroupScaleLock = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "node_group_scale_lock",
 			Namespace: NAMESPACE,
 			Help: "indicates if the nodegroup is locked from scaling",
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupScaleLockDuration indicates how long the nodegroup is locked from scaling
+	NodeGroupScaleLockDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "node_group_scale_lock_duration",
+			Namespace: NAMESPACE,
+			Help: "indicates how long the nodegroup is locked from scaling",
+			Buckets: []float64{60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680, 1740},
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupScaleLockCheckWasLocked indicates how many scale lock `locked()` checks were conduced whilst the lock was held
+	NodeGroupScaleLockCheckWasLocked = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "node_group_scale_lock_check_was_locked",
+			Namespace: NAMESPACE,
+			Help: "indicates how many checks of the nodegroup scale lock were done whilst the lock was held",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupScaleDelta indicates desired change in node group size
 	NodeGroupScaleDelta = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "node_group_scale_delta",
@@ -213,6 +233,8 @@ func init() {
 	prometheus.MustRegister(NodeGroupTaintEvent)
 	prometheus.MustRegister(NodeGroupUntaintEvent)
 	prometheus.MustRegister(NodeGroupScaleLock)
+	prometheus.MustRegister(NodeGroupScaleLockDuration)
+	prometheus.MustRegister(NodeGroupScaleLockCheckWasLocked)
 	prometheus.MustRegister(NodeGroupScaleDelta)
 	prometheus.MustRegister(CloudProviderMinSize)
 	prometheus.MustRegister(CloudProviderMaxSize)
