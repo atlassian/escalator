@@ -156,7 +156,7 @@ var (
 			Name: "node_group_scale_lock_duration",
 			Namespace: NAMESPACE,
 			Help: "indicates how long the nodegroup is locked from scaling",
-			Buckets: []float64{1, 2, 3, 5, 8, 13, 21, 34, 55},
+			Buckets: []float64{60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680, 1740},
 		},
 		[]string{"node_group"},
 	)
