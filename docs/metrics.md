@@ -41,7 +41,7 @@ These are the metrics that Escalator exposes, and are subject to change:
  - **`escalator_node_group_untaint_event`**: indicates a scale up event
  - **`escalator_node_group_scale_lock`**: indicates if the nodegroup is locked from scaling, zero is asserted unlocked, non-zero postivie locked
  - **`escalator_node_group_scale_delta`**: indicates current scale delta
- - **`escalator_node_group_scale_lock_duration`**: summary metric of scale lock durations
+ - **`escalator_node_group_scale_lock_duration`**: histogram metric of scale lock durations, 60 second buckets from 1 … 30.
  - **`escalator_node_group_scale_lock_check_was_locked`**: counter of how many time the lock status was probed and found locked
  
 ### Cloud Provider
