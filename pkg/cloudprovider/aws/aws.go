@@ -196,9 +196,6 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 			}
 		}
 
-		// TODO: Remove hack to test obtaining instance instantiation time via node termiation
-//		log.Debug(n.NodeInstantiationTime(node))
-
 		input := &autoscaling.TerminateInstanceInAutoScalingGroupInput{
 			InstanceId:                     instanceID,
 			ShouldDecrementDesiredCapacity: awsapi.Bool(true),
@@ -228,15 +225,24 @@ func (n *NodeGroup) Belongs(node *v1.Node) bool {
 }
 
 // NodeInstantiationTime retrieves the instantiation time of the backing instance for the node
-func (n *NodeGroup) NodeInstantiationTime(node *v1.Node) time.Time {
+func (c *CloudProvider) NodeInstantiationTime(node *v1.Node) time.Time {
+	var launchTime time.Time
 	instanceIds := make([]*string, 0, 1)
-	instanceIds = append(instanceIds, &strings.Split(node.Spec.ProviderID, "/")[4])
-	log.Debug(instanceIds)
+	// TODO PdZ - Do we need to wrap the following split to avoid crashes from bad data?
+	id := strings.Split(node.Spec.ProviderID, "/")[4]
+	instanceIds = append(instanceIds, &id)
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: instanceIds,
 	}
-	log.Debug(n.provider.ec2_service.DescribeInstances(input))
-	return time.Now()
+	result, err := c.ec2_service.DescribeInstances(input)
+	if err != nil {
+		log.Error("KUBE-1886: Error describing instances - ", err)
+		// TODO PdZ - Assuming we should do something more here than just log.
+	} else {
+		launchTime = *(result.Reservations[0].Instances[0].LaunchTime)
+	}
+
+	return launchTime
 }
 
 // DecreaseTargetSize decreases the target size of the node group. This function

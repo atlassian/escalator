@@ -39,6 +39,10 @@ type NodeGroupState struct {
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker []string
+
+	// used for tracking scale delta across runs, useful for reducing hysteresis
+	scaleDelta int
+	lastScaleOut    time.Time
 }
 
 // Opts provide the Controller with config for runtime
@@ -98,6 +102,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
 				nodegroup: nodeGroupOpts.Name,
 			},
+			scaleDelta:             0,
 		}
 	}
 
@@ -265,6 +270,34 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		return nodeGroup.scaleUpLock.requestedNodes, nil
 	}
 
+	// If we are not locked, we're either init or after a scale event
+	// If the last scale event was a scale out; i.e. nodesDelta > 0
+	// Calculate the k8s registration latencey from cloud provider
+	// resource instantiation
+
+	// Concerned about:
+	// - lock may open before new nodes register and they will be missed
+	if nodeGroup.scaleDelta > 0 {
+		countNewNodes := 0
+
+		for key, nodeInfo := range nodeGroup.NodeInfoMap {
+			nodeRegTime := nodeInfo.Node().ObjectMeta.CreationTimestamp.Time
+			// Check if node registration time newer than last scale out
+			if nodeRegTime.Sub(nodeGroup.lastScaleOut) > 0 {
+				node := nodeInfo.Node()
+				nodeInstTime := c.cloudProvider.NodeInstantiationTime(node)
+				nodeRegistrationLag := nodeRegTime.Sub(nodeInstTime)
+				log.Debugf("Delta between node instantiation time and node registration: %v - %v", key, nodeRegistrationLag)
+				metrics.NodeGroupNodeRegistrationLag.WithLabelValues(nodegroup).Observe(nodeRegistrationLag.Seconds())
+				countNewNodes += 1
+			}
+		}
+
+		if countNewNodes != nodeGroup.scaleDelta {
+			log.Warning("Expected new nodes: %v Actual new nodes: %v", nodeGroup.scaleDelta, countNewNodes)
+		}
+	}
+
 	// Perform the scaling decision
 	maxPercent := math.Max(cpuPercent, memPercent)
 	nodesDelta := 0
@@ -314,6 +347,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// Try to scale up
 		scaleOptions.nodesDelta = nodesDelta
 		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
+		nodeGroup.lastScaleOut = time.Now()
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
@@ -353,6 +387,7 @@ func (c *Controller) RunOnce() {
 		state := c.nodeGroups[nodeGroupOpts.Name]
 		delta, err := c.scaleNodeGroup(nodeGroupOpts.Name, state)
 		metrics.NodeGroupScaleDelta.WithLabelValues(nodeGroupOpts.Name).Set(float64(delta))
+		state.scaleDelta = delta
 		if err != nil {
 			log.Warn(err)
 		}
