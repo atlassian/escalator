@@ -43,6 +43,7 @@ These are the metrics that Escalator exposes, and are subject to change:
  - **`escalator_node_group_scale_delta`**: indicates current scale delta
  - **`escalator_node_group_scale_lock_duration`**: histogram metric of scale lock durations, 60 second buckets from 1 … 30.
  - **`escalator_node_group_scale_lock_check_was_locked`**: counter of how many time the lock status was probed and found locked
+ - **`escalator_node_group_node_registration_lag`**: histogram metric of how long nodes take to become registered in kube from cloud provider instantiation, 60 second buckets from 1 … 30
  
 ### Cloud Provider
  

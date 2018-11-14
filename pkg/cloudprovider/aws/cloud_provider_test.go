@@ -5,7 +5,9 @@ import (
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	"testing"
 )
 
@@ -155,7 +157,7 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				ids = append(ids, id)
 			}
 
-			awsCloudProvider, err := newMockCloudProvider(ids, &service)
+			awsCloudProvider, err := newMockCloudProvider(ids, &service, nil)
 			assert.Equal(t, tt.err, err)
 
 			// Ensure that the node groups that are supposed to exist have been fetched and registered properly
@@ -190,7 +192,8 @@ func TestCloudProvider_Refresh(t *testing.T) {
 	awsCloudProvider, err := newMockCloudProvider(nodeGroups, &test.MockAutoscalingService{
 		DescribeAutoScalingGroupsOutput: resp,
 		DescribeAutoScalingGroupsErr:    nil,
-	})
+	},
+		nil)
 	assert.Nil(t, err)
 
 	// Ensure the node group is registered
@@ -216,5 +219,63 @@ func TestCloudProvider_Refresh(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, id, nodeGroup.ID())
 		assert.Equal(t, updatedDesiredCapacity, nodeGroup.TargetSize())
+	}
+}
+
+func TestCloudProvider_GetInstance(t *testing.T) {
+	tests := []struct {
+		name     string
+		response *ec2.DescribeInstancesOutput
+		err      error
+	}{
+		{
+			"error describing instances",
+			nil,
+			fmt.Errorf("I like π"),
+		},
+		{
+			"error in reservation count",
+			&ec2.DescribeInstancesOutput{},
+			fmt.Errorf("Malformed DescribeInstances response from AWS, expected only 1 Reservation and 1 Instance for id: abc123"),
+		},
+		{
+			"error in instances count",
+			&ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{}},
+			fmt.Errorf("Malformed DescribeInstances response from AWS, expected only 1 Reservation and 1 Instance for id: abc123"),
+		},
+		{
+			"successful retrieval",
+			&ec2.DescribeInstancesOutput{Reservations: []*ec2.Reservation{{Instances: []*ec2.Instance{{}}}}},
+			nil,
+		},
+	}
+
+	nodeGroups := []string{"1"}
+	node := &v1.Node{
+		Spec: v1.NodeSpec{
+			ProviderID: "aws:///us-east-2b/abc123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock ec2 service
+			ec2_service := &test.MockEc2Service{
+				DescribeInstancesOutput: tt.response,
+				DescribeInstancesErr:    tt.err,
+			}
+
+			awsCloudProvider, err := newMockCloudProvider(nodeGroups, nil, ec2_service)
+
+			assert.Nil(t, err)
+
+			instance, err := awsCloudProvider.GetInstance(node)
+			assert.Equal(t, tt.err, err)
+			if tt.err != nil {
+				assert.Nil(t, instance)
+			} else {
+				assert.NotNil(t, instance)
+			}
+		})
 	}
 }

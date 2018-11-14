@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -42,9 +43,13 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 	service := autoscaling.New(sess, &aws.Config{
 		Credentials: creds,
 	})
+	ec2_service := ec2.New(sess, &aws.Config{
+		Credentials: creds,
+	})
 	cloud := &CloudProvider{
-		service:    service,
-		nodeGroups: make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupIDs)),
+		service:     service,
+		ec2_service: ec2_service,
+		nodeGroups:  make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupIDs)),
 	}
 
 	// Register the node groups

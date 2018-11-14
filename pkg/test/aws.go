@@ -4,6 +4,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
 type MockAutoscalingService struct {
@@ -30,4 +32,16 @@ func (m MockAutoscalingService) SetDesiredCapacity(*autoscaling.SetDesiredCapaci
 
 func (m MockAutoscalingService) TerminateInstanceInAutoScalingGroup(*autoscaling.TerminateInstanceInAutoScalingGroupInput) (*autoscaling.TerminateInstanceInAutoScalingGroupOutput, error) {
 	return m.TerminateInstanceInAutoScalingGroupOutput, m.TerminateInstanceInAutoScalingGroupErr
+}
+
+type MockEc2Service struct {
+	ec2iface.EC2API
+	*client.Client
+
+	DescribeInstancesOutput *ec2.DescribeInstancesOutput
+	DescribeInstancesErr    error
+}
+
+func (m MockEc2Service) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
+	return m.DescribeInstancesOutput, m.DescribeInstancesErr
 }

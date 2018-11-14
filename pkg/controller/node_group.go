@@ -241,8 +241,8 @@ func NewDefaultNodeGroupLister(allPodsLister v1lister.PodLister, allNodesLister 
 }
 
 type nodeGroupsStateOpts struct {
-	nodeGroups             []NodeGroupOptions
-	client                 Client
+	nodeGroups []NodeGroupOptions
+	client     Client
 }
 
 // BuildNodeGroupsState builds a node group state
@@ -250,12 +250,12 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 	nodeGroupsState := make(map[string]*NodeGroupState)
 	for _, ng := range opts.nodeGroups {
 		nodeGroupsState[ng.Name] = &NodeGroupState{
-			Opts:                   ng,
-			NodeGroupLister:        opts.client.Listers[ng.Name],
+			Opts:            ng,
+			NodeGroupLister: opts.client.Listers[ng.Name],
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
-				nodegroup: ng.Name,
+				nodegroup:           ng.Name,
 			},
 		}
 	}

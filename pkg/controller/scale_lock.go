@@ -15,7 +15,7 @@ type scaleLock struct {
 	lockTime            time.Time
 	minimumLockDuration time.Duration
 	// Needed for metrics label value
-	nodegroup           string
+	nodegroup string
 }
 
 // locked returns whether the scale lock is locked
