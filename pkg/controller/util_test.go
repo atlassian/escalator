@@ -7,6 +7,7 @@ import (
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -199,17 +200,17 @@ func calculatePercentageUsage(pods []*v1.Pod, nodes []*v1.Node) (float64, float6
 
 func TestCalcPercentUsage(t *testing.T) {
 	type args struct {
-		cpuR resource.Quantity
-		memR resource.Quantity
-		cpuA resource.Quantity
-		memA resource.Quantity
+		cpuRequest  resource.Quantity
+		memRequest  resource.Quantity
+		cpuCapacity resource.Quantity
+		memCapacity resource.Quantity
 	}
 	tests := []struct {
-		name string
-		args args
-		cpu  float64
-		mem  float64
-		err  error
+		name        string
+		args        args
+		expectedCPU float64
+		expectedMem float64
+		err         error
 	}{
 		{
 			"basic test",
@@ -262,10 +263,14 @@ func TestCalcPercentUsage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cpu, mem, err := calcPercentUsage(tt.args.cpuR, tt.args.memR, tt.args.cpuA, tt.args.memA)
-			assert.Equal(t, tt.err, err)
-			assert.Equal(t, tt.cpu, cpu)
-			assert.Equal(t, tt.mem, mem)
+			cpu, mem, err := calcPercentUsage(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuCapacity, tt.args.memCapacity)
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, tt.err, err.Error())
+			}
+			assert.Equal(t, tt.expectedCPU, cpu)
+			assert.Equal(t, tt.expectedMem, mem)
 		})
 	}
 }

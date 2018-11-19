@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -169,7 +170,11 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 
 			for _, nodeGroup := range awsCloudProvider.NodeGroups() {
 				err = nodeGroup.IncreaseSize(tt.increaseSize)
-				assert.Equal(t, tt.err, err)
+				if tt.err == nil {
+					require.NoError(t, err)
+				} else {
+					require.EqualError(t, tt.err, err.Error())
+				}
 			}
 		})
 	}
@@ -378,7 +383,11 @@ func TestNodeGroup_DeleteNodes(t *testing.T) {
 				mockAutoScalingService.TerminateInstanceInAutoScalingGroupOutput = group.terminateInstanceInAutoScalingGroupOutput
 				mockAutoScalingService.TerminateInstanceInAutoScalingGroupErr = group.terminateInstanceInAutoScalingGroupErr
 				err := nodeGroup.DeleteNodes(group.nodesToDelete...)
-				assert.Equal(t, group.err, err)
+				if group.err == nil {
+					require.NoError(t, err)
+				} else {
+					require.EqualError(t, group.err, err.Error())
+				}
 			}
 		})
 	}
@@ -457,7 +466,11 @@ func TestNodeGroup_DecreaseSize(t *testing.T) {
 
 			for _, nodeGroup := range awsCloudProvider.NodeGroups() {
 				err = nodeGroup.DecreaseTargetSize(tt.decreaseSize)
-				assert.Equal(t, tt.err, err)
+				if tt.err == nil {
+					require.NoError(t, err)
+				} else {
+					require.EqualError(t, tt.err, err.Error())
+				}
 			}
 		})
 	}

@@ -28,12 +28,12 @@ func calcScaleUpDelta(allNodes []*v1.Node, cpuPercent float64, memPercent float6
 }
 
 // calcPercentUsage helper works out the percentage of cpu and mem for request/capacity
-func calcPercentUsage(cpuR, memR, cpuA, memA resource.Quantity) (float64, float64, error) {
-	if cpuA.MilliValue() == 0 || memA.MilliValue() == 0 {
+func calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity resource.Quantity) (float64, float64, error) {
+	if cpuCapacity.MilliValue() == 0 || memCapacity.MilliValue() == 0 {
 		return 0, 0, errors.New("cannot divide by zero in percent calculation")
 	}
 
-	cpuPercent := float64(cpuR.MilliValue()) / float64(cpuA.MilliValue()) * 100
-	memPercent := float64(memR.MilliValue()) / float64(memA.MilliValue()) * 100
+	cpuPercent := float64(cpuRequest.MilliValue()) / float64(cpuCapacity.MilliValue()) * 100
+	memPercent := float64(memRequest.MilliValue()) / float64(memCapacity.MilliValue()) * 100
 	return cpuPercent, memPercent, nil
 }

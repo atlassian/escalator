@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	time "github.com/stephanos/clock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 )
 
@@ -394,7 +395,11 @@ func TestScaleNodeGroup(t *testing.T) {
 			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
 
 			// Ensure there were no errors
-			assert.Equal(t, tt.err, err)
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, tt.err, err.Error())
+			}
 
 			if nodesDelta <= 0 {
 				return
