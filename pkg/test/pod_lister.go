@@ -1,7 +1,7 @@
 package test
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	listerv1 "k8s.io/client-go/listers/core/v1"

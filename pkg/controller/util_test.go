@@ -1,13 +1,14 @@
 package controller
 
 import (
-	"errors"
+	"testing"
+
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"testing"
 )
 
 func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {

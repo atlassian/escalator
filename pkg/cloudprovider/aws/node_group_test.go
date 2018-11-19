@@ -1,15 +1,16 @@
 package aws
 
 import (
-	"errors"
+	"math/rand"
+	"testing"
+
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"math/rand"
-	"testing"
 )
 
 func TestNodeGroup_ID(t *testing.T) {
