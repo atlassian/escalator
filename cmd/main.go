@@ -110,18 +110,23 @@ func setupNodeGroups() []controller.NodeGroupOptions {
 
 // setupK8SClient creates the incluster or out of cluster kubernetes config
 func setupK8SClient(kubeConfigFile *string, leaderElect *bool) kubernetes.Interface {
-	var k8sClient kubernetes.Interface
-
 	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
 	if kubeConfigFile != nil && len(*kubeConfigFile) > 0 {
 		log.Info("Using out of cluster config")
 		if *leaderElect {
 			log.Warn("Doing leader election out of cluster is not recommended.")
 		}
-		k8sClient = k8s.NewOutOfClusterClient(*kubeConfigFile)
-	} else {
-		log.Info("Using in cluster config")
-		k8sClient = k8s.NewInClusterClient()
+		k8sClient, err := k8s.NewOutOfClusterClient(*kubeConfigFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return k8sClient
+	}
+
+	log.Info("Using in cluster config")
+	k8sClient, err := k8s.NewInClusterClient()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return k8sClient
@@ -181,7 +186,8 @@ func main() {
 
 	// setup logging
 	if *loglevel < 0 || *loglevel > 5 {
-		log.Fatalf("Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)", *loglevel)
+		fmt.Fprintf(os.Stderr, "Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)\n", *loglevel)
+		os.Exit(1)
 	}
 	log.SetLevel(log.Level(*loglevel))
 
@@ -244,6 +250,9 @@ func main() {
 		DryMode:              *drymode,
 		CloudProviderBuilder: cloudBuilder,
 	}
-	c := controller.NewController(opts, stopChan)
-	c.RunForever(true)
+	c, err := controller.NewController(opts, stopChan)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Fatal(c.RunForever(true))
 }

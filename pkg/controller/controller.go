@@ -4,37 +4,31 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/kubernetes/pkg/scheduler/cache"
-
 	"github.com/atlassian/escalator/pkg/cloudprovider"
+	"github.com/atlassian/escalator/pkg/cloudprovider/aws"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-
-	"errors"
-
-	log "github.com/sirupsen/logrus"
+	"k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // Controller contains the core logic of the Autoscaler
 type Controller struct {
-	Client   *Client
-	Opts     Opts
-	stopChan <-chan struct{}
-
+	Client        *Client
+	Opts          Opts
+	stopChan      <-chan struct{}
 	cloudProvider cloudprovider.CloudProvider
-
-	nodeGroups map[string]*NodeGroupState
+	nodeGroups    map[string]*NodeGroupState
 }
 
 // NodeGroupState contains everything about a node group in the current state of the application
 type NodeGroupState struct {
-	Opts NodeGroupOptions
 	*NodeGroupLister
-
+	Opts        NodeGroupOptions
 	NodeInfoMap map[string]*cache.NodeInfo
-
 	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode
@@ -46,9 +40,8 @@ type Opts struct {
 	K8SClient            kubernetes.Interface
 	NodeGroups           []NodeGroupOptions
 	CloudProviderBuilder cloudprovider.Builder
-
-	ScanInterval time.Duration
-	DryMode      bool
+	ScanInterval         time.Duration
+	DryMode              bool
 }
 
 // scaleOpts provides options for a scale function
@@ -62,16 +55,15 @@ type scaleOpts struct {
 }
 
 // NewController creates a new controller with the specified options
-func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
-	client := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
-	if client == nil {
-		log.Fatal("Failed to create controller client")
-		return nil
+func NewController(opts Opts, stopChan <-chan struct{}) (*Controller, error) {
+	client, err := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
+	if err != nil {
+		return nil, errors.New("Failed to create controller client")
 	}
 
 	cloud, err := opts.CloudProviderBuilder.Build()
 	if err != nil {
-		log.Fatal("Failed to create cloudprovider", err)
+		return nil, errors.Wrap(err, "Failed to create cloudprovider")
 	}
 
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
@@ -79,7 +71,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 	for _, nodeGroupOpts := range opts.NodeGroups {
 		cloudProviderNodeGroup, ok := cloud.GetNodeGroup(nodeGroupOpts.CloudProviderGroupName)
 		if !ok {
-			log.Fatalf("could not find node group \"%v\" on cloud provider", nodeGroupOpts.CloudProviderGroupName)
+			return nil, errors.Errorf("could not find node group \"%v\" on cloud provider", nodeGroupOpts.CloudProviderGroupName)
 		}
 
 		// Set the node group min_nodes and max_nodes options based on the values in the cloud provider
@@ -91,12 +83,12 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		}
 
 		nodegroupMap[nodeGroupOpts.Name] = &NodeGroupState{
-			Opts:                   nodeGroupOpts,
-			NodeGroupLister:        client.Listers[nodeGroupOpts.Name],
+			Opts:            nodeGroupOpts,
+			NodeGroupLister: client.Listers[nodeGroupOpts.Name],
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
-				nodegroup: nodeGroupOpts.Name,
+				nodegroup:           nodeGroupOpts.Name,
 			},
 		}
 	}
@@ -107,7 +99,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) *Controller {
 		stopChan:      stopChan,
 		cloudProvider: cloud,
 		nodeGroups:    nodegroupMap,
-	}
+	}, nil
 }
 
 // dryMode is a helper that returns the overall drymode result of the controller and nodegroup
@@ -308,6 +300,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		scaleOptions.nodesDelta = -nodesDelta
 		nodesDeltaResult, err = c.ScaleDown(scaleOptions)
 		if err != nil {
+			switch err.(type) {
+			// early return when node is NOT in expected autoscaling group
+			case *aws.NodeNotInAutoScalingGroup:
+				return 0, err
+			default:
+				log.WithField("nodegroup", nodegroup).Error(err)
+			}
+
 			log.WithField("nodegroup", nodegroup).Error(err)
 		}
 	case nodesDelta > 0:
@@ -322,7 +322,13 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// reap any expired nodes
 		removed, err := c.TryRemoveTaintedNodes(scaleOptions)
 		if err != nil {
-			log.WithField("nodegroup", nodegroup).Error(err)
+			switch err.(type) {
+			// early return when node is NOT in expected autoscaling group
+			case *aws.NodeNotInAutoScalingGroup:
+				return 0, err
+			default:
+				log.WithField("nodegroup", nodegroup).Error(err)
+			}
 		}
 		log.WithField("nodegroup", nodegroup).Infof("Reaper: There were %v empty nodes deleted this round", removed)
 	}
@@ -332,7 +338,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 }
 
 // RunOnce performs the main autoscaler logic once
-func (c *Controller) RunOnce() {
+func (c *Controller) RunOnce() error {
 	startTime := time.Now()
 
 	// try refresh cred a few times if they go stale
@@ -354,20 +360,32 @@ func (c *Controller) RunOnce() {
 		delta, err := c.scaleNodeGroup(nodeGroupOpts.Name, state)
 		metrics.NodeGroupScaleDelta.WithLabelValues(nodeGroupOpts.Name).Set(float64(delta))
 		if err != nil {
-			log.Warn(err)
+			switch err.(type) {
+			// return error which will cause app erroring out
+			case *aws.NodeNotInAutoScalingGroup:
+				return err
+			default:
+				log.Warn(err)
+			}
+
 		}
 	}
 
 	metrics.RunCount.Add(1)
 	endTime := time.Now()
 	log.Debugf("Scaling took a total of %v", endTime.Sub(startTime))
+	return nil
 }
 
 // RunForever starts the autoscaler process and runs once every ScanInterval. blocks thread
-func (c *Controller) RunForever(runImmediately bool) {
+// it always returns a non-nil error
+func (c *Controller) RunForever(runImmediately bool) error {
 	if runImmediately {
 		log.Debug("**********[AUTOSCALER FIRST LOOP]**********")
-		c.RunOnce()
+		err := c.RunOnce()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Start the main loop
@@ -376,11 +394,14 @@ func (c *Controller) RunForever(runImmediately bool) {
 		select {
 		case <-ticker.C:
 			log.Debug("**********[AUTOSCALER MAIN LOOP]**********")
-			c.RunOnce()
+			err := c.RunOnce()
+			if err != nil {
+				return err
+			}
 		case <-c.stopChan:
 			log.Debugf("Stopping main loop")
 			ticker.Stop()
-			return
+			return errors.New("main loop stopped")
 		}
 	}
 }

@@ -310,7 +310,7 @@ func TestNodeGroup_DeleteNodes(t *testing.T) {
 					},
 					&autoscaling.TerminateInstanceInAutoScalingGroupOutput{},
 					nil,
-					errors.New("node instance-3, aws:///us-east-1a/instance-3 belongs in a different asg than asg-1"),
+					&NodeNotInAutoScalingGroup{NodeName: "instance-3", ProviderID: "aws:///us-east-1a/instance-3", NodeGroup: "asg-1"},
 				},
 			},
 		},

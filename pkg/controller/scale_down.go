@@ -2,12 +2,13 @@ package controller
 
 import (
 	"fmt"
-	time "github.com/stephanos/clock"
 	"sort"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider/aws"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	log "github.com/sirupsen/logrus"
+	time "github.com/stephanos/clock"
 	"k8s.io/api/core/v1"
 )
 
@@ -15,8 +16,14 @@ import (
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	removed, err := c.TryRemoveTaintedNodes(opts)
 	if err != nil {
-		// continue instead of exiting, because reaping nodes is separate than tainting
-		log.WithError(err).Warning("Reaping nodes failed")
+		switch err.(type) {
+		// early return when node not in expected autoscaling group is found
+		case *aws.NodeNotInAutoScalingGroup:
+			return 0, err
+		default:
+			// continue instead of exiting, because reaping nodes is separate than tainting
+			log.WithError(err).Warning("Reaping nodes failed")
+		}
 	}
 	log.Infof("Reaper: There were %v empty nodes deleted this round", removed)
 	return c.scaleDownTaint(opts)
