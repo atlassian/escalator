@@ -114,20 +114,10 @@ func setupK8SClient(kubeConfigFile *string, leaderElect *bool) (kubernetes.Inter
 		if *leaderElect {
 			log.Warn("Doing leader election out of cluster is not recommended.")
 		}
-		k8sClient, err := k8s.NewOutOfClusterClient(*kubeConfigFile)
-		if err != nil {
-			return nil, err
-		}
-		return k8sClient, nil
+		return k8s.NewOutOfClusterClient(*kubeConfigFile)
 	}
-
 	log.Info("Using in cluster config")
-	k8sClient, err := k8s.NewInClusterClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return k8sClient, nil
+	return k8s.NewInClusterClient()
 }
 
 // awaitStopSignal awaits termination signals and shutdown gracefully
