@@ -45,7 +45,7 @@ func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, st
 
 	synced := k8s.WaitForSync(3, stopCache, podSync, nodeSync)
 	if !synced {
-		return nil, errors.New("attempted to wait for caches to be synced %d times. Exiting")
+		return nil, errors.Errorf("attempted to wait for caches to be synced %d times. Exiting", 3)
 	}
 
 	endTime := time.Now()

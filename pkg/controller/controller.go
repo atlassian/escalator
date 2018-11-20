@@ -57,12 +57,12 @@ type scaleOpts struct {
 func NewController(opts Opts, stopChan <-chan struct{}) (*Controller, error) {
 	client, err := NewClient(opts.K8SClient, opts.NodeGroups, stopChan)
 	if err != nil {
-		return nil, errors.New("Failed to create controller client")
+		return nil, errors.Wrap(err, "failed to create controller client")
 	}
 
 	cloud, err := opts.CloudProviderBuilder.Build()
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create cloudprovider")
+		return nil, errors.Wrap(err, "failed to create cloudprovider")
 	}
 
 	// turn it into a map of name and nodegroupstate for O(1) lookup and data bundling
@@ -339,7 +339,7 @@ func (c *Controller) RunOnce() error {
 		time.Sleep(5 * time.Second) // sleep to allow kube2iam to fill node with metadata
 		c.cloudProvider, err = c.Opts.CloudProviderBuilder.Build()
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		err = c.cloudProvider.Refresh()
 	}
