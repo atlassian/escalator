@@ -179,7 +179,7 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 	for _, node := range nodes {
 		if !n.Belongs(node) {
 			log.Debugf("instances in ASG: %v", n.Nodes())
-			return &NodeNotInAutoScalingGroup{NodeName: node.Name, ProviderID: node.Spec.ProviderID, NodeGroup: n.ID()}
+			return &cloudprovider.NodeNotInNodeGroup{NodeName: node.Name, ProviderID: node.Spec.ProviderID, NodeGroup: n.ID()}
 		}
 
 		// find which instance this is

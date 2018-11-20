@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/atlassian/escalator/pkg/cloudprovider/aws"
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	log "github.com/sirupsen/logrus"
@@ -18,7 +18,7 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	if err != nil {
 		switch err.(type) {
 		// early return when node not in expected autoscaling group is found
-		case *aws.NodeNotInAutoScalingGroup:
+		case *cloudprovider.NodeNotInNodeGroup:
 			return 0, err
 		default:
 			// continue instead of exiting, because reaping nodes is separate than tainting

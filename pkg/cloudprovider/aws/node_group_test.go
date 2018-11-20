@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -316,7 +317,7 @@ func TestNodeGroup_DeleteNodes(t *testing.T) {
 					},
 					&autoscaling.TerminateInstanceInAutoScalingGroupOutput{},
 					nil,
-					&NodeNotInAutoScalingGroup{NodeName: "instance-3", ProviderID: "aws:///us-east-1a/instance-3", NodeGroup: "asg-1"},
+					&cloudprovider.NodeNotInNodeGroup{NodeName: "instance-3", ProviderID: "aws:///us-east-1a/instance-3", NodeGroup: "asg-1"},
 				},
 			},
 		},

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
-	"github.com/atlassian/escalator/pkg/cloudprovider/aws"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"github.com/pkg/errors"
@@ -285,7 +284,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
 
-	var nodesDeltaResult int
 	scaleOptions := scaleOpts{
 		nodes:          allNodes,
 		taintedNodes:   taintedNodes,
@@ -294,43 +292,35 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Perform a scale up, do nothing or scale down based on the nodes delta
+	var nodesDeltaResult int
+	// actionErr keeps the error of any action below and checked after action
+	// make sure shadowing variable won't be created for it
+	var actionErr error
 	switch {
 	case nodesDelta < 0:
 		// Try to scale down
 		scaleOptions.nodesDelta = -nodesDelta
-		nodesDeltaResult, err = c.ScaleDown(scaleOptions)
-		if err != nil {
-			switch err.(type) {
-			// early return when node is NOT in expected autoscaling group
-			case *aws.NodeNotInAutoScalingGroup:
-				return 0, err
-			default:
-				log.WithField("nodegroup", nodegroup).Error(err)
-			}
-
-			log.WithField("nodegroup", nodegroup).Error(err)
-		}
+		nodesDeltaResult, actionErr = c.ScaleDown(scaleOptions)
 	case nodesDelta > 0:
 		// Try to scale up
 		scaleOptions.nodesDelta = nodesDelta
-		nodesDeltaResult, err = c.ScaleUp(scaleOptions)
-		if err != nil {
-			log.WithField("nodegroup", nodegroup).Error(err)
-		}
+		nodesDeltaResult, actionErr = c.ScaleUp(scaleOptions)
 	default:
 		log.WithField("nodegroup", nodegroup).Info("No need to scale")
 		// reap any expired nodes
-		removed, err := c.TryRemoveTaintedNodes(scaleOptions)
-		if err != nil {
-			switch err.(type) {
-			// early return when node is NOT in expected autoscaling group
-			case *aws.NodeNotInAutoScalingGroup:
-				return 0, err
-			default:
-				log.WithField("nodegroup", nodegroup).Error(err)
-			}
-		}
+		var removed int
+		removed, actionErr = c.TryRemoveTaintedNodes(scaleOptions)
 		log.WithField("nodegroup", nodegroup).Infof("Reaper: There were %v empty nodes deleted this round", removed)
+	}
+
+	if actionErr != nil {
+		switch actionErr.(type) {
+		// early return when node is NOT in expected node group
+		case *cloudprovider.NodeNotInNodeGroup:
+			return 0, actionErr
+		default:
+			log.WithField("nodegroup", nodegroup).Error(actionErr)
+		}
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugf("DeltaScaled: %v", nodesDeltaResult)
@@ -362,7 +352,7 @@ func (c *Controller) RunOnce() error {
 		if err != nil {
 			switch err.(type) {
 			// return error which will cause app erroring out
-			case *aws.NodeNotInAutoScalingGroup:
+			case *cloudprovider.NodeNotInNodeGroup:
 				return err
 			default:
 				log.Warn(err)
