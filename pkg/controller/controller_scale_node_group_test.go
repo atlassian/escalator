@@ -1,14 +1,15 @@
 package controller
 
 import (
-	"errors"
-	time "github.com/stephanos/clock"
 	"testing"
 	duration "time"
 
 	"github.com/atlassian/escalator/pkg/test"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	time "github.com/stephanos/clock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 )
 
@@ -84,7 +85,7 @@ func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 		nodes = append(nodes, test.BuildTestNodes(5, test.NodeOpts{
 			CPU: 1000,
 			Mem: 1000,
-		}) ...)
+		})...)
 
 		client, opts := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
 
@@ -394,7 +395,11 @@ func TestScaleNodeGroup(t *testing.T) {
 			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
 
 			// Ensure there were no errors
-			assert.Equal(t, tt.err, err)
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, tt.err, err.Error())
+			}
 
 			if nodesDelta <= 0 {
 				return

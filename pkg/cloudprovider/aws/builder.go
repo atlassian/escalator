@@ -2,6 +2,8 @@ package aws
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -9,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 // Builder builds the aws cloud provider
@@ -17,12 +18,6 @@ type Builder struct {
 	ProviderOpts cloudprovider.BuildOpts
 	Opts         Opts
 }
-
-type Opts struct {
-	AssumeRoleARN string
-}
-
-const AssumeRoleNamePrefix = "atlassian-escalator"
 
 // Build the cloud provider
 func (b Builder) Build() (cloudprovider.CloudProvider, error) {
