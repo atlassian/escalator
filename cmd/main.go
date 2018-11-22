@@ -14,14 +14,14 @@ import (
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -58,9 +58,7 @@ func (b cloudProviderBuilder) Build() (cloudprovider.CloudProvider, error) {
 			},
 		}.Build()
 	default:
-		err := fmt.Errorf("provider %v does not exist", b.ProviderOpts.ProviderID)
-		log.Fatal(err)
-		return nil, err
+		return nil, errors.Errorf("provider %v does not exist", b.ProviderOpts.ProviderID)
 	}
 }
 
@@ -80,15 +78,15 @@ func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.
 }
 
 // setupNodeGroups reads and validates the nodegroupoptions
-func setupNodeGroups() []controller.NodeGroupOptions {
+func setupNodeGroups() ([]controller.NodeGroupOptions, error) {
 	// nodegroupConfigFile is required by kingpin. Won't get to here if it's not defined
 	configFile, err := os.Open(*nodegroupConfigFile)
 	if err != nil {
-		log.Fatalf("Failed to open configFile: %v", err)
+		return nil, errors.Wrap(err, "failed to open configFile")
 	}
 	nodegroups, err := controller.UnmarshalNodeGroupOptions(configFile)
 	if err != nil {
-		log.Fatalf("Failed to decode configFile: %v", err)
+		return nil, errors.Wrap(err, "failed to decode configFile")
 	}
 
 	// Validate each nodegroup options
@@ -105,26 +103,21 @@ func setupNodeGroups() []controller.NodeGroupOptions {
 		log.WithField("nodegroup", nodegroup.Name).Infof("Registered with drymode %v", nodegroup.DryMode || *drymode)
 	}
 
-	return nodegroups
+	return nodegroups, nil
 }
 
 // setupK8SClient creates the incluster or out of cluster kubernetes config
-func setupK8SClient(kubeConfigFile *string, leaderElect *bool) kubernetes.Interface {
-	var k8sClient kubernetes.Interface
-
+func setupK8SClient(kubeConfigFile *string, leaderElect *bool) (kubernetes.Interface, error) {
 	// if the kubeConfigFile is in the cmdline args then use the out of cluster config
 	if kubeConfigFile != nil && len(*kubeConfigFile) > 0 {
 		log.Info("Using out of cluster config")
 		if *leaderElect {
 			log.Warn("Doing leader election out of cluster is not recommended.")
 		}
-		k8sClient = k8s.NewOutOfClusterClient(*kubeConfigFile)
-	} else {
-		log.Info("Using in cluster config")
-		k8sClient = k8s.NewInClusterClient()
+		return k8s.NewOutOfClusterClient(*kubeConfigFile)
 	}
-
-	return k8sClient
+	log.Info("Using in cluster config")
+	return k8s.NewInClusterClient()
 }
 
 // awaitStopSignal awaits termination signals and shutdown gracefully
@@ -181,7 +174,8 @@ func main() {
 
 	// setup logging
 	if *loglevel < 0 || *loglevel > 5 {
-		log.Fatalf("Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)", *loglevel)
+		fmt.Fprintf(os.Stderr, "Invalid log level %v provided. Must be between 0 (Critical) and 5 (Debug)\n", *loglevel)
+		os.Exit(1)
 	}
 	log.SetLevel(log.Level(*loglevel))
 
@@ -191,8 +185,14 @@ func main() {
 
 	log.Info("Starting with log level", log.GetLevel())
 
-	nodegroups := setupNodeGroups()
-	k8sClient := setupK8SClient(kubeConfigFile, leaderElect)
+	nodegroups, err := setupNodeGroups()
+	if err != nil {
+		log.Fatal(err)
+	}
+	k8sClient, err := setupK8SClient(kubeConfigFile, leaderElect)
+	if err != nil {
+		log.Fatal(err)
+	}
 	cloudBuilder := setupCloudProvider(nodegroups)
 
 	// Thanks to the Kube client's use of glog, and glog's requirement to run
@@ -244,6 +244,9 @@ func main() {
 		DryMode:              *drymode,
 		CloudProviderBuilder: cloudBuilder,
 	}
-	c := controller.NewController(opts, stopChan)
-	c.RunForever(true)
+	c, err := controller.NewController(opts, stopChan)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Fatal(c.RunForever(true))
 }

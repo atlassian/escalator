@@ -21,7 +21,7 @@
   revision = "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a"
 
 [[projects]]
-  digest = "1:08225e25c9af1431a7cd51e07f2461025bad109b5bc49ca1cef9b62f120d0b3b"
+  digest = "1:f65f6b7672aa251f893d182ebf8cedfcc6d5fa0ab23bcb85b3078baf659305f9"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -59,8 +59,8 @@
     "service/sts",
   ]
   pruneopts = "UT"
-  revision = "f557567ff83b93530a0498d4bdb0eb616af70bb3"
-  version = "v1.15.79"
+  revision = "66af558c91f83a793b4a0101f70742062982f611"
+  version = "v1.15.81"
 
 [[projects]]
   branch = "master"
@@ -257,6 +257,14 @@
   version = "v2.0.1"
 
 [[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -294,7 +302,7 @@
     "model",
   ]
   pruneopts = "UT"
-  revision = "b36ad289a3eaecdc52470a19591146a2c0ffb532"
+  revision = "aeab699e26f4d4089dba5e522e5d9babd2adbaf7"
 
 [[projects]]
   branch = "master"
@@ -334,9 +342,12 @@
   revision = "e4ec0ab5053ee441dab6c55d0c3633f275269f72"
 
 [[projects]]
-  digest = "1:18752d0b95816a1b777505a97f71c7467a8445b8ffb55631a7bf779f6ba4fa83"
+  digest = "1:c40d65817cdd41fac9aa7af8bed56927bb2d6d47e4fea566a74880f5c2b1c41e"
   name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  packages = [
+    "assert",
+    "require",
+  ]
   pruneopts = "UT"
   revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
   version = "v1.2.2"
@@ -364,14 +375,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:48b757e61d662021f49a6a0afc67dacae27ee0c3a8f858d927126bcdf49222d3"
+  digest = "1:f343f077a5b0bc3a3788b3a04e24dd417e3e25b2acb529c413e212d2c42416ef"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "UT"
-  revision = "ec83556a53fe16b65c452a104ea9d1e86a671852"
+  revision = "0cf1ed9e522b7dbb416f080a5c8003de9b702bf4"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -472,7 +483,7 @@
   name = "k8s.io/apiextensions-apiserver"
   packages = ["pkg/features"]
   pruneopts = "UT"
-  revision = "3e208dbb243be4948d50e1eda15f08b854b923f3"
+  revision = "e8a638592964bfb3aaacb66d283c483097d1c0a7"
 
 [[projects]]
   digest = "1:b7a7277a24d4ca275a5c8d45dcfd90847fbbfdcd6b0bf43f23777a628cd9515c"
@@ -533,7 +544,7 @@
     "pkg/util/feature",
   ]
   pruneopts = "UT"
-  revision = "509339a012d7be6e5c5192aeafd6bde7e16c7109"
+  revision = "e3c8fa95bba5a5ff9939a62c6ccd51ff3646b350"
 
 [[projects]]
   digest = "1:49beef51d70700465848e7c9d603587850b5af90176c51d3c1d0b6a6f189484f"
@@ -685,11 +696,13 @@
     "github.com/aws/aws-sdk-go/service/ec2",
     "github.com/aws/aws-sdk-go/service/ec2/ec2iface",
     "github.com/google/uuid",
+    "github.com/pkg/errors",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/sirupsen/logrus",
     "github.com/stephanos/clock",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/require",
     "gopkg.in/alecthomas/kingpin.v2",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/errors",

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	v1lister "k8s.io/client-go/listers/core/v1"
@@ -22,7 +23,7 @@ type Client struct {
 
 // NewClient creates a new client wrapper over the k8sclient with some pod and node listers
 // It will wait for the cache to sync before returning
-func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, stopCache <-chan struct{}) *Client {
+func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, stopCache <-chan struct{}) (*Client, error) {
 	// Backing store lister for all pods and nodes
 	podStopChan := make(chan struct{})
 	nodeStopChan := make(chan struct{})
@@ -42,9 +43,10 @@ func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, st
 	log.Info("Waiting for cache to sync...")
 	startTime := time.Now()
 
-	synced := k8s.WaitForSync(3, stopCache, podSync, nodeSync)
+	const waitForSyncTries = 3
+	synced := k8s.WaitForSync(waitForSyncTries, stopCache, podSync, nodeSync)
 	if !synced {
-		log.Fatalf("Attempted to wait for caches to be synced %d times. Exiting..", 3)
+		return nil, errors.Errorf("attempted to wait for caches to be synced %d times. Exiting", waitForSyncTries)
 	}
 
 	endTime := time.Now()
@@ -67,5 +69,5 @@ func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, st
 		allNodeLister,
 	}
 
-	return &client
+	return &client, nil
 }

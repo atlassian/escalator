@@ -64,3 +64,7 @@
 [[override]]
   name = "github.com/docker/distribution"
   branch = "master"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "1.2.2"
