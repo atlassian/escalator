@@ -1,9 +1,10 @@
-.PHONY: build setup test test-race test-vet docker clean distclean
+.PHONY: build setup test test-race test-vet docker clean distclean fmt
 
 TARGET=escalator
 # E.g. set this to -v (I.e. GOCMDOPTS=-v via shell) to get the go command to be verbose
 GOCMDOPTS?=
-SOURCES=$(shell for dir in pkg cmd; do if [ -d $$dir ]; then find $$dir -type f -iname '*.go'; fi; done)
+SRC_DIRS=pkg cmd
+SOURCES=$(shell for dir in $(SRC_DIRS); do if [ -d $$dir ]; then find $$dir -type f -iname '*.go'; fi; done)
 
 $(TARGET): vendor $(SOURCES)
 	go build $(GOCMDOPTS) -o $(TARGET) cmd/main.go
@@ -15,13 +16,13 @@ setup: vendor
 vendor: Gopkg.lock
 	dep ensure -vendor-only $(GOCMDOPTS)
 
-test:
+test: vendor
 	go test ./... -cover
 
-test-race:
+test-race: vendor
 	go test ./... -cover -race
 
-test-vet:
+test-vet: vendor
 	go vet ./...
 
 docker: Dockerfile
@@ -38,3 +39,6 @@ Gopkg.lock: Gopkg.toml
 
 Gopkg.toml: $(SOURCES)
 	@if ! dep check; then touch $@; fi;
+
+fmt:
+	gofmt -w $(SRC_DIRS)

@@ -166,7 +166,8 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 				DescribeAutoScalingGroupsOutput: &autoscaling.DescribeAutoScalingGroupsOutput{
 					AutoScalingGroups: tt.autoScalingGroups,
 				},
-			})
+			},
+				nil)
 			assert.Nil(t, err)
 
 			for _, nodeGroup := range awsCloudProvider.NodeGroups() {
@@ -371,7 +372,7 @@ func TestNodeGroup_DeleteNodes(t *testing.T) {
 			}
 
 			// Create the aws cloud provider
-			awsCloudProvider, err := newMockCloudProvider(nodeGroupNames, &mockAutoScalingService)
+			awsCloudProvider, err := newMockCloudProvider(nodeGroupNames, &mockAutoScalingService, nil)
 			assert.Nil(t, err)
 
 			// Delete nodes from each node group
@@ -462,7 +463,8 @@ func TestNodeGroup_DecreaseSize(t *testing.T) {
 				DescribeAutoScalingGroupsOutput: &autoscaling.DescribeAutoScalingGroupsOutput{
 					AutoScalingGroups: tt.autoScalingGroups,
 				},
-			})
+			},
+				nil)
 			assert.Nil(t, err)
 
 			for _, nodeGroup := range awsCloudProvider.NodeGroups() {

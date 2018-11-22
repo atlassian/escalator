@@ -1,13 +1,18 @@
 package aws
 
 import (
+	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/metrics"
 	awsapi "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 )
@@ -15,14 +20,19 @@ import (
 // ProviderName identifies this module as aws
 const ProviderName = "aws"
 
-func instanceToProviderID(instance *autoscaling.Instance) string {
+func instanceToProviderId(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
+}
+
+func providerIdToInstanceId(providerId string) string {
+	return strings.Split(providerId, "/")[4]
 }
 
 // CloudProvider providers an aws cloud provider implementation
 type CloudProvider struct {
-	service    autoscalingiface.AutoScalingAPI
-	nodeGroups map[string]*NodeGroup
+	service     autoscalingiface.AutoScalingAPI
+	ec2_service ec2iface.EC2API
+	nodeGroups  map[string]*NodeGroup
 }
 
 // Name returns name of the cloud provider.
@@ -97,6 +107,47 @@ func (c *CloudProvider) Refresh() error {
 	}
 
 	return c.RegisterNodeGroups(ids...)
+}
+
+type Instance struct {
+	id          string
+	ec2Instance *ec2.Instance
+}
+
+func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, error) {
+	var instance *Instance
+
+	id := providerIdToInstanceId(node.Spec.ProviderID)
+
+	input := &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{&id},
+	}
+
+	result, err := c.ec2_service.DescribeInstances(input)
+
+	if err != nil {
+		log.Error("Error describing instance - ", err)
+	} else {
+		// There can be only one
+		if len(result.Reservations) != 1 || len(result.Reservations[0].Instances) != 1 {
+			err = errors.New("Malformed DescribeInstances response from AWS, expected only 1 Reservation and 1 Instance for id: " + id)
+		} else {
+			instance = &Instance{
+				id:          id,
+				ec2Instance: result.Reservations[0].Instances[0],
+			}
+		}
+	}
+
+	return instance, err
+}
+
+func (i *Instance) InstantiationTime() time.Time {
+	return *i.ec2Instance.LaunchTime
+}
+
+func (i *Instance) Id() string {
+	return i.id
 }
 
 // NodeGroup implements a aws nodegroup
@@ -185,7 +236,7 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 		// find which instance this is
 		var instanceID *string
 		for _, instance := range n.asg.Instances {
-			if node.Spec.ProviderID == instanceToProviderID(instance) {
+			if node.Spec.ProviderID == instanceToProviderId(instance) {
 				instanceID = instance.InstanceId
 				break
 			}
@@ -241,7 +292,7 @@ func (n *NodeGroup) DecreaseTargetSize(delta int64) error {
 func (n *NodeGroup) Nodes() []string {
 	result := make([]string, 0, len(n.asg.Instances))
 	for _, instance := range n.asg.Instances {
-		result = append(result, instanceToProviderID(instance))
+		result = append(result, instanceToProviderId(instance))
 	}
 
 	return result

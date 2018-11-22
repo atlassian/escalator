@@ -20,7 +20,8 @@ Escalator requires the following IAM policy to be able to properly integrate wit
       "Action": [
         "autoscaling:DescribeAutoScalingGroups",
         "autoscaling:SetDesiredCapacity",
-        "autoscaling:TerminateInstanceInAutoScalingGroup"
+        "autoscaling:TerminateInstanceInAutoScalingGroup",
+        "ec2:DescribeInstances"
       ],
       "Resource": "*"
     }

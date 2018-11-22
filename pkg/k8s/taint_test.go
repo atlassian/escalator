@@ -1,13 +1,13 @@
 package k8s
 
 import (
-	"testing"
-	"time"
 	apiv1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"testing"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
@@ -115,8 +115,8 @@ func TestGetToBeRemovedTime_InvalidValue(t *testing.T) {
 
 	// Add the invalid taint
 	node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
-		Key: ToBeRemovedByAutoscalerKey,
-		Value: "invalid-value", // invalid value, should be current time as a unix timestamp
+		Key:    ToBeRemovedByAutoscalerKey,
+		Value:  "invalid-value", // invalid value, should be current time as a unix timestamp
 		Effect: apiv1.TaintEffectNoSchedule,
 	})
 

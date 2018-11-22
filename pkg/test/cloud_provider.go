@@ -1,6 +1,8 @@
 package test
 
 import (
+	"time"
+
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"k8s.io/api/core/v1"
 )
@@ -45,6 +47,22 @@ func (c *CloudProvider) Refresh() error {
 
 func (c *CloudProvider) RegisterNodeGroup(nodeGroup *NodeGroup) {
 	c.nodeGroups[nodeGroup.id] = nodeGroup
+}
+
+func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, error) {
+	return Instance{}, nil
+}
+
+type Instance struct {
+	id string
+}
+
+func (i Instance) InstantiationTime() time.Time {
+	return time.Now()
+}
+
+func (i Instance) Id() string {
+	return i.id
 }
 
 type NodeGroup struct {

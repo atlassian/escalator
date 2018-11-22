@@ -2,6 +2,7 @@ package cloudprovider
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/api/core/v1"
 )
@@ -24,6 +25,17 @@ type CloudProvider interface {
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
 	Refresh() error
+
+	GetInstance(node *v1.Node) (Instance, error)
+}
+
+// Instance contains convenience functions for extracting common information from CP instances
+type Instance interface {
+	// InstantiationTime gets the time the resource was instantiated
+	InstantiationTime() time.Time
+
+	// Id gets the cloud provider resource identifier
+	Id() string
 }
 
 // NodeGroup contains configuration info and functions to control a set

@@ -188,10 +188,10 @@ func TestNodePodsRemaining(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		args args
+		name      string
+		args      args
 		wantCount int
-		wantOk bool
+		wantOk    bool
 	}{
 		{
 			"empty node",
