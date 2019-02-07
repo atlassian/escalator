@@ -159,7 +159,7 @@ func startLeaderElection(client kubernetes.Interface, resourceLockID string, con
 		return nil, err
 	}
 
-	go leaderElector.Run()
+	go leaderElector.Run(ctx)
 	select {
 	case <-ctx.Done():
 		return ctx, ctx.Err()
