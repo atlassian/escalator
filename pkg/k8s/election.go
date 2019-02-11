@@ -5,7 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
@@ -35,7 +35,7 @@ func GetLeaderElector(ctx context.Context, config LeaderElectConfig, client v1.C
 		RenewDeadline: config.RenewDeadline,
 		RetryPeriod:   config.RetryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(stop <-chan struct{}) {
+			OnStartedLeading: func(ctx context.Context) {
 				log.WithFields(log.Fields{
 					"lock":     resourceLock.Describe(),
 					"identity": resourceLock.Identity(),
