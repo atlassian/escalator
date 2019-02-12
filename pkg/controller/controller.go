@@ -208,6 +208,8 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	log.WithField("nodegroup", nodegroup).Infof("cordoned nodes remaining total: %v", len(cordonedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining untainted: %v", len(untaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining tainted: %v", len(taintedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("Minimum Node: %v", nodeGroup.Opts.MinNodes)
+	log.WithField("nodegroup", nodegroup).Infof("Maximum Node: %v", nodeGroup.Opts.MaxNodes)
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
 	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
@@ -390,6 +392,19 @@ func (c *Controller) RunOnce() error {
 	for _, nodeGroupOpts := range c.Opts.NodeGroups {
 		log.Debugf("**********[START NODEGROUP %v]**********", nodeGroupOpts.Name)
 		state := c.nodeGroups[nodeGroupOpts.Name]
+		// Double check if node group still exists from the cloud provider then retrieve the latest stat
+		cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(nodeGroupOpts.CloudProviderGroupName)
+		if !ok {
+  		err = errors.New("could not find node group!")
+  		return err
+		}
+		// Update the min_nodes and max_nodes based on the latest value from the cloud provider
+		if nodeGroupOpts.autoDiscoverMinMaxNodeOptions() {
+  		state.Opts.MinNodes = int(cloudProviderNodeGroup.MinSize())
+  		log.Debugf("auto discovered min_nodes = %v for node group %v", state.Opts.MinNodes, nodeGroupOpts.Name)
+  		state.Opts.MaxNodes = int(cloudProviderNodeGroup.MaxSize())
+  		log.Debugf("auto discovered max_nodes = %v for node group %v", state.Opts.MaxNodes, nodeGroupOpts.Name)
+		}
 		delta, err := c.scaleNodeGroup(nodeGroupOpts.Name, state)
 		metrics.NodeGroupScaleDelta.WithLabelValues(nodeGroupOpts.Name).Set(float64(delta))
 		state.scaleDelta = delta
