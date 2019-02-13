@@ -172,7 +172,7 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 			log.WithField("drymode", "off").Infof("Tainting node %v", bundle.node.Name)
 
 			// Taint the node
-			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client)
+			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client, nodeGroup.Opts.TaintEffect)
 			if err != nil {
 				log.Errorf("While tainting %v: %v", bundle.node.Name, err)
 			} else {

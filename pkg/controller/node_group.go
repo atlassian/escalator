@@ -40,6 +40,8 @@ type NodeGroupOptions struct {
 
 	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
 
+	TaintEffect v1.TaintEffect `json:"taint_effect,omitempty" yaml:"taint_effect,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration time.Duration
 	hardDeleteGracePeriodDuration time.Duration
@@ -100,7 +102,13 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
 
+	checkThat(validTaintEffect(nodegroup.TaintEffect), "taint_effect must be valid kubernetes taint")
 	return problems
+}
+
+// Empty String is valid value for TaintEffect as AddToBeRemovedTaint method will default to NoSchedule
+func validTaintEffect(taintEffect v1.TaintEffect) bool {
+	return len(taintEffect) == 0 || k8s.TaintEffectTypes[taintEffect]
 }
 
 // SoftDeleteGracePeriodDuration lazily returns/parses the softDeleteGracePeriod string into a duration
