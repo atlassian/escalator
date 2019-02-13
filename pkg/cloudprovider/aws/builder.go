@@ -44,11 +44,11 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 	cloud := &CloudProvider{
 		service:     service,
 		ec2_service: ec2_service,
-		nodeGroups:  make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupIDs)),
+		nodeGroups:  make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupConfigs)),
 	}
 
 	// Register the node groups
-	err = cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupIDs...)
+	err = cloud.RegisterNodeGroups(b.ProviderOpts.NodeGroupConfigs...)
 	if err != nil {
 		return nil, err
 	}

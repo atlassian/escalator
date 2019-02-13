@@ -20,7 +20,7 @@ type CloudProvider interface {
 	GetNodeGroup(string) (NodeGroup, bool)
 
 	// RegisterNodeGroup adds the nodegroup to the list of nodes groups
-	RegisterNodeGroups(...string) error
+	RegisterNodeGroups(...NodeGroupConfig) error
 
 	// Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
@@ -93,6 +93,20 @@ type Builder interface {
 
 // BuildOpts providers all options to create your cloud provider
 type BuildOpts struct {
-	ProviderID   string
-	NodeGroupIDs []string
+	ProviderID       string
+	NodeGroupConfigs []NodeGroupConfig
+}
+
+// NodeGroupConfig contains the configuration for a node group
+type NodeGroupConfig struct {
+	GroupID   string
+	AWSConfig AWSNodeGroupConfig
+}
+
+// AWSNodeGroupConfig contains the AWS cloud provider specific configuration
+// for a node group
+type AWSNodeGroupConfig struct {
+	LaunchTemplateID          string
+	LaunchTemplateVersion     string
+	FleetInstanceReadyTimeout time.Duration
 }

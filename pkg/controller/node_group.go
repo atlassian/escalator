@@ -42,10 +42,23 @@ type NodeGroupOptions struct {
 
 	TaintEffect v1.TaintEffect `json:"taint_effect,omitempty" yaml:"taint_effect,omitempty"`
 
+	AWS AWSNodeGroupOptions `json:"aws" yaml:"aws"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration time.Duration
 	hardDeleteGracePeriodDuration time.Duration
 	scaleUpCoolDownPeriodDuration time.Duration
+}
+
+// AWSNodeGroupOptions represents a nodegroup running on a cluster that is
+// using the AWS cloud provider
+type AWSNodeGroupOptions struct {
+	LaunchTemplateID          string `json:"launch_template_id,omitempty" yaml:"launch_template_id,omitempty"`
+	LaunchTemplateVersion     string `json:"launch_template_version,omitempty" yaml:"launch_template_version,omitempty"`
+	FleetInstanceReadyTimeout string `json:"fleet_instance_ready_timeout,omitempty" yaml:"fleet_instance_ready_timeout,omitempty"`
+
+	// Private variables for storing the parsed duration from the string
+	fleetInstanceReadyTimeout time.Duration
 }
 
 // UnmarshalNodeGroupOptions decodes the yaml or json reader into a struct
@@ -153,6 +166,21 @@ func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
 // autoDiscoverMinMaxNodeOptions returns whether the min_nodes and max_nodes options should be "auto-discovered" from the cloud provider
 func (n *NodeGroupOptions) autoDiscoverMinMaxNodeOptions() bool {
 	return n.MinNodes == 0 && n.MaxNodes == 0
+}
+
+// FleetInstanceReadyTimeoutDuration lazily returns/parses the fleetInstanceReadyTimeout string into a duration
+func (n *AWSNodeGroupOptions) FleetInstanceReadyTimeoutDuration() time.Duration {
+	if n.fleetInstanceReadyTimeout == 0 && n.FleetInstanceReadyTimeout != "" {
+		duration, err := time.ParseDuration(n.FleetInstanceReadyTimeout)
+		if err != nil {
+			return 0
+		}
+		n.fleetInstanceReadyTimeout = duration
+	} else if n.fleetInstanceReadyTimeout == 0 && n.FleetInstanceReadyTimeout == "" {
+		n.fleetInstanceReadyTimeout = 1 * time.Minute
+	}
+
+	return n.fleetInstanceReadyTimeout
 }
 
 // NodeGroupLister is just a light wrapper around a pod lister and node lister

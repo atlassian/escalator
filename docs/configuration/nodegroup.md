@@ -26,6 +26,10 @@ node_groups:
     soft_delete_grace_period: 1m
     hard_delete_grace_period: 10m
     taint_effect: NoExecute
+    aws:
+        fleet_instance_ready_timeout: 1m
+        launch_template_version: lt-1a2b3c4d
+        launch_template_id: "1"
 ```
 
 ## Options
@@ -179,3 +183,44 @@ The valid values are :
 - PreferNoSchedule
 
 IF not set, it will default to NoSchedule.
+
+### `aws.fleet_instance_ready_timeout`
+
+This is an optional field. The default value is 1 minute.
+
+When using the one-shot capacity acquisition for AWS (see `aws.launch_template_id`), this is the maximum amount of time
+that Escalator will block waiting for new EC2 instances to become ready so that they can be added to the node group.
+This roughly corresponds to the amount of time it takes an instance to boot to multi-user mode and for the EC2 control
+plane to notice that it is healthy. This generally takes much less than a minute.
+
+**Note:** Escalator will block other scaling operations for, at most, this amount of time while new capacity comes
+online.
+
+### `aws.launch_template_id`
+
+This value is the launch template ID (of the format `lt-[a-f0-9]{17}`) to use as a template for new instances that are
+acquired using the AWS Fleet API. This value can be obtained through the AWS EC2 console on the Launch Templates page
+or from the `LaunchTemplateId` field returned from the
+[create-launch-template](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-launch-template.html) CLI command
+and AWS API call.
+
+Setting this value and that of `aws.launch_template_version` allows Escalator to use the AWS Fleet API to acquire all
+desired capacity for a scale-up operation at once rather than waiting for an auto-scaling group to add capacity. This
+call may fail if AWS is unable to fulfill all capacity for some reason. Escalator will wait for the acquired capacity
+to become ready on the AWS side and will attach it all to the Escalator managed auto-scaling-group.
+
+The instance types configured in the launch template should match the instance types configured for the auto-scaling
+group. If the auto-scaling group was created using a launch template instead of a launch configuration then that
+template ID should be used here.
+
+**Note:** the AWS Fleet API does not support balancing requested instances by availability zone. When using this
+functionality the desired capacity will be acquire all at once in a single availability zone or not at all. This may
+change in a future update to the API.
+
+### `aws.launch_template_version`
+
+This value is the version of the launch template to use. See `aws.launch_template_id` above. This value should be a
+numeric string. This value can be obtained through the AWS EC2 console on the Launch Templates page or from the
+`LatestVersionNumber` or `DefaultVersionNumber` field returned from the
+[create-launch-template](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-launch-template.html) CLI command
+and AWS API call.
