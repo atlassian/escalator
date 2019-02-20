@@ -19,9 +19,10 @@ import (
 // Value: time.Now().Unix()
 // Effect: NoSchedule | NoExecute | PreferNoSchedule
 
-var TaintEffectTypes  = map[apiv1.TaintEffect]bool{
-	apiv1.TaintEffectNoExecute: true,
-	apiv1.TaintEffectNoSchedule: true,
+// TaintEffectTypes a map of TaintEffect to boolean true used for validating supported taint types
+var TaintEffectTypes = map[apiv1.TaintEffect]bool{
+	apiv1.TaintEffectNoExecute:        true,
+	apiv1.TaintEffectNoSchedule:       true,
 	apiv1.TaintEffectPreferNoSchedule: true,
 }
 
