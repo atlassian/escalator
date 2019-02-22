@@ -218,7 +218,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	// We want to be really simple right now so we don't do anything if we are outside the range of allowed nodes
 	// We assume it is a config error or something bad has gone wrong in the cluster
-	if len(allNodes) == 0 {
+
+	// In case if ASG size is zero, check if there's any pending pods
+	if len(allNodes) == 0 && len(pods) <= 0 {
 		err = errors.New("no nodes remaining")
 		log.WithField("nodegroup", nodegroup).Warning(err.Error())
 		return 0, err
@@ -279,7 +281,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Calc %
+	log.WithField("nodegroup", nodegroup).Debugf("cpuRequest: %v, memRequest: %v", cpuRequest, memRequest)
 	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
+	log.WithField("nodegroup", nodegroup).Debugf("cpuPercent: %v, memPercent: %v", cpuPercent, memPercent)
 	if err != nil {
 		log.Errorf("Failed to calculate percentages: %v", err)
 		return 0, err
@@ -324,6 +328,13 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 			log.Errorf("Failed to calculate node delta: %v", err)
 			return nodesDelta, err
 		}
+	}
+
+	// Special handling of pending pods when there's no running node.
+	// At this point, we know there's nothing we can do for the pending pods. So, let's scale up one node!
+	// If the newly scaled up node cannot handle all the pods, the existing scale up logic will kick in and handle the rest of the remaining pod.
+	if len(allNodes) == 0 && len(pods) > 0 {
+		nodesDelta = 1
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
