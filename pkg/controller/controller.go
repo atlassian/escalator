@@ -220,7 +220,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// We assume it is a config error or something bad has gone wrong in the cluster
 
 	// In case if ASG size is zero, check if there's any pending pods
-	if len(allNodes) == 0 && len(pods) <= 0 {
+	if len(allNodes) == 0 && len(pods) == 0 {
 		err = errors.New("no nodes remaining")
 		log.WithField("nodegroup", nodegroup).Warning(err.Error())
 		return 0, err
