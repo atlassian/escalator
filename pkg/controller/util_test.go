@@ -5,7 +5,6 @@ import (
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
@@ -234,7 +233,7 @@ func TestCalcPercentUsage(t *testing.T) {
 			},
 			0,
 			0,
-			errors.New("cannot divide by zero in percent calculation"),
+			nil,
 		},
 		{
 			"zero numerator test",
@@ -258,7 +257,7 @@ func TestCalcPercentUsage(t *testing.T) {
 			},
 			0,
 			0,
-			errors.New("cannot divide by zero in percent calculation"),
+			nil,
 		},
 	}
 	for _, tt := range tests {

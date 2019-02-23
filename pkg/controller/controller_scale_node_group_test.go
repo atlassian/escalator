@@ -257,7 +257,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			errors.New("cannot divide by zero in percent calculation"),
+			nil,
 		},
 		{
 			"invalid node and pod usage/requests",
@@ -271,7 +271,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			errors.New("cannot divide by zero in percent calculation"),
+			nil,
 		},
 		{
 			"invalid node and pod usage/requests",
@@ -285,7 +285,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			errors.New("cannot divide by zero in percent calculation"),
+			nil,
 		},
 		{
 			"lister not being able to list pods",
