@@ -44,7 +44,7 @@ See [Docs](docs/README.md)
 versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
 - [Dep](https://golang.github.io/dep/). It is recommended to use a recent release from 
 [https://github.com/golang/dep/releases](https://github.com/golang/dep/releases)
-- [Go](https://golang.org/) version 1.10+, but newer versions of Go are highly recommended.
+- [Go](https://golang.org/) version 1.11+, but newer versions of Go are highly recommended.
 - Dependencies and their locked versions can be found in `Gopkg.toml` and `Gopkg.lock`.
 
 ## Building
@@ -105,7 +105,7 @@ go test ./pkg/controller
 Pull requests, issues and comments welcome. For pull requests:
 
 * Add tests for new features and bug fixes
-* Follow the existing style
+* Follow the existing style (we are using [goreturns](https://github.com/sqs/goreturns) to format and lint escalator)
 * Separate unrelated changes into multiple pull requests
 
 See the existing issues for things to start contributing.

@@ -14,18 +14,20 @@ cache:
 go_import_path: github.com/atlassian/escalator
 go:
   - "1.11.x"
-  - "1.10.x"
 
 before_install:
   # Download the binary to bin folder in $GOPATH
   - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
   # Make the binary executable
   - chmod +x $GOPATH/bin/dep
+  # install goreturns for linting
+  - go get -u github.com/sqs/goreturns
 
 install:
   - make setup
 
 script:
+  - make lint
   - make test
   - make test-race
   - make test-vet

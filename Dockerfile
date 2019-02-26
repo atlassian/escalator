@@ -1,4 +1,4 @@
-FROM golang:1.10 as builder
+FROM golang:1.11 as builder
 WORKDIR /go/src/github.com/atlassian/escalator/
 RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 COPY Gopkg.toml Gopkg.lock Makefile ./

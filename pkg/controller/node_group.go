@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	v1lister "k8s.io/client-go/listers/core/v1"
 )

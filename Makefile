@@ -1,4 +1,4 @@
-.PHONY: build setup test test-race test-vet docker clean distclean fmt
+.PHONY: build setup test test-race test-vet docker clean distclean fmt lint
 
 TARGET=escalator
 # E.g. set this to -v (I.e. GOCMDOPTS=-v via shell) to get the go command to be verbose
@@ -40,5 +40,13 @@ Gopkg.lock: Gopkg.toml
 Gopkg.toml: $(SOURCES)
 	@if ! dep check; then touch $@; fi;
 
-fmt:
-	gofmt -w $(SRC_DIRS)
+# goreturns runs both gofmt and goimports.
+# This is used to pickup more comphrehnsive formatting/codestyle changes
+# https://github.com/sqs/goreturns
+fmt: vendor
+	goreturns -w pkg/ cmd/
+
+# the linting also uses goreturns.
+# the lint.sh script reports formatting changes/errors
+lint: vendor
+	./lint.sh

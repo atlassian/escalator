@@ -1,12 +1,13 @@
 package controller
 
 import (
-	"github.com/atlassian/escalator/pkg/test"
-	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/atlassian/escalator/pkg/test"
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestNewPodLabelFilterFunc(t *testing.T) {
