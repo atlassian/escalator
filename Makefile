@@ -25,6 +25,9 @@ test-race: vendor
 test-vet: vendor
 	go vet ./...
 
+lint: vendor
+	gofmt -d -e pkg/ cmd/
+
 docker: Dockerfile
 	docker build -t atlassian/escalator .
 

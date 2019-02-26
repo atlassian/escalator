@@ -26,6 +26,7 @@ install:
   - make setup
 
 script:
+  - make lint
   - make test
   - make test-race
   - make test-vet
