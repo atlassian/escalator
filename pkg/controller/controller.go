@@ -9,7 +9,7 @@ import (
 	"github.com/atlassian/escalator/pkg/metrics"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/scheduler/cache"
 )
@@ -152,7 +152,7 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 func (c *Controller) calculateNewNodeMetrics(nodegroup string, nodeGroup *NodeGroupState) {
 	// If we are not locked, we're either init or after a scale event
 	// If the last scale event was a scale out; i.e. nodesDelta > 0
-	// Calculate the k8s registration latencey from cloud provider
+	// Calculate the k8s registration latency from cloud provider
 	// resource instantiation
 
 	// Concerned about:
@@ -172,7 +172,7 @@ func (c *Controller) calculateNewNodeMetrics(nodegroup string, nodeGroup *NodeGr
 					nodeRegistrationLag := nodeRegTime.Sub(instance.InstantiationTime())
 					log.Debugf("Delta between node instantiation time and node registration: %v - %v", key, nodeRegistrationLag)
 					metrics.NodeGroupNodeRegistrationLag.WithLabelValues(nodegroup).Observe(nodeRegistrationLag.Seconds())
-					countNewNodes += 1
+					countNewNodes++
 				}
 			}
 		}
@@ -405,7 +405,7 @@ func (c *Controller) RunOnce() error {
 		// Double check if node group still exists from the cloud provider then retrieve the latest stat
 		cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(nodeGroupOpts.CloudProviderGroupName)
 		if !ok {
-			err = errors.New("could not find node group!")
+			err = errors.New("could not find node group")
 			return err
 		}
 		// Update the min_nodes and max_nodes based on the latest value from the cloud provider

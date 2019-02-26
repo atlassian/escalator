@@ -7,7 +7,7 @@ import (
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -177,10 +177,10 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 
 			// Calculate the scale up percentage after adding the new nodes
 			// Both of the percentages should be below the scale up threshold percent
-			newCpuPercent, newMemPercent, _ := calculatePercentageUsage(tt.args.pods, newNodes)
+			newCPUPercent, newMemPercent, _ := calculatePercentageUsage(tt.args.pods, newNodes)
 
 			threshold := float64(tt.args.nodeGroup.Opts.ScaleUpThresholdPercent)
-			assert.True(t, newCpuPercent <= threshold, "New CPU percent: %v should be less than threshold: %v", newCpuPercent, threshold)
+			assert.True(t, newCPUPercent <= threshold, "New CPU percent: %v should be less than threshold: %v", newCPUPercent, threshold)
 			assert.True(t, newMemPercent <= threshold, "New Mem percent: %v should be less than threshold: %v", newMemPercent, threshold)
 		})
 	}

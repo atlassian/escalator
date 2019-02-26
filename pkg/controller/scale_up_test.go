@@ -8,7 +8,7 @@ import (
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestControllerScaleUpUntaint(t *testing.T) {
@@ -164,7 +164,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			var tc int
 			for _, node := range nodes {
 				if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
-					k8s.AddToBeRemovedTaint(node, client)
+					k8s.AddToBeRemovedTaint(node, client, "NoSchedule")
 					nodeGroupsState["buildeng"].taintTracker = append(nodeGroupsState["buildeng"].taintTracker, node.Name)
 					<-updateChan
 					tc++

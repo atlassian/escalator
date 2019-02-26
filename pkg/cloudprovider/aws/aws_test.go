@@ -1,11 +1,12 @@
 package aws
 
 import (
+	"testing"
+
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestInstanceToProviderId(t *testing.T) {

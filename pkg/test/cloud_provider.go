@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const ProviderName = "test"

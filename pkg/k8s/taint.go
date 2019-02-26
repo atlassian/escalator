@@ -17,7 +17,14 @@ import (
 // Taint Scheme:
 // Key: atlassian.com/escalator
 // Value: time.Now().Unix()
-// Effect: NoSchedule
+// Effect: NoSchedule | NoExecute | PreferNoSchedule
+
+// TaintEffectTypes a map of TaintEffect to boolean true used for validating supported taint types
+var TaintEffectTypes = map[apiv1.TaintEffect]bool{
+	apiv1.TaintEffectNoExecute:        true,
+	apiv1.TaintEffectNoSchedule:       true,
+	apiv1.TaintEffectPreferNoSchedule: true,
+}
 
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
@@ -63,7 +70,7 @@ func EndTaintFailSafe(actualTainted int) error {
 
 // AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
 // returns the most recent update of the node that is successful
-func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
+func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface, taintEffect apiv1.TaintEffect) (*apiv1.Node, error) {
 	if tainted > targetTaints {
 		log.Warning("Taint count exceeds the target set by the lock")
 	}
@@ -93,10 +100,15 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*apiv1.
 		return updatedNode, nil
 	}
 
+	effect := apiv1.TaintEffectNoSchedule
+	if len(taintEffect) > 0 {
+		effect = taintEffect
+	}
+
 	updatedNode.Spec.Taints = append(updatedNode.Spec.Taints, apiv1.Taint{
 		Key:    ToBeRemovedByAutoscalerKey,
 		Value:  fmt.Sprint(time.Now().Unix()),
-		Effect: apiv1.TaintEffectNoSchedule,
+		Effect: effect,
 	})
 
 	updatedNodeWithTaint, err := client.CoreV1().Nodes().Update(updatedNode)

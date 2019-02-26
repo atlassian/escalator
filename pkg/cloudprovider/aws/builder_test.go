@@ -1,8 +1,9 @@
 package aws
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBuilder_assumeRoleEnabled(t *testing.T) {
