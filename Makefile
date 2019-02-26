@@ -1,4 +1,4 @@
-.PHONY: build setup test test-race test-vet docker clean distclean fmt
+.PHONY: build setup test test-race test-vet docker clean distclean fmt lint
 
 TARGET=escalator
 # E.g. set this to -v (I.e. GOCMDOPTS=-v via shell) to get the go command to be verbose
@@ -25,9 +25,6 @@ test-race: vendor
 test-vet: vendor
 	go vet ./...
 
-lint: vendor
-	./lint.sh
-
 docker: Dockerfile
 	docker build -t atlassian/escalator .
 
@@ -43,5 +40,8 @@ Gopkg.lock: Gopkg.toml
 Gopkg.toml: $(SOURCES)
 	@if ! dep check; then touch $@; fi;
 
-fmt:
-	gofmt -w $(SRC_DIRS)
+fmt: vendor
+	goreturns -w pkg/ cmd/
+
+lint: vendor
+	./lint.sh
