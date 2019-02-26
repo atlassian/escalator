@@ -221,9 +221,8 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	// In case if ASG size is zero, check if there's any pending pods
 	if len(allNodes) == 0 && len(pods) == 0 {
-		err = errors.New("no nodes remaining")
-		log.WithField("nodegroup", nodegroup).Warning(err.Error())
-		return 0, err
+		log.WithField("nodegroup", nodegroup).Info("no nodes remaining")
+		return 0, nil
 	}
 	if len(allNodes) < nodeGroup.Opts.MinNodes {
 		err = errors.New("node count less than the minimum")
