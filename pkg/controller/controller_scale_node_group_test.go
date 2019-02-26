@@ -217,7 +217,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				NodeGroupOptions{},
 				ListerOptions{},
 			},
-			errors.New("no nodes remaining"),
+			nil,
 		},
 		{
 			"node count less than the minimum",
