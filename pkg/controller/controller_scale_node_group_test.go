@@ -10,7 +10,7 @@ import (
 	time "github.com/stephanos/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 type ListerOptions struct {
@@ -151,7 +151,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 2000, 8000},
 				buildTestPods(40, 500, 1000),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                    "default",
 					CloudProviderGroupName:  "default",
 					MinNodes:                5,
 					MaxNodes:                100,
@@ -167,7 +167,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 2000, 8000},
 				buildTestPods(40, 100, 2000),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                    "default",
 					CloudProviderGroupName:  "default",
 					MinNodes:                5,
 					MaxNodes:                100,
@@ -183,7 +183,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 2000, 8000},
 				buildTestPods(40, 500, 1000),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                    "default",
 					CloudProviderGroupName:  "default",
 					MinNodes:                5,
 					MaxNodes:                100,
@@ -199,7 +199,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 2000, 8000},
 				buildTestPods(60, 500, 1000),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                    "default",
 					CloudProviderGroupName:  "default",
 					MinNodes:                5,
 					MaxNodes:                100,
@@ -346,7 +346,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 1500, 5000},
 				buildTestPods(100, 500, 600),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                    "default",
 					CloudProviderGroupName:  "default",
 					MinNodes:                5,
 					MaxNodes:                100,
@@ -449,7 +449,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				buildTestNodes(10, 2000, 8000),
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                               "default",
 					CloudProviderGroupName:             "default",
 					MinNodes:                           5,
 					MaxNodes:                           100,
@@ -474,7 +474,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				buildTestNodes(10, 2000, 8000),
 				buildTestPods(10, 1000, 1000),
 				NodeGroupOptions{
-					Name: "default",
+					Name:                               "default",
 					CloudProviderGroupName:             "default",
 					MinNodes:                           5,
 					MaxNodes:                           100,
