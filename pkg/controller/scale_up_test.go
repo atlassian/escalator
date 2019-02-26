@@ -164,7 +164,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			var tc int
 			for _, node := range nodes {
 				if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
-					k8s.AddToBeRemovedTaint(node, client)
+					k8s.AddToBeRemovedTaint(node, client, "NoSchedule")
 					nodeGroupsState["buildeng"].taintTracker = append(nodeGroupsState["buildeng"].taintTracker, node.Name)
 					<-updateChan
 					tc++

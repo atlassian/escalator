@@ -46,12 +46,38 @@ func getStringFromChan(c chan string) string {
 func TestAddToBeRemovedTaint(t *testing.T) {
 	node := test.BuildTestNode(test.NodeOpts{})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
-	updated, err := AddToBeRemovedTaint(node, fakeClient)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, "NoExecute")
 
 	assert.NoError(t, err)
 	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
-	_, ok := GetToBeRemovedTaint(updated)
+	taint, ok := GetToBeRemovedTaint(updated)
 	assert.True(t, ok)
+	assert.Equal(t, apiv1.TaintEffectNoExecute, taint.Effect)
+}
+
+func TestAddToBeRemovedTaint_DefaultNoScheduleTaintOnEmptyObject(t *testing.T) {
+	node := test.BuildTestNode(test.NodeOpts{})
+	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, apiv1.TaintEffect(""))
+
+	assert.NoError(t, err)
+	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
+	taint, ok := GetToBeRemovedTaint(updated)
+	assert.True(t, ok)
+	assert.NotEmpty(t, taint)
+	assert.Equal(t, apiv1.TaintEffectNoSchedule, taint.Effect)
+}
+
+func TestAddToBeRemovedTaint_DefaultNoScheduleTaintOnEmptyString(t *testing.T) {
+	node := test.BuildTestNode(test.NodeOpts{})
+	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, "")
+
+	assert.NoError(t, err)
+	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
+	taint, ok := GetToBeRemovedTaint(updated)
+	assert.True(t, ok)
+	assert.Equal(t, apiv1.TaintEffectNoSchedule, taint.Effect)
 }
 
 func TestAddToBeRemovedTaint_AlreadyExists(t *testing.T) {
@@ -59,7 +85,7 @@ func TestAddToBeRemovedTaint_AlreadyExists(t *testing.T) {
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 
 	// Add the taint
-	updated, err := AddToBeRemovedTaint(node, fakeClient)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, "NoSchedule")
 	assert.NoError(t, err)
 	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
 
@@ -67,7 +93,7 @@ func TestAddToBeRemovedTaint_AlreadyExists(t *testing.T) {
 	fakeClient, updatedNodes = buildFakeClientAndUpdateChannel(updated)
 
 	// Add the taint again on the updated node
-	_, err = AddToBeRemovedTaint(updated, fakeClient)
+	_, err = AddToBeRemovedTaint(updated, fakeClient, "NoSchedule")
 	assert.NoError(t, err)
 	// Ensure the taint is not added again
 	assert.Equal(t, "nothing returned", getStringFromChan(updatedNodes))
@@ -76,14 +102,14 @@ func TestAddToBeRemovedTaint_AlreadyExists(t *testing.T) {
 func TestGetToBeRemovedTaint(t *testing.T) {
 	node := test.BuildTestNode(test.NodeOpts{})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
-	updated, err := AddToBeRemovedTaint(node, fakeClient)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, "NoExecute")
 
 	assert.NoError(t, err)
 	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
 	taint, ok := GetToBeRemovedTaint(updated)
 	assert.True(t, ok)
 	assert.Equal(t, ToBeRemovedByAutoscalerKey, taint.Key)
-	assert.Equal(t, apiv1.TaintEffectNoSchedule, taint.Effect)
+	assert.Equal(t, apiv1.TaintEffectNoExecute, taint.Effect)
 }
 
 func TestGetToBeRemovedTime(t *testing.T) {
@@ -98,7 +124,7 @@ func TestGetToBeRemovedTime(t *testing.T) {
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 
 	// Add the taint to the node
-	updated, err := AddToBeRemovedTaint(node, fakeClient)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, "NoSchedule")
 	assert.NoError(t, err)
 	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
 	_, ok := GetToBeRemovedTaint(updated)
@@ -129,7 +155,7 @@ func TestDeleteToBeRemovedTaint(t *testing.T) {
 	node := test.BuildTestNode(test.NodeOpts{})
 	fakeClient, updatedNodes := buildFakeClientAndUpdateChannel(node)
 
-	updated, err := AddToBeRemovedTaint(node, fakeClient)
+	updated, err := AddToBeRemovedTaint(node, fakeClient, "NoSchedule")
 	assert.NoError(t, err)
 	assert.Equal(t, updated.Name, getStringFromChan(updatedNodes))
 

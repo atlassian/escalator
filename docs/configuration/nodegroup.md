@@ -25,6 +25,7 @@ node_groups:
     scale_up_cool_down_timeout: 10m
     soft_delete_grace_period: 1m
     hard_delete_grace_period: 10m
+    taint_effect: NoExecute
 ```
 
 ## Options
@@ -167,3 +168,14 @@ It is highly recommended to have the `hard_delete_grace_period` option set to a 
 nodes enough time to finish before the node is terminated. 
 
 Logic for determining if a node is empty can be found in `pkg/k8s` `NodeEmpty()`
+
+### `taint-effect`
+
+This is an optional field and the value defines the taint effect that will be applied to the nodes when scaling down.
+The valid values are :
+
+- NoSchedule
+- NoExecute
+- PreferNoSchedule
+
+IF not set, it will default to NoSchedule.
