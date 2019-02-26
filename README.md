@@ -105,7 +105,7 @@ go test ./pkg/controller
 Pull requests, issues and comments welcome. For pull requests:
 
 * Add tests for new features and bug fixes
-* Follow the existing style
+* Follow the existing style (we are using [goreturns](https://github.com/sqs/goreturns) to format and lint escalator)
 * Separate unrelated changes into multiple pull requests
 
 See the existing issues for things to start contributing.

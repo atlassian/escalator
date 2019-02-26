@@ -40,8 +40,13 @@ Gopkg.lock: Gopkg.toml
 Gopkg.toml: $(SOURCES)
 	@if ! dep check; then touch $@; fi;
 
+# goreturns runs both gofmt and goimports.
+# This is used to pickup more comphrehnsive formatting/codestyle changes
+# https://github.com/sqs/goreturns
 fmt: vendor
 	goreturns -w pkg/ cmd/
 
+# the linting also uses goreturns.
+# the lint.sh script reports formatting changes/errors
 lint: vendor
 	./lint.sh
