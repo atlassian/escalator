@@ -9,7 +9,7 @@ import (
 	"github.com/atlassian/escalator/pkg/metrics"
 	log "github.com/sirupsen/logrus"
 	time "github.com/stephanos/clock"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // ScaleDown performs the taint and remove node logic

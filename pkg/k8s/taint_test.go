@@ -1,17 +1,19 @@
 package k8s
 
 import (
+	"testing"
+	"time"
+
 	apiv1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"testing"
-	"time"
+
+	"strconv"
 
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
-	"strconv"
 )
 
 // Borrowed from: https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/utils/deletetaint/delete_test.go

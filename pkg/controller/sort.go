@@ -1,6 +1,6 @@
 package controller
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 // nodeIndexBundle bundles an original index to a node so that it can be tracked during sorting
 type nodeIndexBundle struct {

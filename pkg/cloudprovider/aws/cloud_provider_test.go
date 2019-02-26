@@ -2,13 +2,14 @@ package aws
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
-	"testing"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestCloudProvider_Name(t *testing.T) {
