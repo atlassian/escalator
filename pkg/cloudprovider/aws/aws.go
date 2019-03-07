@@ -304,7 +304,7 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 	input := &autoscaling.SetDesiredCapacityInput{
 		AutoScalingGroupName: awsapi.String(n.id),
 		DesiredCapacity:      awsapi.Int64(newSize),
-		HonorCooldown:        awsapi.Bool(true),
+		HonorCooldown:        awsapi.Bool(false),
 	}
 
 	log.WithField("asg", n.id).Debugf("SetDesiredCapacity: %v", newSize)
