@@ -178,6 +178,35 @@ func (n *NodeGroup) ID() string {
 	return n.id
 }
 
+// GetLaunchConfigName returns the name of Launch Configuration Name the node group used.
+func (n *NodeGroup) GetLaunchConfigName() string {
+	return awsapi.StringValue(n.asg.LaunchConfigurationName)
+}
+
+// GetLaunchConfigInstanceType returns the instance type used by the Launch Configuration used by the node group.
+func (c *CloudProvider) GetLaunchConfigInstanceType(launchConfigName string) (string, error) {
+	input := &autoscaling.DescribeLaunchConfigurationsInput{
+		LaunchConfigurationNames: []*string{
+			awsapi.String(launchConfigName),
+		},
+	}
+	result, err := c.service.DescribeLaunchConfigurations(input)
+	if err != nil {
+		log.Errorf("failed to get describe launch configuration %v. err: %v", launchConfigName, err)
+	}
+	return *result.LaunchConfigurations[0].InstanceType, err
+}
+
+// Get CPU unit for the instance type
+func (c *CloudProvider) GetInstanceTypeCPU(instanceTypeName string) int64 {
+	return InstanceTypes[instanceTypeName].VCPU
+}
+
+// Get Memory unit for the instance type
+func (c *CloudProvider) GetInstanceTypeMEM(instanceTypeName string) int64 {
+	return InstanceTypes[instanceTypeName].MemoryMb
+}
+
 // MinSize returns minimum size of the node group.
 func (n *NodeGroup) MinSize() int64 {
 	return awsapi.Int64Value(n.asg.MinSize)
