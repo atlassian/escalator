@@ -1,3 +1,5 @@
+//go:generate go run ec2_instance_types/gen.go
+
 package aws
 
 import (
