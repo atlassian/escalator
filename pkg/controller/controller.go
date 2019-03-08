@@ -36,6 +36,12 @@ type NodeGroupState struct {
 	// used for tracking scale delta across runs, useful for reducing hysteresis
 	scaleDelta   int
 	lastScaleOut time.Time
+
+	// used to track the instance type details from the launch configuration for the node group
+	launchConfigName string
+	instanceTypeName string
+	instanceTypeCpu  int64
+	instanceTypeMem  int64
 }
 
 // Opts provide the Controller with config for runtime
@@ -210,6 +216,10 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining tainted: %v", len(taintedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("Minimum Node: %v", nodeGroup.Opts.MinNodes)
 	log.WithField("nodegroup", nodegroup).Infof("Maximum Node: %v", nodeGroup.Opts.MaxNodes)
+	log.WithField("nodegroup", nodegroup).Infof("Launch Configuration Name: %v", nodeGroup.launchConfigName)
+	log.WithField("nodegroup", nodegroup).Infof("Instance Type: %v", nodeGroup.instanceTypeName)
+	log.WithField("nodegroup", nodegroup).Infof("Instance CPU: %v", nodeGroup.instanceTypeCpu)
+	log.WithField("nodegroup", nodegroup).Infof("Instance MemoryMb: %v", nodeGroup.instanceTypeMem)
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
 	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
@@ -253,6 +263,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.Errorf("Failed to calculate requests: %v", err)
 		return 0, err
 	}
+
 	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(untaintedNodes)
 	if err != nil {
 		log.Errorf("Failed to calculate capacity: %v", err)
@@ -306,6 +317,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// Perform the scaling decision
 	maxPercent := math.Max(cpuPercent, memPercent)
 	nodesDelta := 0
+
+	// TODO: this logic needs to fix! Should use newly fetched instance type CPU/Mem to calculate the capacity and delta
+	//if len(allNodes) == 0 && len(pods) > 0 && len(untaintedNodes) <= 0 {
+	//	memCapacity = resource.MustParse("1")
+	//	cpuCapacity = resource.MustParse("1")
+	//	nodesDelta = 1
+	//}
+	//log.WithField("nodegroup", nodegroup).Debugf("cpuCapacity: %v, memCapacity: %v", cpuCapacity, memCapacity)
 
 	// Determine if we want to scale up or down. Selects the first condition that is true
 	switch {
@@ -415,6 +434,15 @@ func (c *Controller) RunOnce() error {
 			state.Opts.MaxNodes = int(cloudProviderNodeGroup.MaxSize())
 			log.Debugf("auto discovered max_nodes = %v for node group %v", state.Opts.MaxNodes, nodeGroupOpts.Name)
 		}
+		// Update Launch Configuration Name
+		state.launchConfigName = cloudProviderNodeGroup.GetLaunchConfigName()
+		// Get the current instance type for the Launch configuration used by the node group
+		instanceTypeName, err := c.cloudProvider.GetLaunchConfigInstanceType(state.launchConfigName)
+		// Look up the instance type detail
+		log.Debugf("Instance Type Name: %v", instanceTypeName)
+		state.instanceTypeName = instanceTypeName
+		state.instanceTypeCpu = c.cloudProvider.GetInstanceTypeCPU(instanceTypeName)
+		state.instanceTypeMem = c.cloudProvider.GetInstanceTypeMEM(instanceTypeName)
 		delta, err := c.scaleNodeGroup(nodeGroupOpts.Name, state)
 		metrics.NodeGroupScaleDelta.WithLabelValues(nodeGroupOpts.Name).Set(float64(delta))
 		state.scaleDelta = delta
