@@ -27,6 +27,13 @@ type CloudProvider interface {
 	Refresh() error
 
 	GetInstance(node *v1.Node) (Instance, error)
+
+	// GetLaunchConfigInstanceType returns the instance type used by the Launch Configuration used by the node group.
+	GetLaunchConfigInstanceType(launchConfigName string) (string, error)
+
+	// Get Instance type CPU/Mem res
+	GetInstanceTypeCPU(instanceTypeName string) int64
+	GetInstanceTypeMEM(instanceTypeName string) int64
 }
 
 // Instance contains convenience functions for extracting common information from CP instances
@@ -46,6 +53,9 @@ type NodeGroup interface {
 
 	// ID returns an unique identifier of the node group.
 	ID() string
+
+	// LaunchConfigName returns the name of Launch Configuration Name the node group used.
+	GetLaunchConfigName() string
 
 	// MinSize returns minimum size of the node group.
 	MinSize() int64
