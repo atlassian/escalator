@@ -1,4 +1,4 @@
-.PHONY: build setup test test-race test-vet docker clean distclean fmt lint
+.PHONY: build setup test test-race test-vet docker clean distclean fmt lint generate
 
 TARGET=escalator
 # E.g. set this to -v (I.e. GOCMDOPTS=-v via shell) to get the go command to be verbose
@@ -12,6 +12,9 @@ $(TARGET): vendor $(SOURCES)
 build: $(TARGET)
 
 setup: vendor
+
+generate:
+	go generate ./pkg/cloudprovider/aws
 
 vendor: Gopkg.lock
 	dep ensure -vendor-only $(GOCMDOPTS)
