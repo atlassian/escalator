@@ -27,8 +27,26 @@ func calcScaleUpDelta(allNodes []*v1.Node, cpuPercent float64, memPercent float6
 	return delta, nil
 }
 
+func allEqual(matchValue int64, resourceValues ...int64) bool {
+	for _, v := range resourceValues {
+		if v != matchValue {
+			return false
+		}
+	}
+	return true
+}
+
 // calcPercentUsage helper works out the percentage of cpu and mem for request/capacity
 func calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity resource.Quantity) (float64, float64, error) {
+
+	mCPUReq, mMemReq, mCPUCap, mMemCap := cpuRequest.MilliValue(), memRequest.MilliValue(), cpuCapacity.MilliValue(), memCapacity.MilliValue()
+
+	// in this case there is already 0 usage and 0 request. Escalator should do nothing
+	if allEqual(0, mCPUReq, mMemReq, mCPUCap, mMemCap) {
+		return 0, 0, nil
+	}
+	//
+
 	if cpuCapacity.MilliValue() == 0 || memCapacity.MilliValue() == 0 {
 		// Needs to return nil for just in case if ASG size is zero.
 		return 0, 0, nil
