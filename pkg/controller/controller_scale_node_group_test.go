@@ -210,11 +210,33 @@ func TestScaleNodeGroup(t *testing.T) {
 			nil,
 		},
 		{
-			"no nodes",
+			"no nodes and no pods",
 			args{
 				nodeArgs{0, 0, 0},
 				buildTestPods(0, 0, 0),
-				NodeGroupOptions{},
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                0,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+				},
+				ListerOptions{},
+			},
+			nil,
+		},
+		{
+			"scale up from 0 node",
+			args{
+				nodeArgs{0, 1000, 10000},
+				buildTestPods(1, 500, 1000),
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                0,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+				},
 				ListerOptions{},
 			},
 			nil,
@@ -246,7 +268,7 @@ func TestScaleNodeGroup(t *testing.T) {
 			errors.New("node count larger than the maximum"),
 		},
 		{
-			"invalid node and pod usage/requests",
+			"node and pod usage/requests",
 			args{
 				nodeArgs{10, 0, 0},
 				buildTestPods(5, 0, 0),
@@ -257,7 +279,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			nil,
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"invalid node and pod usage/requests",
@@ -271,7 +293,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			nil,
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"invalid node and pod usage/requests",
@@ -285,7 +307,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			nil,
+			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
 			"lister not being able to list pods",

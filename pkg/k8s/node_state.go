@@ -45,7 +45,7 @@ func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*cache.NodeInfo) bool {
 	return ok && nodePodsRemaining == 0
 }
 
-// NodeEmpty returns the number of pods on the node, except for daemonset pods
+// NodePodsRemaining returns the number of pods on the node, except for daemonset pods
 func NodePodsRemaining(node *v1.Node, nodeInfoMap map[string]*cache.NodeInfo) (int, bool) {
 	nodeInfo, ok := nodeInfoMap[node.Name]
 	if !ok {

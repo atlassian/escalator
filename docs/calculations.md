@@ -40,6 +40,9 @@ The utilisation would then be calculated as follows:
  
 We then take the higher percentage utilisation, in this case CPU: **250%**.
 
+When node group's minimum size is set to 0, a special value (math.MaxFloat64) is used for CPU/Memory percentage utilisation if
+it scales up from 0. This value will be used to calculate scale up delta as describe below.
+
 Based on this figure we will then either scale up, do nothing or scale down. This depends on what the thresholds are 
 configured at. Threshold configuration is [documented here](./configuration/advanced-configuration.md).
 
@@ -66,6 +69,21 @@ By requesting the node group to scale up by `6` nodes, the new total node count 
 The utilisation would then be calculated as follows:
  - CPU: `5000m / 8000m * 100` = **62.5%**
  - Memory: `1000mb / 32000mb * 100` = **3.125%**
+
+ If the utilisation is the special value (math.MaxFloat64) mentioned above which means it scales up from 0, escalator will look up node group state for cached version of node allocatable capacity and then calculate the delta based on that. Otherwise it will just increase the node group by 1 when cached value doesn't exist, for example escalator tries to scale up from 0 right after it starts.
+
+ **For example:**
+
+when cached capacity exists:
+- `scale_up_threshold_percent` is `70`
+- cached node CPU allocatable capacity is `1000m`
+- pods CPU request is `1800m`
+- `1800m/1000m/70*100` = `2.57100`
+- Amount to increase by: `ceil(2.57100)` = `3` nodes
+
+when cached capacity doesn't exist:
+- Amount to increase by: `1` node
+
 
 ## Daemonsets
 

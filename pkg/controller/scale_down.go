@@ -29,7 +29,9 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	return c.scaleDownTaint(opts)
 }
 
-// TryRemoveTaintedNodes attempts to remove nodes are tainted and empty or have passed their grace period
+// TryRemoveTaintedNodes attempts to remove nodes are
+// * tainted and empty
+// * have passed their grace period
 func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	var toBeDeleted []*v1.Node
 	for _, candidate := range opts.taintedNodes {
@@ -51,7 +53,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 				}
 			} else {
 				nodePodsRemaining, ok := k8s.NodePodsRemaining(candidate, opts.nodeGroup.NodeInfoMap)
-				podsRemainingMessage := ""
+				var podsRemainingMessage string
 				if ok {
 					podsRemainingMessage = fmt.Sprintf("%d pods remaining", nodePodsRemaining)
 				} else {
@@ -78,7 +80,6 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 			if !ok {
 				continue
 			}
-
 			podsRemaining += nodePodsRemaining
 		}
 
@@ -117,6 +118,7 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	if len(opts.untaintedNodes)-nodesToRemove < opts.nodeGroup.Opts.MinNodes {
 		// Set the delta to maximum amount we can remove without going over
 		nodesToRemove = len(opts.untaintedNodes) - opts.nodeGroup.Opts.MinNodes
+
 		log.Infof("untainted nodes close to minimum (%v). Adjusting taint amount to (%v)", opts.nodeGroup.Opts.MinNodes, nodesToRemove)
 		// If have less node than the minimum, abort!
 		if nodesToRemove < 0 {

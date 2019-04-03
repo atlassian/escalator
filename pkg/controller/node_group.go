@@ -87,7 +87,7 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	if !nodegroup.autoDiscoverMinMaxNodeOptions() {
 		checkThat(nodegroup.MinNodes < nodegroup.MaxNodes, "min_nodes must be less than max_nodes")
 		checkThat(nodegroup.MaxNodes > 0, "max_nodes must be larger than 0")
-		checkThat(nodegroup.MinNodes > 0, "min_nodes must be larger than 0")
+		checkThat(nodegroup.MinNodes >= 0, "min_nodes must be not less than 0")
 	}
 
 	checkThat(nodegroup.SlowNodeRemovalRate <= nodegroup.FastNodeRemovalRate, "slow_node_removal_rate must be less than fast_node_removal_rate")

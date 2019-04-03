@@ -47,6 +47,12 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			MaxNodes: 6,
 			DryMode:  false,
 		},
+		{
+			Name:     "default",
+			MinNodes: 0,
+			MaxNodes: 6,
+			DryMode:  false,
+		},
 	}
 
 	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
@@ -90,7 +96,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			"",
 		},
 		{
-			"test try taint 4, min nodes = 3",
+			"test try taint 4, min nodes = 3, total nodes = 6",
 			args{
 				scaleOpts{
 					nodes,
@@ -105,7 +111,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			"",
 		},
 		{
-			"test try taint 4, min nodes = 3",
+			"test try taint 4, min nodes = 3, total nodes = 2",
 			args{
 				scaleOpts{
 					nodes[:2],
@@ -118,6 +124,36 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			0,
 			true,
 			"the number of nodes(2) is less than specified minimum of 3. Taking no action",
+		},
+		{
+			"test try taint 4, min nodes = 0, total nodes = 3",
+			args{
+				scaleOpts{
+					nodes[:3],
+					[]*v1.Node{},
+					nodes[:3],
+					nodeGroupsState["default"],
+					4,
+				},
+			},
+			3,
+			false,
+			"",
+		},
+		{
+			"test try taint 4, min nodes = 0, total nodes = 6",
+			args{
+				scaleOpts{
+					nodes,
+					[]*v1.Node{},
+					nodes,
+					nodeGroupsState["default"],
+					4,
+				},
+			},
+			4,
+			false,
+			"",
 		},
 	}
 	for _, tt := range tests {
