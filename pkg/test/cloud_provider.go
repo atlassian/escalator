@@ -61,7 +61,7 @@ func (i Instance) InstantiationTime() time.Time {
 	return time.Now()
 }
 
-func (i Instance) Id() string {
+func (i Instance) ID() string {
 	return i.id
 }
 

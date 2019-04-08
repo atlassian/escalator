@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type ListerOptions struct {
@@ -210,14 +211,36 @@ func TestScaleNodeGroup(t *testing.T) {
 			nil,
 		},
 		{
-			"no nodes",
+			"no nodes and no pods",
 			args{
 				nodeArgs{0, 0, 0},
 				buildTestPods(0, 0, 0),
-				NodeGroupOptions{},
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                0,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+				},
 				ListerOptions{},
 			},
-			errors.New("no nodes remaining"),
+			nil,
+		},
+		{
+			"scale up from 0 node",
+			args{
+				nodeArgs{0, 1000, 10000},
+				buildTestPods(1, 500, 1000),
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                0,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+				},
+				ListerOptions{},
+			},
+			nil,
 		},
 		{
 			"node count less than the minimum",
@@ -246,7 +269,7 @@ func TestScaleNodeGroup(t *testing.T) {
 			errors.New("node count larger than the maximum"),
 		},
 		{
-			"invalid node and pod usage/requests",
+			"node and pod usage/requests",
 			args{
 				nodeArgs{10, 0, 0},
 				buildTestPods(5, 0, 0),
@@ -434,19 +457,22 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		nodeGroupOptions NodeGroupOptions
 		listerOptions    ListerOptions
 	}
+	var defaultNodeCPUCapaity int64 = 2000
+	var defaultNodeMemCapacity int64 = 8000
 
 	tests := []struct {
-		name        string
-		args        args
-		runs        int
-		runInterval duration.Duration
-		want        int
-		err         error
+		name                      string
+		args                      args
+		scaleUpWithCachedCapacity bool
+		runs                      int
+		runInterval               duration.Duration
+		want                      int
+		err                       error
 	}{
 		{
-			"10 nodes, 0 pods, fast node removal",
+			"10 nodes, 0 pods, min nodes 5, fast node removal",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				buildTestNodes(10, defaultNodeCPUCapaity, defaultNodeMemCapacity),
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -463,6 +489,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			false,
 			1,
 			duration.Minute,
 			-4,
@@ -471,7 +498,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		{
 			"10 nodes, 10 pods, slow node removal",
 			args{
-				buildTestNodes(10, 2000, 8000),
+				buildTestNodes(10, defaultNodeCPUCapaity, defaultNodeMemCapacity),
 				buildTestPods(10, 1000, 1000),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -488,9 +515,90 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			false,
 			5,
 			duration.Minute,
 			-2,
+			nil,
+		},
+		{
+			"4 nodes, 0 pods, min nodes 0, fast node removal to scale down to 0",
+			args{
+				buildTestNodes(4, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestPods(0, 0, 0),
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           0,
+					MaxNodes:                           100,
+					ScaleUpThresholdPercent:            70,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 60,
+					FastNodeRemovalRate:                4,
+					SlowNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "1m",
+					TaintEffect:                        "NoExecute",
+				},
+				ListerOptions{},
+			},
+			false,
+			1,
+			duration.Minute,
+			-4,
+			nil,
+		},
+		{
+			"0 nodes, 10 pods, min nodes 0, scale up from 0 without cache",
+			args{
+				buildTestNodes(0, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestPods(40, 200, 800),
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           0,
+					MaxNodes:                           100,
+					ScaleUpThresholdPercent:            70,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 60,
+					FastNodeRemovalRate:                4,
+					SlowNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "1m",
+					ScaleUpCoolDownPeriod:              "1m",
+					TaintEffect:                        "NoExecute",
+				},
+				ListerOptions{},
+			},
+			false,
+			1,
+			duration.Minute,
+			1,
+			nil,
+		},
+		{
+			"0 nodes, 10 pods, min nodes 0, scale up from 0 with cache",
+			args{
+				buildTestNodes(0, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestPods(40, 200, 800),
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           0,
+					MaxNodes:                           100,
+					ScaleUpThresholdPercent:            70,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 60,
+					FastNodeRemovalRate:                4,
+					SlowNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "1m",
+					ScaleUpCoolDownPeriod:              "1m",
+					TaintEffect:                        "NoExecute",
+				},
+				ListerOptions{},
+			},
+			true,
+			1,
+			duration.Minute,
+			6,
 			nil,
 		},
 	}
@@ -519,6 +627,14 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 				client:     *client,
 			})
 
+			// add cached node allocatable capacity when configured
+			if tt.scaleUpWithCachedCapacity {
+				defaultNodeGroupState := nodeGroupsState[tt.args.nodeGroupOptions.Name]
+				defaultNodeGroupState.cpuCapacity = *resource.NewMilliQuantity(defaultNodeCPUCapaity, resource.DecimalSI)
+				defaultNodeGroupState.memCapacity = *resource.NewQuantity(defaultNodeMemCapacity, resource.DecimalSI)
+				nodeGroupsState[tt.args.nodeGroupOptions.Name] = defaultNodeGroupState
+			}
+
 			controller := &Controller{
 				Client:        client,
 				Opts:          opts,
@@ -538,7 +654,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			assert.Equal(t, tt.want, nodesDelta)
 			assert.Equal(t, tt.err, err)
 
-			// Run subsequent runs of the scale to "simulate" the deletion of the tainted nodes
+			// Run subsequent runs of the scale to "simulate" the deletion of the tainted nodes when scaling down
 			for i := 0; i < tt.runs; i++ {
 				mockClock.Add(tt.runInterval)
 				_, err := controller.scaleNodeGroup(tt.args.nodeGroupOptions.Name, nodeGroupsState[tt.args.nodeGroupOptions.Name])

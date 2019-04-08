@@ -34,8 +34,8 @@ type Instance interface {
 	// InstantiationTime gets the time the resource was instantiated
 	InstantiationTime() time.Time
 
-	// Id gets the cloud provider resource identifier
-	Id() string
+	// ID gets the cloud provider resource identifier
+	ID() string
 }
 
 // NodeGroup contains configuration info and functions to control a set

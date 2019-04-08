@@ -165,8 +165,11 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 			nodes := test.BuildTestNodes(tt.args.initialNodeAmount, tt.args.nodeOpts)
 			cpuPercent, memPercent, _ := calculatePercentageUsage(tt.args.pods, nodes)
 
+			// get pods requests
+			memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(tt.args.pods)
+			require.NoError(t, err)
 			// Calculate scale up delta
-			want, _ := calcScaleUpDelta(nodes, cpuPercent, memPercent, tt.args.nodeGroup)
+			want, _ := calcScaleUpDelta(nodes, cpuPercent, memPercent, cpuRequest, memRequest, tt.args.nodeGroup)
 
 			if want <= 0 {
 				return
@@ -195,15 +198,16 @@ func calculatePercentageUsage(pods []*v1.Pod, nodes []*v1.Node) (float64, float6
 	memCapacity, cpuCapacity, _ := k8s.CalculateNodesCapacityTotal(nodes)
 
 	// Calculate percentage usage
-	return calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity)
+	return calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity, int64(len(nodes)))
 }
 
 func TestCalcPercentUsage(t *testing.T) {
 	type args struct {
-		cpuRequest  resource.Quantity
-		memRequest  resource.Quantity
-		cpuCapacity resource.Quantity
-		memCapacity resource.Quantity
+		cpuRequest             resource.Quantity
+		memRequest             resource.Quantity
+		cpuCapacity            resource.Quantity
+		memCapacity            resource.Quantity
+		numberOfUntaintedNodes int64
 	}
 	tests := []struct {
 		name        string
@@ -219,6 +223,7 @@ func TestCalcPercentUsage(t *testing.T) {
 				*resource.NewQuantity(50, resource.DecimalSI),
 				*resource.NewMilliQuantity(100, resource.DecimalSI),
 				*resource.NewQuantity(100, resource.DecimalSI),
+				1,
 			},
 			50,
 			50,
@@ -231,6 +236,20 @@ func TestCalcPercentUsage(t *testing.T) {
 				*resource.NewQuantity(50, resource.DecimalSI),
 				*resource.NewMilliQuantity(0, resource.DecimalSI),
 				*resource.NewQuantity(0, resource.DecimalSI),
+				10,
+			},
+			0,
+			0,
+			errors.New("cannot divide by zero in percent calculation"),
+		},
+		{
+			"no pods request while number of nodes is not 0",
+			args{
+				*resource.NewMilliQuantity(0, resource.DecimalSI),
+				*resource.NewQuantity(0, resource.DecimalSI),
+				*resource.NewMilliQuantity(0, resource.DecimalSI),
+				*resource.NewQuantity(0, resource.DecimalSI),
+				1,
 			},
 			0,
 			0,
@@ -243,6 +262,7 @@ func TestCalcPercentUsage(t *testing.T) {
 				*resource.NewQuantity(0, resource.DecimalSI),
 				*resource.NewMilliQuantity(66, resource.DecimalSI),
 				*resource.NewQuantity(66, resource.DecimalSI),
+				1,
 			},
 			0,
 			0,
@@ -255,15 +275,16 @@ func TestCalcPercentUsage(t *testing.T) {
 				*resource.NewQuantity(0, resource.DecimalSI),
 				*resource.NewMilliQuantity(0, resource.DecimalSI),
 				*resource.NewQuantity(0, resource.DecimalSI),
+				0,
 			},
 			0,
 			0,
-			errors.New("cannot divide by zero in percent calculation"),
+			nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cpu, mem, err := calcPercentUsage(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuCapacity, tt.args.memCapacity)
+			cpu, mem, err := calcPercentUsage(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuCapacity, tt.args.memCapacity, tt.args.numberOfUntaintedNodes)
 			if tt.err == nil {
 				require.NoError(t, err)
 			} else {

@@ -14,12 +14,12 @@ func TestInstanceToProviderId(t *testing.T) {
 		AvailabilityZone: aws.String("us-east-1b"),
 		InstanceId:       aws.String("abc123"),
 	}
-	res := instanceToProviderId(instance)
+	res := instanceToProviderID(instance)
 	assert.Equal(t, "aws:///us-east-1b/abc123", res)
 }
 
 func TestProviderIdToInstanceId(t *testing.T) {
-	assert.Equal(t, "abc123", providerIdToInstanceId("aws:///us-east-1b/abc123"))
+	assert.Equal(t, "abc123", providerIDToInstanceID("aws:///us-east-1b/abc123"))
 }
 
 func newMockCloudProvider(nodeGroups []string, service *test.MockAutoscalingService, ec2_service *test.MockEc2Service) (*CloudProvider, error) {

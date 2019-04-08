@@ -20,11 +20,11 @@ import (
 // ProviderName identifies this module as aws
 const ProviderName = "aws"
 
-func instanceToProviderId(instance *autoscaling.Instance) string {
+func instanceToProviderID(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
 }
 
-func providerIdToInstanceId(providerId string) string {
+func providerIDToInstanceID(providerId string) string {
 	return strings.Split(providerId, "/")[4]
 }
 
@@ -109,15 +109,17 @@ func (c *CloudProvider) Refresh() error {
 	return c.RegisterNodeGroups(ids...)
 }
 
+// Instance includes base EC2 instance information
 type Instance struct {
 	id          string
 	ec2Instance *ec2.Instance
 }
 
+// GetInstance creates an Instance object through k8s Node object
 func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, error) {
 	var instance *Instance
 
-	id := providerIdToInstanceId(node.Spec.ProviderID)
+	id := providerIDToInstanceID(node.Spec.ProviderID)
 
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{&id},
@@ -142,11 +144,13 @@ func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, erro
 	return instance, err
 }
 
+// InstantiationTime returns EC2 instance launch time
 func (i *Instance) InstantiationTime() time.Time {
 	return *i.ec2Instance.LaunchTime
 }
 
-func (i *Instance) Id() string {
+// ID return EC2 instance ID
+func (i *Instance) ID() string {
 	return i.id
 }
 
@@ -236,7 +240,7 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 		// find which instance this is
 		var instanceID *string
 		for _, instance := range n.asg.Instances {
-			if node.Spec.ProviderID == instanceToProviderId(instance) {
+			if node.Spec.ProviderID == instanceToProviderID(instance) {
 				instanceID = instance.InstanceId
 				break
 			}
@@ -292,7 +296,7 @@ func (n *NodeGroup) DecreaseTargetSize(delta int64) error {
 func (n *NodeGroup) Nodes() []string {
 	result := make([]string, 0, len(n.asg.Instances))
 	for _, instance := range n.asg.Instances {
-		result = append(result, instanceToProviderId(instance))
+		result = append(result, instanceToProviderID(instance))
 	}
 
 	return result
