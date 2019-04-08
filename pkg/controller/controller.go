@@ -205,7 +205,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// store a cached version of node capacity
-	if (nodeGroup.cpuCapacity.IsZero() || nodeGroup.memCapacity.IsZero()) && len(allNodes) > 0 {
+	if len(allNodes) > 0 {
 		nodeGroup.cpuCapacity = *allNodes[0].Status.Allocatable.Cpu()
 		nodeGroup.memCapacity = *allNodes[0].Status.Allocatable.Memory()
 	}
