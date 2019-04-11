@@ -302,8 +302,15 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	// Metrics
 	log.WithField("nodegroup", nodegroup).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
-	metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(cpuPercent)
-	metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
+
+	// on the case that we're scaling up from 0, emit 0 as the metrics to keep metrics sane
+	if cpuPercent == math.MaxFloat64 || memPercent == math.MaxFloat64 {
+		metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(0)
+		metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(0)
+	} else {
+		metrics.NodeGroupsCPUPercent.WithLabelValues(nodegroup).Set(cpuPercent)
+		metrics.NodeGroupsMemPercent.WithLabelValues(nodegroup).Set(memPercent)
+	}
 
 	locked := nodeGroup.scaleUpLock.locked()
 	if locked {
