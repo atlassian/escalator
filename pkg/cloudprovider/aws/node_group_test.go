@@ -17,12 +17,12 @@ import (
 
 func TestNodeGroup_ID(t *testing.T) {
 	id := "nodegroup"
-	nodeGroup := NewNodeGroup(id, &autoscaling.Group{}, &CloudProvider{})
+	nodeGroup := NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: id}, &autoscaling.Group{}, &CloudProvider{})
 	assert.Equal(t, id, nodeGroup.ID())
 }
 
 func TestNodeGroup_String(t *testing.T) {
-	nodeGroup := NewNodeGroup("nodegroup", &autoscaling.Group{}, &CloudProvider{})
+	nodeGroup := NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "nodegroup"}, &autoscaling.Group{}, &CloudProvider{})
 	assert.IsType(t, "string", nodeGroup.String())
 }
 
@@ -33,7 +33,7 @@ func TestNodeGroup_MinSize(t *testing.T) {
 		MinSize: aws.Int64(minSize),
 	}
 
-	nodeGroup := NewNodeGroup("nodegroup", asg, &CloudProvider{})
+	nodeGroup := NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "nodegroup"}, asg, &CloudProvider{})
 	assert.Equal(t, minSize, nodeGroup.MinSize())
 }
 
@@ -44,7 +44,7 @@ func TestNodeGroup_MaxSize(t *testing.T) {
 		MaxSize: aws.Int64(maxSize),
 	}
 
-	nodeGroup := NewNodeGroup("nodegroup", asg, &CloudProvider{})
+	nodeGroup := NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "nodegroup"}, asg, &CloudProvider{})
 	assert.Equal(t, maxSize, nodeGroup.MaxSize())
 }
 
@@ -56,7 +56,7 @@ func TestNodeGroup_TargetSize(t *testing.T) {
 		DesiredCapacity: aws.Int64(desiredCapacity),
 	}
 
-	nodeGroup := NewNodeGroup(id, asg, &CloudProvider{})
+	nodeGroup := NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: id}, asg, &CloudProvider{})
 	assert.Equal(t, desiredCapacity, nodeGroup.TargetSize())
 }
 
@@ -92,7 +92,7 @@ func TestNodeGroup_Size(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			asg := &autoscaling.Group{Instances: tt.instances}
-			nodeGroup := NewNodeGroup("nodegroup", asg, &CloudProvider{})
+			nodeGroup := NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "nodegroup"}, asg, &CloudProvider{})
 			assert.Equal(t, tt.expected, nodeGroup.Size())
 		})
 	}

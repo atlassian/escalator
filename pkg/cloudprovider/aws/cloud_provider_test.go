@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -25,15 +26,14 @@ func TestCloudProvider_NodeGroups(t *testing.T) {
 		{
 			"single node group",
 			map[string]*NodeGroup{
-				"1": NewNodeGroup("1", &autoscaling.Group{}, &CloudProvider{}),
+				"1": NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "1"}, &autoscaling.Group{}, &CloudProvider{}),
 			},
 		},
 		{
 			"multiple node groups",
 			map[string]*NodeGroup{
-				"1": NewNodeGroup("1", &autoscaling.Group{}, &CloudProvider{}),
-				"2": NewNodeGroup("2", &autoscaling.Group{}, &CloudProvider{}),
-			},
+				"1": NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "1"}, &autoscaling.Group{}, &CloudProvider{}),
+				"2": NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "2"}, &autoscaling.Group{}, &CloudProvider{})},
 		},
 		{
 			"no node groups",
@@ -61,7 +61,7 @@ func TestCloudProvider_GetNodeGroup(t *testing.T) {
 		{
 			"get a node group that exists",
 			map[string]*NodeGroup{
-				"1": NewNodeGroup("1", &autoscaling.Group{}, &CloudProvider{}),
+				"1": NewNodeGroup(&cloudprovider.NodeGroupConfig{GroupID: "1"}, &autoscaling.Group{}, &CloudProvider{}),
 			},
 			"1",
 			true,

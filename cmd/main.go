@@ -64,14 +64,21 @@ func (b cloudProviderBuilder) Build() (cloudprovider.CloudProvider, error) {
 
 // setupCloudProvider creates the cloudprovider builder with the nodegroup opts
 func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.Builder {
-	var nodegroupIDs []string
+	var nodeGroupConfigs []cloudprovider.NodeGroupConfig
 	for _, n := range nodegroups {
-		nodegroupIDs = append(nodegroupIDs, n.CloudProviderGroupName)
+		nodeGroupConfigs = append(nodeGroupConfigs, cloudprovider.NodeGroupConfig{
+			GroupID: n.CloudProviderGroupName,
+			AWSConfig: cloudprovider.AWSNodeGroupConfig{
+				LaunchTemplateID:          n.AWS.LaunchTemplateID,
+				LaunchTemplateVersion:     n.AWS.LaunchTemplateVersion,
+				FleetInstanceReadyTimeout: n.AWS.FleetInstanceReadyTimeoutDuration(),
+			},
+		})
 	}
 	cloudBuilder := cloudProviderBuilder{
 		ProviderOpts: cloudprovider.BuildOpts{
-			ProviderID:   *cloudProviderID,
-			NodeGroupIDs: nodegroupIDs,
+			ProviderID:       *cloudProviderID,
+			NodeGroupConfigs: nodeGroupConfigs,
 		},
 	}
 	return cloudBuilder

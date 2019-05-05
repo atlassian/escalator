@@ -3,6 +3,7 @@ package aws
 import (
 	"testing"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -31,8 +32,13 @@ func newMockCloudProvider(nodeGroups []string, service *test.MockAutoscalingServ
 		nodeGroups:  make(map[string]*NodeGroup, len(nodeGroups)),
 	}
 
+	configs := make([]cloudprovider.NodeGroupConfig, 0, len(nodeGroups))
+	for _, i := range nodeGroups {
+		configs = append(configs, cloudprovider.NodeGroupConfig{GroupID: i})
+	}
+
 	if service != nil {
-		err = cloudProvider.RegisterNodeGroups(nodeGroups...)
+		err = cloudProvider.RegisterNodeGroups(configs...)
 	}
 
 	return cloudProvider, err

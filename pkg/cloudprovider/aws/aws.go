@@ -57,10 +57,13 @@ func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) 
 }
 
 // RegisterNodeGroups adds the nodegroup to the list of nodes groups
-func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
-	strs := make([]*string, len(ids))
-	for i, s := range ids {
-		strs[i] = awsapi.String(s)
+func (c *CloudProvider) RegisterNodeGroups(groups ...cloudprovider.NodeGroupConfig) error {
+	configs := make(map[string]*cloudprovider.NodeGroupConfig, len(groups))
+	strs := make([]*string, len(groups))
+	for i, s := range groups {
+		c := s
+		strs[i] = awsapi.String(s.GroupID)
+		configs[s.GroupID] = &c
 	}
 
 	input := &autoscaling.DescribeAutoScalingGroupsInput{
@@ -69,7 +72,7 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 
 	result, err := c.service.DescribeAutoScalingGroups(input)
 	if err != nil {
-		log.Errorf("failed to describe asgs %v. err: %v", ids, err)
+		log.Errorf("failed to describe asgs %v. err: %v", groups, err)
 		return err
 	}
 
@@ -81,11 +84,7 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 			continue
 		}
 
-		c.nodeGroups[id] = NewNodeGroup(
-			id,
-			group,
-			c,
-		)
+		c.nodeGroups[id] = NewNodeGroup(configs[id], group, c)
 	}
 
 	// Update metrics for each node group
@@ -101,12 +100,12 @@ func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
 
 // Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 func (c *CloudProvider) Refresh() error {
-	ids := make([]string, 0, len(c.nodeGroups))
-	for id := range c.nodeGroups {
-		ids = append(ids, id)
+	configs := make([]cloudprovider.NodeGroupConfig, 0, len(c.nodeGroups))
+	for _, ng := range c.nodeGroups {
+		configs = append(configs, *ng.config)
 	}
 
-	return c.RegisterNodeGroups(ids...)
+	return c.RegisterNodeGroups(configs...)
 }
 
 // Instance includes base EC2 instance information
@@ -160,14 +159,16 @@ type NodeGroup struct {
 	asg *autoscaling.Group
 
 	provider *CloudProvider
+	config   *cloudprovider.NodeGroupConfig
 }
 
 // NewNodeGroup creates a new nodegroup from the aws group backing
-func NewNodeGroup(id string, asg *autoscaling.Group, provider *CloudProvider) *NodeGroup {
+func NewNodeGroup(config *cloudprovider.NodeGroupConfig, asg *autoscaling.Group, provider *CloudProvider) *NodeGroup {
 	return &NodeGroup{
-		id:       id,
+		id:       config.GroupID,
 		asg:      asg,
 		provider: provider,
+		config:   config,
 	}
 }
 
@@ -203,6 +204,12 @@ func (n *NodeGroup) Size() int64 {
 	return int64(len(n.asg.Instances))
 }
 
+// canScaleInOneShot return value indicates if the cloud provider is configured
+// to support one-shot scaling
+func (n *NodeGroup) canScaleInOneShot() bool {
+	return n.config.AWSConfig.LaunchTemplateID != ""
+}
+
 // IncreaseSize increases the size of the node group. To delete a node you need
 // to explicitly name it and use DeleteNode. This function should wait until
 // node group size is updated.
@@ -216,7 +223,14 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 	}
 
 	log.WithField("asg", n.id).Debugf("IncreaseSize: %v", delta)
-	return n.setASGDesiredSize(n.TargetSize() + delta)
+
+	if n.canScaleInOneShot() {
+		log.WithField("asg", n.id).Infof("Scaling with CreateFleet strategy")
+		return n.setASGDesiredSizeOneShot(delta)
+	} else {
+		log.WithField("asg", n.id).Infof("Scaling with SetDesiredCapacity trategy")
+		return n.setASGDesiredSize(n.TargetSize() + delta)
+	}
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
@@ -316,4 +330,118 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 	log.WithField("asg", n.id).Debugf("CurrentTargetSize: %v", n.TargetSize())
 	_, err := n.provider.service.SetDesiredCapacity(input)
 	return err
+}
+
+// setASGDesiredSizeOneShot uses the AWS fleet API to acquire all desired
+// capacity in one step and then add it to the existing auto-scaling group.
+func (n *NodeGroup) setASGDesiredSizeOneShot(addCount int64) error {
+	fleet, err := n.provider.ec2_service.CreateFleet(&ec2.CreateFleetInput{
+		Type:                             awsapi.String("instant"),
+		TerminateInstancesWithExpiration: awsapi.Bool(false),
+		OnDemandOptions: &ec2.OnDemandOptionsRequest{
+			MinTargetCapacity:  awsapi.Int64(addCount),
+			SingleInstanceType: awsapi.Bool(true),
+		},
+		TargetCapacitySpecification: &ec2.TargetCapacitySpecificationRequest{
+			OnDemandTargetCapacity:    awsapi.Int64(addCount),
+			TotalTargetCapacity:       awsapi.Int64(addCount),
+			DefaultTargetCapacityType: awsapi.String("on-demand"),
+		},
+		LaunchTemplateConfigs: []*ec2.FleetLaunchTemplateConfigRequest{
+			&ec2.FleetLaunchTemplateConfigRequest{
+				LaunchTemplateSpecification: &ec2.FleetLaunchTemplateSpecificationRequest{
+					LaunchTemplateId: awsapi.String(n.config.AWSConfig.LaunchTemplateID),
+					Version:          awsapi.String(n.config.AWSConfig.LaunchTemplateVersion),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// This will hold any launch errors for the fleet. In the case of an
+	// instant fleet with a single instant type this will indicate that the
+	// entire fleet failed to launch.
+	for _, lerr := range fleet.Errors {
+		return errors.New(*lerr.ErrorMessage)
+	}
+
+	instances := make([]*string, 0)
+	for _, i := range fleet.Instances {
+		instances = append(instances, i.InstanceIds...)
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	deadline := time.NewTimer(n.config.AWSConfig.FleetInstanceReadyTimeout)
+	defer ticker.Stop()
+	defer deadline.Stop()
+
+	// Escalator will block waiting for all nodes to become avaiable in this
+	// node group for the maximum time specified in FleetInstanceReadyTimeout.
+	// This should typically be quite fast as it's just the time for the
+	// instance to boot and transition to ready state. The instance must be in
+	// ready state before AttachInstances will graft it onto an ASG.
+InstanceReadyLoop:
+	for {
+		select {
+		case <-ticker.C:
+			if n.allInstancesReady(instances) {
+				break InstanceReadyLoop
+			}
+		case <-deadline.C:
+			return errors.New("Not all instances could be started")
+		}
+	}
+
+	// The AttachInstances API only supports adding 20 instances at a time
+	batchSize := 20
+	batch := make([]*string, batchSize)
+	for batchSize < len(instances) {
+		instances, batch = instances[batchSize:], instances[0:batchSize:batchSize]
+
+		_, err = n.provider.service.AttachInstances(&autoscaling.AttachInstancesInput{
+			AutoScalingGroupName: awsapi.String(n.id),
+			InstanceIds:          batch,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Attach the remainder for instance sets that are not evenly divisible by
+	// batchSize
+	_, err = n.provider.service.AttachInstances(&autoscaling.AttachInstancesInput{
+		AutoScalingGroupName: awsapi.String(n.id),
+		InstanceIds:          instances,
+	})
+
+	log.WithField("asg", n.id).Debugf("CurrentSize: %v", n.Size())
+	log.WithField("asg", n.id).Debugf("CurrentTargetSize: %v", n.TargetSize())
+	return err
+}
+
+func (n *NodeGroup) allInstancesReady(ids []*string) bool {
+	ready := false
+
+	n.provider.ec2_service.DescribeInstanceStatusPages(&ec2.DescribeInstanceStatusInput{
+		InstanceIds:         ids,
+		IncludeAllInstances: awsapi.Bool(true),
+	}, func(r *ec2.DescribeInstanceStatusOutput, lastPage bool) bool {
+		for _, i := range r.InstanceStatuses {
+			if *i.InstanceState.Name != "running" {
+				return false
+			}
+		}
+
+		// If we made it to the last page and didn't bail early then all
+		// instances are ready
+		if lastPage {
+			ready = true
+		}
+
+		return true
+	})
+
+	return ready
 }

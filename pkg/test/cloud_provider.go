@@ -37,7 +37,7 @@ func (c *CloudProvider) GetNodeGroup(id string) (cloudprovider.NodeGroup, bool) 
 	return ng, ok
 }
 
-func (c *CloudProvider) RegisterNodeGroups(ids ...string) error {
+func (c *CloudProvider) RegisterNodeGroups(groups ...cloudprovider.NodeGroupConfig) error {
 	return nil
 }
 
