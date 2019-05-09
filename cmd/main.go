@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/atlassian/escalator/pkg/metrics/pprof"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -212,6 +214,12 @@ func main() {
 	os.Args = []string{"escalator"}
 	flag.Parse()
 	os.Args = tempArgs
+
+	// setup pprof
+	var profiler pprof.Profiler
+	mux := http.NewServeMux()
+	profiler.InstallHTTP(mux)
+	go http.ListenAndServe(":9090", mux)
 
 	// start serving metrics endpoint
 	metrics.Start(*addr)
