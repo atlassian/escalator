@@ -42,7 +42,7 @@ See [Docs](docs/README.md)
 
 - [Kubernetes](https://kubernetes.io/) version 1.8+. Escalator has been tested and deployed on 1.8+ and newer. Older 
 versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
-- [Go](https://golang.org/) version 1.12+ with `GO111MODULE=on`, but Go 1.13+ Go is highly recommended as Escalator uses go modules for dependencies.
+- [Go](https://golang.org/) version 1.12+ with `GO111MODULE=on`, but Go 1.13+ is highly recommended as Escalator uses go modules for dependencies.
 - Dependencies and their locked versions can be found in `go.mod` and `go.sum`.
 
 ## Building
