@@ -4,27 +4,17 @@ sudo: required
 services:
   - docker
 
-env:
-  - DEP_VERSION="0.5.4"
-
 cache:
   directories:
-    - $GOPATH/pkg/dep
+    - $GOPATH/pkg/mod
 
 go_import_path: github.com/atlassian/escalator
 go:
-  - "1.12.x"
+  - "1.13.x"
 
 before_install:
-  # Download the binary to bin folder in $GOPATH
-  - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
-  # Make the binary executable
-  - chmod +x $GOPATH/bin/dep
   # install goreturns for linting
   - go get -u github.com/sqs/goreturns
-
-install:
-  - make setup
 
 script:
   - make lint
