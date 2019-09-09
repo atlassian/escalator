@@ -1,6 +1,6 @@
 FROM golang:1.13 as builder
 WORKDIR /go/src/github.com/atlassian/escalator/
-COPY go.mod ./
+COPY go.mod go.sum ./
 COPY cmd cmd
 COPY pkg pkg
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo cmd/main.go
