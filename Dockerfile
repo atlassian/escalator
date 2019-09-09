@@ -1,8 +1,6 @@
-FROM golang:1.12.9 as builder
+FROM golang:1.13 as builder
 WORKDIR /go/src/github.com/atlassian/escalator/
-RUN curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-COPY Gopkg.toml Gopkg.lock Makefile ./
-RUN make setup
+COPY go.mod ./
 COPY cmd cmd
 COPY pkg pkg
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo cmd/main.go
