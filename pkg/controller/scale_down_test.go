@@ -330,9 +330,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			}
 			// test wet mode
 			c.Opts.DryMode = false
-			assert.NoError(t, k8s.BeginTaintFailSafe(len(tt.want)))
 			got := c.taintOldestN(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
-			assert.NoError(t, k8s.EndTaintFailSafe(len(got)))
 			eq := assert.Equal(t, tt.want, got)
 			if eq {
 				for _, i := range got {
@@ -348,10 +346,8 @@ func TestControllerTaintOldestN(t *testing.T) {
 			}
 
 			// test dry mode
-			assert.NoError(t, k8s.BeginTaintFailSafe(len(tt.want)))
 			c.Opts.DryMode = true
 			got = c.taintOldestN(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
-			assert.NoError(t, k8s.EndTaintFailSafe(len(got)))
 			assert.Equal(t, tt.want, got)
 
 			// untaint all
