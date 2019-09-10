@@ -82,6 +82,10 @@ the `iam.amazonaws.com/role` annotation.
 
 **Note:** the `AWS_REGION` environment variable.
 
+## Using Launch Templates
+
+Escalator works out of the box with either [Launch-Configurations](https://docs.aws.amazon.com/autoscaling/ec2/userguide/LaunchConfiguration.html) or [Launch-Templates](https://docs.aws.amazon.com/autoscaling/ec2/userguide/LaunchTemplates.html). When using Launch-Templates, Escalator supports using multiple instance types in the one Auto Scaling Group. However, if the instance types have significantly different sizing (CPU / Memory), Escalator may take more than one Scaling operation to reach the desired capacity depending on the type of existing nodes in the cluster and the size of the new instance provided. We recommend having smaller sized instances as the first priority in your Auto Scaling Group, and the larger type second. This will increase the chance that Escalator will over provision instead of under provision the first time.
+
 ## Common issues, caveats and gotchas
 
 - Ensure that if you are using the remote credential provider that `AWS_REGION` or `AWS_DEFAULT_REGION` is set to the 
