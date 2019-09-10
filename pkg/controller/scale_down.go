@@ -134,20 +134,8 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 
 	log.WithField("nodegroup", nodegroupName).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
 	metrics.NodeGroupTaintEvent.WithLabelValues(nodegroupName).Add(float64(nodesToRemove))
-
-	// Lock the tainting to a maximum on 10 nodes
-	if err := k8s.BeginTaintFailSafe(nodesToRemove); err != nil {
-		// Don't taint if there was an error on the lock
-		log.Errorf("Failed to get safety lock on tainter: %v", err)
-		return 0, err
-	}
 	// Perform the tainting loop with the fail safe around it
 	tainted := c.taintOldestN(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
-	// Validate the fail-safe worked
-	if err := k8s.EndTaintFailSafe(len(tainted)); err != nil {
-		log.Errorf("Failed to validate safety lock on tainter: %v", err)
-		return len(tainted), err
-	}
 
 	log.Infof("Tainted a total of %v nodes", len(tainted))
 	return len(tainted), nil
@@ -163,9 +151,9 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 	sort.Sort(sorted)
 
 	taintedIndices := make([]int, 0, n)
-	for i, bundle := range sorted {
+	for _, bundle := range sorted {
 		// stop at N (or when array is fully iterated)
-		if len(taintedIndices) >= n || i >= k8s.MaximumTaints {
+		if len(taintedIndices) >= n {
 			break
 		}
 
@@ -183,7 +171,6 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 			}
 		} else {
 			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
-			k8s.IncrementTaintCount()
 			taintedIndices = append(taintedIndices, bundle.index)
 			log.WithField("drymode", "on").Infof("Tainting node %v", bundle.node.Name)
 		}

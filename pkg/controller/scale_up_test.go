@@ -160,7 +160,6 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			}
 
 			// taint all
-			k8s.BeginTaintFailSafe(len(nodes))
 			var tc int
 			for _, node := range nodes {
 				if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
@@ -170,7 +169,6 @@ func TestControllerUntaintNewestN(t *testing.T) {
 					tc++
 				}
 			}
-			k8s.EndTaintFailSafe(tc)
 
 			// test wet mode
 			c.Opts.DryMode = false
