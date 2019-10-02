@@ -63,6 +63,65 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 	return client, opts
 }
 
+// Test the edge case where the min nodes gets changed to above the current number of untainted nodes
+// the controller should untaint all tainted nodes to get above the new min ASG size instead of bringing up new nodes first
+func TestUntaintNodeGroupMinNodes(t *testing.T) {
+	t.Run("10 minNodes, 10 tainted, 0 untainted - scale up by untainting", func(t *testing.T) {
+		nodeGroupName := "default"
+		minNodes := 10
+		maxNodes := 20
+		nodeGroups := []NodeGroupOptions{{
+			Name:                    nodeGroupName,
+			MinNodes:                minNodes,
+			MaxNodes:                maxNodes,
+			ScaleUpThresholdPercent: 100,
+		}}
+
+		nodes := test.BuildTestNodes(10, test.NodeOpts{
+			CPU:     1000,
+			Mem:     1000,
+			Tainted: true,
+		})
+
+		client, opts := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
+
+		// For these test cases we only use 1 node group/cloud provider node group
+		nodeGroupSize := 1
+
+		// Create a test (mock) cloud provider
+		testCloudProvider := test.NewCloudProvider(nodeGroupSize)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupName,
+			int64(minNodes),
+			int64(maxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		// Create a node group state with the mapping of node groups to the cloud providers node groups
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		_, err := controller.scaleNodeGroup(nodeGroupName, nodeGroupsState[nodeGroupName])
+		assert.NoError(t, err)
+
+		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroupName], nodes)
+		// Ensure that the tainted nodes where untainted
+		assert.Equal(t, minNodes, len(untainted))
+		assert.Equal(t, 0, len(tainted))
+	})
+}
+
 //Test if when the cluster has nodes = MaxNodes but some of these nodes are tainted
 // it will untaint them before trying to scale up the cloud provider
 func TestUntaintNodeGroupMaxNodes(t *testing.T) {

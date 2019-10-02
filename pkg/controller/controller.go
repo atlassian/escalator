@@ -281,9 +281,11 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
 		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
 		result, err := c.ScaleUp(scaleOpts{
-			nodes:      allNodes,
-			nodesDelta: nodeGroup.Opts.MinNodes - len(untaintedNodes),
-			nodeGroup:  nodeGroup,
+			nodes:          allNodes,
+			nodesDelta:     nodeGroup.Opts.MinNodes - len(untaintedNodes),
+			nodeGroup:      nodeGroup,
+			taintedNodes:   taintedNodes,
+			untaintedNodes: untaintedNodes,
 		})
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
