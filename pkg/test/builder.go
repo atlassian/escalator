@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -167,6 +168,7 @@ type PodOpts struct {
 	Owner             string
 	NodeAffinityKey   string
 	NodeAffinityValue string
+	NodeAffinityOp    v1.NodeSelectorOperator
 	NodeName          string
 }
 
@@ -195,19 +197,23 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		}
 	}
 
-	var affinty *apiv1.Affinity
+	var affinity *apiv1.Affinity
 	if len(opts.NodeAffinityKey) > 0 || len(opts.NodeAffinityValue) > 0 {
-		affinty = &apiv1.Affinity{
+		if opts.NodeAffinityOp == "" {
+			opts.NodeAffinityOp = v1.NodeSelectorOpIn
+		}
+		affinity = &apiv1.Affinity{
 			NodeAffinity: &apiv1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{
 					NodeSelectorTerms: []apiv1.NodeSelectorTerm{
-						0: {
+						{
 							MatchExpressions: []apiv1.NodeSelectorRequirement{
 								{
 									Key: opts.NodeAffinityKey,
 									Values: []string{
-										0: opts.NodeAffinityValue,
+										opts.NodeAffinityValue,
 									},
+									Operator: opts.NodeAffinityOp,
 								},
 							},
 						},
@@ -227,7 +233,7 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		Spec: apiv1.PodSpec{
 			Containers:   containers,
 			NodeSelector: nodeSelector,
-			Affinity:     affinty,
+			Affinity:     affinity,
 		},
 	}
 

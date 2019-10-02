@@ -192,6 +192,17 @@ type NodeGroupLister struct {
 	Nodes k8s.NodeLister
 }
 
+// unwrapNodeSelectorTerms is a helper to safely get the NodeSelectorTerms array from a pod
+// returns nil slice if not exists
+func unwrapNodeSelectorTerms(pod *v1.Pod) []v1.NodeSelectorTerm {
+	if pod.Spec.Affinity != nil &&
+		pod.Spec.Affinity.NodeAffinity != nil &&
+		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		return pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	}
+	return nil
+}
+
 // NewPodAffinityFilterFunc creates a new PodFilterFunc based on filtering by label selectors
 func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 	return func(pod *v1.Pod) bool {
@@ -208,16 +219,18 @@ func NewPodAffinityFilterFunc(labelKey, labelValue string) k8s.PodFilterFunc {
 		}
 
 		// finally, if the pod has an affinity for our selector then we will include it
-		if pod.Spec.Affinity != nil && pod.Spec.Affinity.NodeAffinity != nil && pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms != nil {
-				for _, term := range pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-					for _, expression := range term.MatchExpressions {
-						if expression.Key == labelKey {
-							for _, value := range expression.Values {
-								if value == labelValue {
-									return true
-								}
-							}
+		for _, term := range unwrapNodeSelectorTerms(pod) {
+			for _, expression := range term.MatchExpressions {
+				// this is the key we're looking for
+				if expression.Key != labelKey {
+					continue
+				}
+				// perform the appropriate match for the expression operator
+				// we only support In
+				if expression.Operator == v1.NodeSelectorOpIn {
+					for _, value := range expression.Values {
+						if value == labelValue {
+							return true
 						}
 					}
 				}

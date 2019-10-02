@@ -42,7 +42,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 
 	nodeGroups := []NodeGroupOptions{
 		{
-			Name:     "buildeng",
+			Name:     "example",
 			MinNodes: 3,
 			MaxNodes: 6,
 			DryMode:  false,
@@ -87,7 +87,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 					nodes,
 					[]*v1.Node{},
 					nodes,
-					nodeGroupsState["buildeng"],
+					nodeGroupsState["example"],
 					2,
 				},
 			},
@@ -102,7 +102,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 					nodes,
 					[]*v1.Node{},
 					nodes,
-					nodeGroupsState["buildeng"],
+					nodeGroupsState["example"],
 					4,
 				},
 			},
@@ -117,7 +117,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 					nodes[:2],
 					[]*v1.Node{},
 					nodes[:2],
-					nodeGroupsState["buildeng"],
+					nodeGroupsState["example"],
 					4,
 				},
 			},
@@ -180,7 +180,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 					<-updateChan
 				}
 			}
-			nodeGroupsState["buildeng"].taintTracker = nil
+			nodeGroupsState["example"].taintTracker = nil
 		})
 	}
 }
@@ -216,7 +216,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 
 	nodeGroups := []NodeGroupOptions{
 		{
-			Name:     "buildeng",
+			Name:     "example",
 			MinNodes: 1,
 			MaxNodes: 5,
 			DryMode:  false,
@@ -251,7 +251,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"first 3 nodes. taint 3",
 			args{
 				nodes[:3],
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				3,
 			},
 			[]int{1, 2, 0},
@@ -260,7 +260,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"first 3 nodes. taint 2",
 			args{
 				nodes[:3],
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				2,
 			},
 			[]int{1, 2},
@@ -269,7 +269,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"6 nodes. taint 0",
 			args{
 				nodes,
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				0,
 			},
 			[]int{},
@@ -278,7 +278,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"6 nodes. taint 2",
 			args{
 				nodes,
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				2,
 			},
 			[]int{4, 5},
@@ -287,7 +287,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"6 nodes. taint 6",
 			args{
 				nodes,
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				6,
 			},
 			[]int{4, 5, 1, 2, 0, 3},
@@ -296,7 +296,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"6 nodes. taint 5",
 			args{
 				nodes,
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				5,
 			},
 			[]int{4, 5, 1, 2, 0},
@@ -305,7 +305,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"6 nodes. taint 7",
 			args{
 				nodes,
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				7,
 			},
 			[]int{4, 5, 1, 2, 0, 3},
@@ -314,7 +314,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 			"4 nodes. taint 1",
 			args{
 				nodes[:4],
-				nodeGroupsState["buildeng"],
+				nodeGroupsState["example"],
 				1,
 			},
 			[]int{1},
@@ -357,7 +357,7 @@ func TestControllerTaintOldestN(t *testing.T) {
 					<-updateChan
 				}
 			}
-			nodeGroupsState["buildeng"].taintTracker = nil
+			nodeGroupsState["example"].taintTracker = nil
 		})
 	}
 }
