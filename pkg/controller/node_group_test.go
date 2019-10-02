@@ -11,13 +11,13 @@ import (
 )
 
 func TestNewPodLabelFilterFunc(t *testing.T) {
-	buildengPod := test.BuildTestPod(test.PodOpts{
+	examplePod := test.BuildTestPod(test.PodOpts{
 		NodeSelectorKey:   "customer",
-		NodeSelectorValue: "buildeng",
+		NodeSelectorValue: "example",
 	})
 	badKeyPod := test.BuildTestPod(test.PodOpts{
 		NodeSelectorKey:   "wronglabelkey",
-		NodeSelectorValue: "buildeng",
+		NodeSelectorValue: "example",
 	})
 	badLabelPod := test.BuildTestPod(test.PodOpts{
 		NodeSelectorKey:   "customer",
@@ -29,12 +29,17 @@ func TestNewPodLabelFilterFunc(t *testing.T) {
 	})
 	daemonSet := test.BuildTestPod(test.PodOpts{
 		NodeSelectorKey:   "customer",
-		NodeSelectorValue: "buildeng",
+		NodeSelectorValue: "example",
 		Owner:             "DaemonSet",
 	})
 	affinity := test.BuildTestPod(test.PodOpts{
 		NodeAffinityKey:   "customer",
-		NodeAffinityValue: "buildeng",
+		NodeAffinityValue: "example",
+	})
+	affinityIncorrectOp := test.BuildTestPod(test.PodOpts{
+		NodeAffinityKey:   "customer",
+		NodeAffinityValue: "example",
+		NodeAffinityOp:    v1.NodeSelectorOpNotIn,
 	})
 
 	type args struct {
@@ -48,46 +53,46 @@ func TestNewPodLabelFilterFunc(t *testing.T) {
 		want bool
 	}{
 		{
-			"buildeng customer should pass",
+			"example customer should pass",
 			args{
 				"customer",
-				"buildeng",
-				buildengPod,
+				"example",
+				examplePod,
 			},
 			true,
 		},
 		{
-			"buildeng customer should fail",
+			"example customer should fail",
 			args{
 				"customer",
 				"kitt",
-				buildengPod,
+				examplePod,
 			},
 			false,
 		},
 		{
-			"buildeng wrong key should fail",
+			"example wrong key should fail",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				badKeyPod,
 			},
 			false,
 		},
 		{
-			"buildeng wrong value should fail",
+			"example wrong value should fail",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				badLabelPod,
 			},
 			false,
 		},
 		{
-			"buildeng bad both should fail",
+			"example bad both should fail",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				badBothPod,
 			},
 			false,
@@ -96,26 +101,35 @@ func TestNewPodLabelFilterFunc(t *testing.T) {
 			"daemonset should be false",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				daemonSet,
 			},
 			false,
 		},
 		{
-			"correct affinty should be true",
+			"correct affinity should be true",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				affinity,
 			},
 			true,
 		},
 		{
-			"wrong affinty should be false",
+			"wrong affinity should be false",
 			args{
 				"customer",
 				"shared",
 				affinity,
+			},
+			false,
+		},
+		{
+			"correct affinity wrong operator should be false",
+			args{
+				"customer",
+				"shared",
+				affinityIncorrectOp,
 			},
 			false,
 		},
@@ -130,9 +144,9 @@ func TestNewPodLabelFilterFunc(t *testing.T) {
 }
 
 func TestNewPodDefaultFilterFunc(t *testing.T) {
-	buildengPod := test.BuildTestPod(test.PodOpts{
+	examplePod := test.BuildTestPod(test.PodOpts{
 		NodeSelectorKey:   "customer",
-		NodeSelectorValue: "buildeng",
+		NodeSelectorValue: "example",
 	})
 	sharedPod := test.BuildTestPod(test.PodOpts{
 		NodeSelectorKey:   "customer",
@@ -162,9 +176,9 @@ func TestNewPodDefaultFilterFunc(t *testing.T) {
 		want bool
 	}{
 		{
-			"buildeng customer should fail",
+			"example customer should fail",
 			args{
-				buildengPod,
+				examplePod,
 			},
 			false,
 		},
@@ -221,13 +235,13 @@ func TestNewPodDefaultFilterFunc(t *testing.T) {
 }
 
 func TestNewNodeLabelFilterFunc(t *testing.T) {
-	buildengNode := test.BuildTestNode(test.NodeOpts{
+	exampleNode := test.BuildTestNode(test.NodeOpts{
 		LabelKey:   "customer",
-		LabelValue: "buildeng",
+		LabelValue: "example",
 	})
 	badKeyNode := test.BuildTestNode(test.NodeOpts{
 		LabelKey:   "wronglabelkey",
-		LabelValue: "buildeng",
+		LabelValue: "example",
 	})
 	badLabelNode := test.BuildTestNode(test.NodeOpts{
 		LabelKey:   "customer",
@@ -249,46 +263,46 @@ func TestNewNodeLabelFilterFunc(t *testing.T) {
 		want bool
 	}{
 		{
-			"buildeng customer should pass",
+			"example customer should pass",
 			args{
 				"customer",
-				"buildeng",
-				buildengNode,
+				"example",
+				exampleNode,
 			},
 			true,
 		},
 		{
-			"buildeng customer should fail",
+			"example customer should fail",
 			args{
 				"customer",
 				"kitt",
-				buildengNode,
+				exampleNode,
 			},
 			false,
 		},
 		{
-			"buildeng wrong key should fail",
+			"example wrong key should fail",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				badKeyNode,
 			},
 			false,
 		},
 		{
-			"buildeng wrong value should fail",
+			"example wrong value should fail",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				badLabelNode,
 			},
 			false,
 		},
 		{
-			"buildeng bad both should fail",
+			"example bad both should fail",
 			args{
 				"customer",
-				"buildeng",
+				"example",
 				badBothNode,
 			},
 			false,
@@ -311,9 +325,9 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(opts))
 		assert.NotNil(t, opts[0])
-		assert.Equal(t, "buildeng", opts[0].Name)
+		assert.Equal(t, "example", opts[0].Name)
 		assert.Equal(t, "customer", opts[0].LabelKey)
-		assert.Equal(t, "buildeng", opts[0].LabelValue)
+		assert.Equal(t, "example", opts[0].LabelValue)
 		assert.Equal(t, 5, opts[0].MinNodes)
 		assert.Equal(t, 300, opts[0].MaxNodes)
 		assert.Equal(t, true, opts[0].DryMode)
@@ -340,16 +354,16 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.Empty(t, opts)
 	})
 
-	t.Run("test yaml unmarshal Buildeng good", func(t *testing.T) {
+	t.Run("test yaml unmarshal example good", func(t *testing.T) {
 		yamlReader := strings.NewReader(yamlBE)
 		opts, err := UnmarshalNodeGroupOptions(yamlReader)
 
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(opts))
 		assert.NotNil(t, opts[0])
-		assert.Equal(t, "buildeng", opts[0].Name)
+		assert.Equal(t, "example", opts[0].Name)
 		assert.Equal(t, "customer", opts[0].LabelKey)
-		assert.Equal(t, "buildeng", opts[0].LabelValue)
+		assert.Equal(t, "example", opts[0].LabelValue)
 		assert.Equal(t, 10, opts[0].MinNodes)
 		assert.Equal(t, 300, opts[0].MaxNodes)
 		assert.Equal(t, false, opts[0].DryMode)
@@ -364,9 +378,9 @@ node_groups:
 
 var yamlValid = `
 node_groups:
-  - name: "buildeng"
+  - name: "example"
     label_key: "customer"
-    label_value: "buildeng"
+    label_value: "example"
     min_nodes: 5
     max_nodes: 300
     dry_mode: true
@@ -395,9 +409,9 @@ node_groups:
 `
 
 var yamlBE = `node_groups:
-  - name: "buildeng"
+  - name: "example"
     label_key: "customer"
-    label_value: "buildeng"
+    label_value: "example"
     min_nodes: 10
     max_nodes: 300
     dry_mode: false
