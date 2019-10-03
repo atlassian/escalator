@@ -349,7 +349,7 @@ func (n *NodeGroup) setASGDesiredSizeOneShot(addCount int64) error {
 			DefaultTargetCapacityType: awsapi.String("on-demand"),
 		},
 		LaunchTemplateConfigs: []*ec2.FleetLaunchTemplateConfigRequest{
-			&ec2.FleetLaunchTemplateConfigRequest{
+			{
 				LaunchTemplateSpecification: &ec2.FleetLaunchTemplateSpecificationRequest{
 					LaunchTemplateId: awsapi.String(n.config.AWSConfig.LaunchTemplateID),
 					Version:          awsapi.String(n.config.AWSConfig.LaunchTemplateVersion),
