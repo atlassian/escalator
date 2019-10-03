@@ -378,7 +378,7 @@ func (n *NodeGroup) setASGDesiredSizeOneShot(addCount int64) error {
 	defer ticker.Stop()
 	defer deadline.Stop()
 
-	// Escalator will block waiting for all nodes to become avaiable in this
+	// Escalator will block waiting for all nodes to become available in this
 	// node group for the maximum time specified in FleetInstanceReadyTimeout.
 	// This should typically be quite fast as it's just the time for the
 	// instance to boot and transition to ready state. The instance must be in
@@ -397,7 +397,7 @@ InstanceReadyLoop:
 
 	// The AttachInstances API only supports adding 20 instances at a time
 	batchSize := 20
-	batch := make([]*string, batchSize)
+	var batch []*string
 	for batchSize < len(instances) {
 		instances, batch = instances[batchSize:], instances[0:batchSize:batchSize]
 
