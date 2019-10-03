@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
+// MockAutoscalingService is a mock implentation of a cloud provider interface
 type MockAutoscalingService struct {
 	autoscalingiface.AutoScalingAPI
 	*client.Client
@@ -22,18 +23,22 @@ type MockAutoscalingService struct {
 	TerminateInstanceInAutoScalingGroupErr    error
 }
 
+// DescribeAutoScalingGroups mock implementation for MockAutoscalingService
 func (m MockAutoscalingService) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGroupsInput) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
 	return m.DescribeAutoScalingGroupsOutput, m.DescribeAutoScalingGroupsErr
 }
 
+// SetDesiredCapacity mock implementation for MockAutoscalingService
 func (m MockAutoscalingService) SetDesiredCapacity(*autoscaling.SetDesiredCapacityInput) (*autoscaling.SetDesiredCapacityOutput, error) {
 	return m.SetDesiredCapacityOutput, m.SetDesiredCapacityErr
 }
 
+// TerminateInstanceInAutoScalingGroup mock implementation for MockAutoscalingService
 func (m MockAutoscalingService) TerminateInstanceInAutoScalingGroup(*autoscaling.TerminateInstanceInAutoScalingGroupInput) (*autoscaling.TerminateInstanceInAutoScalingGroupOutput, error) {
 	return m.TerminateInstanceInAutoScalingGroupOutput, m.TerminateInstanceInAutoScalingGroupErr
 }
 
+// MockEc2Service mocks the EC2API for DescribeInstances
 type MockEc2Service struct {
 	ec2iface.EC2API
 	*client.Client
@@ -42,6 +47,7 @@ type MockEc2Service struct {
 	DescribeInstancesErr    error
 }
 
+// DescribeInstances mock implementation for MockAutoscalingService
 func (m MockEc2Service) DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	return m.DescribeInstancesOutput, m.DescribeInstancesErr
 }

@@ -261,12 +261,12 @@ func TestCloudProvider_GetInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock ec2 service
-			ec2_service := &test.MockEc2Service{
+			ec2Service := &test.MockEc2Service{
 				DescribeInstancesOutput: tt.response,
 				DescribeInstancesErr:    tt.err,
 			}
 
-			awsCloudProvider, err := newMockCloudProvider(nodeGroups, nil, ec2_service)
+			awsCloudProvider, err := newMockCloudProvider(nodeGroups, nil, ec2Service)
 
 			assert.Nil(t, err)
 
