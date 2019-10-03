@@ -24,15 +24,15 @@ func instanceToProviderID(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
 }
 
-func providerIDToInstanceID(providerId string) string {
-	return strings.Split(providerId, "/")[4]
+func providerIDToInstanceID(providerID string) string {
+	return strings.Split(providerID, "/")[4]
 }
 
 // CloudProvider providers an aws cloud provider implementation
 type CloudProvider struct {
-	service     autoscalingiface.AutoScalingAPI
-	ec2_service ec2iface.EC2API
-	nodeGroups  map[string]*NodeGroup
+	service    autoscalingiface.AutoScalingAPI
+	ec2Service ec2iface.EC2API
+	nodeGroups map[string]*NodeGroup
 }
 
 // Name returns name of the cloud provider.
@@ -124,7 +124,7 @@ func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, erro
 		InstanceIds: []*string{&id},
 	}
 
-	result, err := c.ec2_service.DescribeInstances(input)
+	result, err := c.ec2Service.DescribeInstances(input)
 
 	if err != nil {
 		log.Error("Error describing instance - ", err)
@@ -227,10 +227,11 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 	if n.canScaleInOneShot() {
 		log.WithField("asg", n.id).Infof("Scaling with CreateFleet strategy")
 		return n.setASGDesiredSizeOneShot(delta)
-	} else {
-		log.WithField("asg", n.id).Infof("Scaling with SetDesiredCapacity trategy")
-		return n.setASGDesiredSize(n.TargetSize() + delta)
 	}
+
+	log.WithField("asg", n.id).Infof("Scaling with SetDesiredCapacity trategy")
+	return n.setASGDesiredSize(n.TargetSize() + delta)
+
 }
 
 // DeleteNodes deletes nodes from this node group. Error is returned either on
@@ -335,7 +336,7 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 // setASGDesiredSizeOneShot uses the AWS fleet API to acquire all desired
 // capacity in one step and then add it to the existing auto-scaling group.
 func (n *NodeGroup) setASGDesiredSizeOneShot(addCount int64) error {
-	fleet, err := n.provider.ec2_service.CreateFleet(&ec2.CreateFleetInput{
+	fleet, err := n.provider.ec2Service.CreateFleet(&ec2.CreateFleetInput{
 		Type:                             awsapi.String("instant"),
 		TerminateInstancesWithExpiration: awsapi.Bool(false),
 		OnDemandOptions: &ec2.OnDemandOptionsRequest{
@@ -424,7 +425,7 @@ InstanceReadyLoop:
 func (n *NodeGroup) allInstancesReady(ids []*string) bool {
 	ready := false
 
-	n.provider.ec2_service.DescribeInstanceStatusPages(&ec2.DescribeInstanceStatusInput{
+	n.provider.ec2Service.DescribeInstanceStatusPages(&ec2.DescribeInstanceStatusInput{
 		InstanceIds:         ids,
 		IncludeAllInstances: awsapi.Bool(true),
 	}, func(r *ec2.DescribeInstanceStatusOutput, lastPage bool) bool {

@@ -9,7 +9,7 @@ import (
 
 const ProviderName = "test"
 
-// cloudProvider implements the CloudProvider interface
+// CloudProvider implements the CloudProvider interface
 type CloudProvider struct {
 	nodeGroups map[string]*NodeGroup
 }

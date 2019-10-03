@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// NAMESPACE is the prometheus prefix namespace for the exported metrics
 const NAMESPACE = "escalator"
 
 var (
@@ -34,7 +35,7 @@ var (
 		},
 		[]string{"node_group"},
 	)
-	// NodeGroupNodes nodes considered by specific node groups
+	// NodeGroupNodesCordoned nodes considered by specific node groups
 	NodeGroupNodesCordoned = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name:      "node_group_cordoned_nodes",
@@ -61,7 +62,7 @@ var (
 		},
 		[]string{"node_group"},
 	)
-	// NodeGroupsPodEvicted pods evicted during a scale down
+	// NodeGroupPodsEvicted pods evicted during a scale down
 	NodeGroupPodsEvicted = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name:      "node_group_pods_evicted",

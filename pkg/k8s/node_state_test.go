@@ -61,7 +61,7 @@ func TestCreateNodeNameToInfoMap(t *testing.T) {
 			var validPodCount int
 			for _, pod := range tt.args.pods {
 				if _, ok := nodeInfo[pod.Spec.NodeName]; ok {
-					validPodCount += 1
+					validPodCount++
 				}
 			}
 

@@ -127,7 +127,7 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 			*resource.NewQuantity(0, resource.DecimalSI),
 		},
 		{
-			"test mulitple containers",
+			"test multiple containers",
 			args{
 				[]*v1.Pod{p6, p7},
 			},

@@ -38,12 +38,12 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 	service := autoscaling.New(sess, &aws.Config{
 		Credentials: creds,
 	})
-	ec2_service := ec2.New(sess, &aws.Config{
+	ec2Service := ec2.New(sess, &aws.Config{
 		Credentials: creds,
 	})
 	cloud := &CloudProvider{
 		service:     service,
-		ec2_service: ec2_service,
+		ec2Service: ec2Service,
 		nodeGroups:  make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupConfigs)),
 	}
 
