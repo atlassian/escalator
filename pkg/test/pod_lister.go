@@ -8,6 +8,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// NewTestPodWatcher creates a new test PodLister with given pods and options
 func NewTestPodWatcher(pods []*v1.Pod, opts PodListerOptions) listerv1.PodLister {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	for _, pod := range pods {
@@ -16,6 +17,7 @@ func NewTestPodWatcher(pods []*v1.Pod, opts PodListerOptions) listerv1.PodLister
 	return &podLister{store, opts}
 }
 
+// PodListerOptions for creating a new test PodLister
 type PodListerOptions struct {
 	ReturnErrorOnList bool
 }
