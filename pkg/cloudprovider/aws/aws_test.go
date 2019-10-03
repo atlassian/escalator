@@ -27,9 +27,9 @@ func newMockCloudProvider(nodeGroups []string, service *test.MockAutoscalingServ
 	var err error
 
 	cloudProvider := &CloudProvider{
-		service:     service,
+		service:    service,
 		ec2Service: ec2Service,
-		nodeGroups:  make(map[string]*NodeGroup, len(nodeGroups)),
+		nodeGroups: make(map[string]*NodeGroup, len(nodeGroups)),
 	}
 
 	configs := make([]cloudprovider.NodeGroupConfig, 0, len(nodeGroups))

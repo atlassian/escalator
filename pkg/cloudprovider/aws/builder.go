@@ -42,9 +42,9 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 		Credentials: creds,
 	})
 	cloud := &CloudProvider{
-		service:     service,
+		service:    service,
 		ec2Service: ec2Service,
-		nodeGroups:  make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupConfigs)),
+		nodeGroups: make(map[string]*NodeGroup, len(b.ProviderOpts.NodeGroupConfigs)),
 	}
 
 	// Register the node groups
