@@ -15,6 +15,7 @@ go:
 before_install:
   # install goreturns for linting
   - go get -u github.com/sqs/goreturns
+  - go get -u golang.org/x/lint/golint
 
 script:
   - make lint

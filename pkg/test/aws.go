@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
-// MockAutoscalingService is a mock implentation of a cloud provider interface
+// MockAutoscalingService is a mock implementation of a cloud provider interface
 type MockAutoscalingService struct {
 	autoscalingiface.AutoScalingAPI
 	*client.Client
