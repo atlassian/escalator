@@ -257,6 +257,7 @@ func init() {
 
 // Start starts the metrics endpoint on a new thread
 func Start(addr string) {
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(addr, nil)
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(addr, mux)
 }
