@@ -67,6 +67,7 @@ func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.
 	var nodeGroupConfigs []cloudprovider.NodeGroupConfig
 	for _, n := range nodegroups {
 		nodeGroupConfigs = append(nodeGroupConfigs, cloudprovider.NodeGroupConfig{
+			Name:    n.Name,
 			GroupID: n.CloudProviderGroupName,
 			AWSConfig: cloudprovider.AWSNodeGroupConfig{
 				LaunchTemplateID:          n.AWS.LaunchTemplateID,

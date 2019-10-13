@@ -67,15 +67,16 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 // the controller should untaint all tainted nodes to get above the new min ASG size instead of bringing up new nodes first
 func TestUntaintNodeGroupMinNodes(t *testing.T) {
 	t.Run("10 minNodes, 10 tainted, 0 untainted - scale up by untainting", func(t *testing.T) {
-		nodeGroupName := "default"
 		minNodes := 10
 		maxNodes := 20
-		nodeGroups := []NodeGroupOptions{{
-			Name:                    nodeGroupName,
+		nodeGroup := NodeGroupOptions{
+			Name:                    "default",
+			CloudProviderGroupName:  "default",
 			MinNodes:                minNodes,
 			MaxNodes:                maxNodes,
 			ScaleUpThresholdPercent: 100,
-		}}
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
 
 		nodes := test.BuildTestNodes(10, test.NodeOpts{
 			CPU:     1000,
@@ -91,7 +92,8 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 		// Create a test (mock) cloud provider
 		testCloudProvider := test.NewCloudProvider(nodeGroupSize)
 		testNodeGroup := test.NewNodeGroup(
-			nodeGroupName,
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
 			int64(minNodes),
 			int64(maxNodes),
 			int64(len(nodes)),
@@ -112,10 +114,10 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 			cloudProvider: testCloudProvider,
 		}
 
-		_, err := controller.scaleNodeGroup(nodeGroupName, nodeGroupsState[nodeGroupName])
+		_, err := controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
 		assert.NoError(t, err)
 
-		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroupName], nodes)
+		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
 		// Ensure that the tainted nodes where untainted
 		assert.Equal(t, minNodes, len(untainted))
 		assert.Equal(t, 0, len(tainted))
@@ -126,15 +128,16 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 // it will untaint them before trying to scale up the cloud provider
 func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 	t.Run("10 maxNodes, 5 tainted, 5 untainted - scale up", func(t *testing.T) {
-		nodeGroupName := "default"
 		minNodes := 2
 		maxNodes := 10
-		nodeGroups := []NodeGroupOptions{{
-			Name:                    nodeGroupName,
+		nodeGroup := NodeGroupOptions{
+			Name:                    "default",
+			CloudProviderGroupName:  "default",
 			MinNodes:                minNodes,
 			MaxNodes:                maxNodes,
 			ScaleUpThresholdPercent: 70,
-		}}
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
 
 		nodes := test.BuildTestNodes(5, test.NodeOpts{
 			CPU:     1000,
@@ -155,7 +158,8 @@ func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 		// Create a test (mock) cloud provider
 		testCloudProvider := test.NewCloudProvider(nodeGroupSize)
 		testNodeGroup := test.NewNodeGroup(
-			nodeGroupName,
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
 			int64(minNodes),
 			int64(maxNodes),
 			int64(len(nodes)),
@@ -176,9 +180,9 @@ func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 			cloudProvider: testCloudProvider,
 		}
 
-		controller.scaleNodeGroup(nodeGroupName, nodeGroupsState[nodeGroupName])
+		controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
 
-		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroupName], nodes)
+		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
 		// Ensure that the tainted nodes where untainted
 		assert.Equal(t, maxNodes, len(untainted))
 		assert.Equal(t, 0, len(tainted))
@@ -307,8 +311,9 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{1, 0, 0},
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
-					Name:     "default",
-					MinNodes: 5,
+					Name:                   "default",
+					CloudProviderGroupName: "default",
+					MinNodes:               5,
 				},
 				ListerOptions{},
 			},
@@ -320,8 +325,9 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 0, 0},
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
-					Name:     "default",
-					MaxNodes: 5,
+					Name:                   "default",
+					CloudProviderGroupName: "default",
+					MaxNodes:               5,
 				},
 				ListerOptions{},
 			},
@@ -333,9 +339,10 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, 0, 0},
 				buildTestPods(5, 0, 0),
 				NodeGroupOptions{
-					Name:     "default",
-					MinNodes: 1,
-					MaxNodes: 100,
+					Name:                   "default",
+					CloudProviderGroupName: "default",
+					MinNodes:               1,
+					MaxNodes:               100,
 				},
 				ListerOptions{},
 			},
@@ -347,9 +354,10 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, -100, 0},
 				buildTestPods(5, 0, -100),
 				NodeGroupOptions{
-					Name:     "default",
-					MinNodes: 1,
-					MaxNodes: 100,
+					Name:                   "default",
+					CloudProviderGroupName: "default",
+					MinNodes:               1,
+					MaxNodes:               100,
 				},
 				ListerOptions{},
 			},
@@ -361,9 +369,10 @@ func TestScaleNodeGroup(t *testing.T) {
 				nodeArgs{10, -100, -100},
 				buildTestPods(5, -100, -100),
 				NodeGroupOptions{
-					Name:     "default",
-					MinNodes: 1,
-					MaxNodes: 100,
+					Name:                   "default",
+					CloudProviderGroupName: "default",
+					MinNodes:               1,
+					MaxNodes:               100,
 				},
 				ListerOptions{},
 			},
@@ -376,6 +385,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				buildTestPods(5, 1000, 2000),
 				NodeGroupOptions{
 					Name:                    "default",
+					CloudProviderGroupName:  "default",
 					MinNodes:                1,
 					MaxNodes:                100,
 					ScaleUpThresholdPercent: 70,
@@ -395,6 +405,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				buildTestPods(5, 1000, 2000),
 				NodeGroupOptions{
 					Name:                    "default",
+					CloudProviderGroupName:  "default",
 					MinNodes:                1,
 					MaxNodes:                100,
 					ScaleUpThresholdPercent: 70,
@@ -414,6 +425,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				buildTestPods(5, 1000, 2000),
 				NodeGroupOptions{
 					Name:                    "default",
+					CloudProviderGroupName:  "default",
 					MinNodes:                1,
 					MaxNodes:                100,
 					ScaleUpThresholdPercent: 70,
@@ -453,6 +465,7 @@ func TestScaleNodeGroup(t *testing.T) {
 			// Create a test (mock) cloud provider
 			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
 			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.CloudProviderGroupName,
 				tt.args.nodeGroupOptions.Name,
 				int64(tt.args.nodeGroupOptions.MinNodes),
 				int64(tt.args.nodeGroupOptions.MaxNodes),
@@ -673,6 +686,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			// Create a test (mock) cloud provider
 			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
 			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.CloudProviderGroupName,
 				tt.args.nodeGroupOptions.Name,
 				int64(tt.args.nodeGroupOptions.MinNodes),
 				int64(tt.args.nodeGroupOptions.MaxNodes),

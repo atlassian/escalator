@@ -89,10 +89,10 @@ func (c *CloudProvider) RegisterNodeGroups(groups ...cloudprovider.NodeGroupConf
 
 	// Update metrics for each node group
 	for _, nodeGroup := range c.nodeGroups {
-		metrics.CloudProviderMinSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.MinSize()))
-		metrics.CloudProviderMaxSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.MaxSize()))
-		metrics.CloudProviderTargetSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.TargetSize()))
-		metrics.CloudProviderSize.WithLabelValues(c.Name(), nodeGroup.ID()).Set(float64(nodeGroup.Size()))
+		metrics.CloudProviderMinSize.WithLabelValues(c.Name(), nodeGroup.ID(), nodeGroup.Name()).Set(float64(nodeGroup.MinSize()))
+		metrics.CloudProviderMaxSize.WithLabelValues(c.Name(), nodeGroup.ID(), nodeGroup.Name()).Set(float64(nodeGroup.MaxSize()))
+		metrics.CloudProviderTargetSize.WithLabelValues(c.Name(), nodeGroup.ID(), nodeGroup.Name()).Set(float64(nodeGroup.TargetSize()))
+		metrics.CloudProviderSize.WithLabelValues(c.Name(), nodeGroup.ID(), nodeGroup.Name()).Set(float64(nodeGroup.Size()))
 	}
 
 	return nil
@@ -155,8 +155,9 @@ func (i *Instance) ID() string {
 
 // NodeGroup implements a aws nodegroup
 type NodeGroup struct {
-	id  string
-	asg *autoscaling.Group
+	id   string
+	name string
+	asg  *autoscaling.Group
 
 	provider *CloudProvider
 	config   *cloudprovider.NodeGroupConfig
@@ -166,6 +167,7 @@ type NodeGroup struct {
 func NewNodeGroup(config *cloudprovider.NodeGroupConfig, asg *autoscaling.Group, provider *CloudProvider) *NodeGroup {
 	return &NodeGroup{
 		id:       config.GroupID,
+		name:     config.Name,
 		asg:      asg,
 		provider: provider,
 		config:   config,
@@ -179,6 +181,11 @@ func (n *NodeGroup) String() string {
 // ID returns an unique identifier of the node group.
 func (n *NodeGroup) ID() string {
 	return n.id
+}
+
+// Name returns the name of the node group for this cloud provider node group.
+func (n *NodeGroup) Name() string {
+	return n.name
 }
 
 // MinSize returns minimum size of the node group.
