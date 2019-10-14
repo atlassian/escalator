@@ -20,6 +20,6 @@ before_install:
 script:
   - make lint
   - make test
-  - make test-race
   - make test-vet
   - make build
+  - make docker
