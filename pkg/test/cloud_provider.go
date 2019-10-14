@@ -80,6 +80,7 @@ func (i Instance) ID() string {
 // NodeGroup is a mock implementation of NodeGroup for testing
 type NodeGroup struct {
 	id         string
+	name       string
 	minSize    int64
 	maxSize    int64
 	actualSize int64
@@ -87,9 +88,10 @@ type NodeGroup struct {
 }
 
 // NewNodeGroup creates a new mock NodeGroup
-func NewNodeGroup(id string, minSize int64, maxSize int64, targetSize int64) *NodeGroup {
+func NewNodeGroup(id string, name string, minSize int64, maxSize int64, targetSize int64) *NodeGroup {
 	return &NodeGroup{
 		id,
+		name,
 		minSize,
 		maxSize,
 		targetSize,
@@ -105,6 +107,11 @@ func (n *NodeGroup) String() string {
 // ID mock implementation for NodeGroup
 func (n *NodeGroup) ID() string {
 	return n.id
+}
+
+// Name mock implementation for NodeGroup
+func (n *NodeGroup) Name() string {
+	return n.name
 }
 
 // MinSize mock implementation for NodeGroup

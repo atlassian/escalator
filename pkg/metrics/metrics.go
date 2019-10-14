@@ -197,7 +197,7 @@ var (
 			Namespace: NAMESPACE,
 			Help:      "current cloud provider minimum size",
 		},
-		[]string{"cloud_provider", "id"},
+		[]string{"cloud_provider", "id", "node_group"},
 	)
 	// CloudProviderMaxSize indicates the current cloud provider maximum size
 	CloudProviderMaxSize = prometheus.NewGaugeVec(
@@ -206,7 +206,7 @@ var (
 			Namespace: NAMESPACE,
 			Help:      "current cloud provider maximum size",
 		},
-		[]string{"cloud_provider", "id"},
+		[]string{"cloud_provider", "id", "node_group"},
 	)
 	// CloudProviderTargetSize indicates the current cloud provider target size
 	CloudProviderTargetSize = prometheus.NewGaugeVec(
@@ -215,7 +215,7 @@ var (
 			Namespace: NAMESPACE,
 			Help:      "current cloud provider target size",
 		},
-		[]string{"cloud_provider", "id"},
+		[]string{"cloud_provider", "id", "node_group"},
 	)
 	// CloudProviderSize indicates the current cloud provider size
 	CloudProviderSize = prometheus.NewGaugeVec(
@@ -224,7 +224,7 @@ var (
 			Namespace: NAMESPACE,
 			Help:      "current cloud provider size",
 		},
-		[]string{"cloud_provider", "id"},
+		[]string{"cloud_provider", "id", "node_group"},
 	)
 )
 

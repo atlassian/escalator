@@ -26,6 +26,8 @@ type CloudProvider interface {
 	// In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
 	Refresh() error
 
+	// GetInstance returns a cloud provider Instance for the provided node. Contains the cloud provider specific
+	// instance for cloud provider specific results.
 	GetInstance(node *v1.Node) (Instance, error)
 }
 
@@ -46,6 +48,9 @@ type NodeGroup interface {
 
 	// ID returns an unique identifier of the node group.
 	ID() string
+
+	// Name returns the name of the node group for this cloud provider node group.
+	Name() string
 
 	// MinSize returns minimum size of the node group.
 	MinSize() int64
@@ -99,6 +104,7 @@ type BuildOpts struct {
 
 // NodeGroupConfig contains the configuration for a node group
 type NodeGroupConfig struct {
+	Name      string
 	GroupID   string
 	AWSConfig AWSNodeGroupConfig
 }
