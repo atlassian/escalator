@@ -115,4 +115,6 @@ type AWSNodeGroupConfig struct {
 	LaunchTemplateID          string
 	LaunchTemplateVersion     string
 	FleetInstanceReadyTimeout time.Duration
+	Lifecycle                 string
+	InstanceTypeOverrides     []string
 }

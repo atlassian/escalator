@@ -19,9 +19,13 @@ Escalator requires the following IAM policy to be able to properly integrate wit
       "Effect": "Allow",
       "Action": [
         "autoscaling:DescribeAutoScalingGroups",
+        "autoscaling:DescribeAutoScalingInstances",
+        "autoscaling:DescribeLaunchConfigurations",
+        "autoscaling:DescribeTags",
         "autoscaling:SetDesiredCapacity",
         "autoscaling:TerminateInstanceInAutoScalingGroup",
-        "ec2:DescribeInstances"
+        "ec2:DescribeInstances",
+        "ec2:DescribeLaunchTemplateVersions"
       ],
       "Resource": "*"
     }
@@ -99,3 +103,5 @@ region.
 - Do not use 
  [Auto Scaling Lifecycle Hooks](https://docs.aws.amazon.com/autoscaling/ec2/userguide/lifecycle-hooks.html) for
  terminating of instances as Escalator will handle the termination of instances itself. 
+- If using launch templates do not use the "network settings" area to configure the security groups. The security groups
+ should be configured via a network interface.

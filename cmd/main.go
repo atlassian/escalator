@@ -75,6 +75,8 @@ func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.
 				LaunchTemplateID:          n.AWS.LaunchTemplateID,
 				LaunchTemplateVersion:     n.AWS.LaunchTemplateVersion,
 				FleetInstanceReadyTimeout: n.AWS.FleetInstanceReadyTimeoutDuration(),
+				Lifecycle:                 n.AWS.Lifecycle,
+				InstanceTypeOverrides:     n.AWS.InstanceTypeOverrides,
 			},
 		})
 	}
