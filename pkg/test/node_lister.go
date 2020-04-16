@@ -40,7 +40,3 @@ func (lister *nodeLister) List(selector labels.Selector) (ret []*v1.Node, err er
 func (lister *nodeLister) Get(name string) (*v1.Node, error) {
 	return nil, nil
 }
-
-func (lister *nodeLister) ListWithPredicate(predicate listerv1.NodeConditionPredicate) ([]*v1.Node, error) {
-	return nil, nil
-}

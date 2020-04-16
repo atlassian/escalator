@@ -5,6 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -21,8 +22,8 @@ type LeaderElectConfig struct {
 }
 
 // GetLeaderElector returns a leader elector
-func GetLeaderElector(ctx context.Context, config LeaderElectConfig, client v1.CoreV1Interface, recorder record.EventRecorder, resourceLockID string) (*leaderelection.LeaderElector, context.Context, <-chan struct{}, error) {
-	resourceLock, err := GetResourceLock(config.Namespace, config.Name, client, recorder, resourceLockID)
+func GetLeaderElector(ctx context.Context, config LeaderElectConfig, coreClient v1.CoreV1Interface, coordClient coordinationv1.CoordinationV1Interface, recorder record.EventRecorder, resourceLockID string) (*leaderelection.LeaderElector, context.Context, <-chan struct{}, error) {
+	resourceLock, err := GetResourceLock(config.Namespace, config.Name, coreClient, coordClient, recorder, resourceLockID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -54,15 +55,15 @@ func GetLeaderElector(ctx context.Context, config LeaderElectConfig, client v1.C
 }
 
 // GetResourceLock returns a resource lock for leader election
-func GetResourceLock(ns string, name string, client v1.CoreV1Interface, recorder record.EventRecorder, resourceLockID string) (resourcelock.Interface, error) {
+func GetResourceLock(ns string, name string, coreClient v1.CoreV1Interface, coordClient coordinationv1.CoordinationV1Interface, recorder record.EventRecorder, resourceLockID string) (resourcelock.Interface, error) {
 	return resourcelock.New(
-		resourcelock.ConfigMapsResourceLock,
+		resourcelock.LeasesResourceLock,
 		ns,
 		name,
-		client,
+		coreClient,
+		coordClient,
 		resourcelock.ResourceLockConfig{
 			Identity:      resourceLockID,
 			EventRecorder: recorder,
-		},
-	)
+		})
 }

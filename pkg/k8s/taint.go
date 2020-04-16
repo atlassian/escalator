@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -34,7 +35,7 @@ const (
 // returns the most recent update of the node that is successful
 func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface, taintEffect apiv1.TaintEffect) (*apiv1.Node, error) {
 	// fetch the latest version of the node to avoid conflict
-	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
 		return node, fmt.Errorf("failed to get node %v: %v", node.Name, err)
 	}
@@ -65,7 +66,7 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface, taintEff
 		Effect: effect,
 	})
 
-	updatedNodeWithTaint, err := client.CoreV1().Nodes().Update(updatedNode)
+	updatedNodeWithTaint, err := client.CoreV1().Nodes().Update(context.TODO(), updatedNode, metav1.UpdateOptions{})
 	if err != nil || updatedNodeWithTaint == nil {
 		return updatedNode, fmt.Errorf("failed to update node %v after adding taint: %v", updatedNode.Name, err)
 	}
@@ -103,7 +104,7 @@ func GetToBeRemovedTime(node *apiv1.Node) (*time.Time, error) {
 // returns the latest successful update of the node
 func DeleteToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*apiv1.Node, error) {
 	// fetch the latest version of the node to avoid conflict
-	updatedNode, err := client.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	if err != nil || updatedNode == nil {
 		return node, fmt.Errorf("failed to get node %v: %v", node.Name, err)
 	}
@@ -115,7 +116,7 @@ func DeleteToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface) (*api
 			updatedNode.Spec.Taints[i] = updatedNode.Spec.Taints[len(updatedNode.Spec.Taints)-1]
 			updatedNode.Spec.Taints = updatedNode.Spec.Taints[:len(updatedNode.Spec.Taints)-1]
 
-			updatedNodeWithoutTaint, err := client.CoreV1().Nodes().Update(updatedNode)
+			updatedNodeWithoutTaint, err := client.CoreV1().Nodes().Update(context.TODO(), updatedNode, metav1.UpdateOptions{})
 			if err != nil || updatedNodeWithoutTaint == nil {
 				return updatedNode, fmt.Errorf("failed to update node %v after deleting taint: %v", updatedNode.Name, err)
 			}

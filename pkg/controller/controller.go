@@ -7,12 +7,12 @@ import (
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 // Controller contains the core logic of the Autoscaler
@@ -28,7 +28,7 @@ type Controller struct {
 type NodeGroupState struct {
 	*NodeGroupLister
 	Opts        NodeGroupOptions
-	NodeInfoMap map[string]*cache.NodeInfo
+	NodeInfoMap map[string]*k8s.NodeInfo
 	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode

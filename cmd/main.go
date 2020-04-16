@@ -162,7 +162,7 @@ func startLeaderElection(client kubernetes.Interface, resourceLockID string, con
 	recorder := eventBroadcaster.NewRecorder(eventsScheme, coreV1.EventSource{Component: "escalator"})
 
 	// Create leader elector
-	leaderElector, ctx, startedLeading, err := k8s.GetLeaderElector(context.Background(), config, client.CoreV1(), recorder, resourceLockID)
+	leaderElector, ctx, startedLeading, err := k8s.GetLeaderElector(context.Background(), config, client.CoreV1(), client.CoordinationV1(), recorder, resourceLockID)
 	if err != nil {
 		return nil, err
 	}
