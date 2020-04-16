@@ -13,10 +13,12 @@ import (
 	"github.com/atlassian/escalator/pkg/controller"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/alecthomas/kingpin.v2"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -38,8 +40,8 @@ var (
 	leaderElectLeaseDuration   = kingpin.Flag("leader-elect-lease-duration", "Leader election lease duration").Default("15s").Duration()
 	leaderElectRenewDeadline   = kingpin.Flag("leader-elect-renew-deadline", "Leader election renew deadline").Default("10s").Duration()
 	leaderElectRetryPeriod     = kingpin.Flag("leader-elect-retry-period", "Leader election retry period").Default("2s").Duration()
-	leaderElectConfigNamespace = kingpin.Flag("leader-elect-config-namespace", "Leader election config map namespace").Default("kube-system").String()
-	leaderElectConfigName      = kingpin.Flag("leader-elect-config-name", "Leader election config map name").Default("escalator-leader-elect").String()
+	leaderElectConfigNamespace = kingpin.Flag("leader-elect-config-namespace", "Leader election lease object  namespace").Default("kube-system").String()
+	leaderElectConfigName      = kingpin.Flag("leader-elect-config-name", "Leader election lease object name").Default("escalator-leader-elect").String()
 )
 
 // cloudProviderBuilder builds the requested cloud provider. aws, gce, etc
@@ -151,6 +153,9 @@ func awaitLeaderDeposed(leaderContext context.Context) {
 // startLeaderElection creates and starts the leader election
 func startLeaderElection(client kubernetes.Interface, resourceLockID string, config k8s.LeaderElectConfig) (context.Context, error) {
 	eventsScheme := runtime.NewScheme()
+	if err := coordinationv1.AddToScheme(eventsScheme); err != nil {
+		return nil, err
+	}
 	if err := coreV1.AddToScheme(eventsScheme); err != nil {
 		return nil, err
 	}

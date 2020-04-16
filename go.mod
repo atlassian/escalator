@@ -1,26 +1,20 @@
 module github.com/atlassian/escalator
 
-go 1.13
+go 1.14
 
 require (
-	cloud.google.com/go v0.38.0 // indirect
 	github.com/101loops/bdd v0.0.0-20161224202746-3e71f58e2cc3 // indirect
-	github.com/Azure/go-autorest/autorest v0.9.0 // indirect
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
 	github.com/aws/aws-sdk-go v1.30.7
 	github.com/evanphx/json-patch v4.5.0+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.4.0 // indirect
-	github.com/google/btree v1.0.0 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.4.0 // indirect
-	github.com/gophercloud/gophercloud v0.1.0 // indirect
-	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
-	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/procfs v0.0.11 // indirect
@@ -37,7 +31,5 @@ require (
 	k8s.io/api v0.18.1
 	k8s.io/apimachinery v0.18.1
 	k8s.io/client-go v0.18.1
-	k8s.io/gengo v0.0.0-20200413195148-3a45101e95ac // indirect
 	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
-	sigs.k8s.io/structured-merge-diff v0.0.0-20190525122527-15d366b2352e // indirect
 )
