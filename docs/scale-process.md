@@ -77,5 +77,5 @@ Escalator taints are given the `atlassian.com/escalator` key.
 Escalator does not use the cordoning command anywhere in it's process. This is done to preserve the cordoning command
 for system administrators to filter the cordoned node out of calculations. This way, a faulty or misbehaving node
 can be cordoned by the system administrator to be debugged or troubleshooted without worrying about the node being 
-tainted and then terminated by Escalator. 
+tainted and then terminated by Escalator.
 

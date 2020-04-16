@@ -19,8 +19,11 @@
     - Scale up
     - Scale down
     - Scale lock
+    - Tainting of nodes
+    - Cordoning of nodes
 - [**Node Termination**](./node-termination.md)
     - Node selection method for termination
+    - Annotating nodes / Stopping termination of selected nodes
 - [**Pod and Node Selectors**](./pod-node-selectors.md)
     - Nodes
     - Pods
