@@ -26,9 +26,7 @@ func NewCachePodWatcher(client kubernetes.Interface, stop <-chan struct{}) (v1li
 		&v1.Pod{},
 		1*time.Hour,
 		cache.ResourceEventHandlerFuncs{},
-		cache.Indexers{
-			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-		},
+		cache.Indexers{},
 	)
 	podLister := v1lister.NewPodLister(podIndexer)
 	go podController.Run(stop)
@@ -49,9 +47,7 @@ func NewCacheNodeWatcher(client kubernetes.Interface, stop <-chan struct{}) (v1l
 		&v1.Node{},
 		1*time.Hour,
 		cache.ResourceEventHandlerFuncs{},
-		cache.Indexers{
-			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
-		},
+		cache.Indexers{},
 	)
 	nodeLister := v1lister.NewNodeLister(nodeIndexer)
 	go nodeController.Run(stop)

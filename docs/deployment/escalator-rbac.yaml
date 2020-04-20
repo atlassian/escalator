@@ -32,17 +32,22 @@ rules:
   - get
   - delete
 - apiGroups:
-  - ""
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+- apiGroups:
+  - coordination.k8s.io
   resourceNames:
   - escalator-leader-elect
   resources:
-  - configmaps
+  - leases
   verbs:
-  - create
   - get
-  - list
-  - watch
   - update
+  - patch
+  - delete
 - apiGroups:
   - ""
   resources:

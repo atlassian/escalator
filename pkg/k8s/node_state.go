@@ -3,24 +3,23 @@ package k8s
 import (
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
-// CreateNodeNameToInfoMap creates a map of cache.NodeInfo which maps node names to nodes and pods to nodes
-// From K8s cluster-autoscaler
-func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*cache.NodeInfo {
-	nodeNameToNodeInfo := make(map[string]*cache.NodeInfo)
+// CreateNodeNameToInfoMap creates a map of NodeInfo which maps node names to nodes and pods to nodes
+// From K8s cluster-autoscaler. Based off the old scheduler cache.NodeInfo
+func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*NodeInfo {
+	nodeNameToNodeInfo := make(map[string]*NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
 		if _, ok := nodeNameToNodeInfo[nodeName]; !ok {
-			nodeNameToNodeInfo[nodeName] = cache.NewNodeInfo()
+			nodeNameToNodeInfo[nodeName] = NewNodeInfo()
 		}
 		nodeNameToNodeInfo[nodeName].AddPod(pod)
 	}
 
 	for _, node := range nodes {
 		if _, ok := nodeNameToNodeInfo[node.Name]; !ok {
-			nodeNameToNodeInfo[node.Name] = cache.NewNodeInfo()
+			nodeNameToNodeInfo[node.Name] = NewNodeInfo()
 		}
 		nodeNameToNodeInfo[node.Name].SetNode(node)
 	}
@@ -40,13 +39,13 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*cache
 }
 
 // NodeEmpty returns if the node is empty of pods, except for daemonsets
-func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*cache.NodeInfo) bool {
+func NodeEmpty(node *v1.Node, nodeInfoMap map[string]*NodeInfo) bool {
 	nodePodsRemaining, ok := NodePodsRemaining(node, nodeInfoMap)
 	return ok && nodePodsRemaining == 0
 }
 
 // NodePodsRemaining returns the number of pods on the node, except for daemonset pods
-func NodePodsRemaining(node *v1.Node, nodeInfoMap map[string]*cache.NodeInfo) (int, bool) {
+func NodePodsRemaining(node *v1.Node, nodeInfoMap map[string]*NodeInfo) (int, bool) {
 	nodeInfo, ok := nodeInfoMap[node.Name]
 	if !ok {
 		log.Warningf("could not find node %v in the nodeinfo map", node.Name)

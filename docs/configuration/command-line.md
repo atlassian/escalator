@@ -26,9 +26,9 @@ Flags:
       --leader-elect-retry-period=2s
                                Leader election retry period
       --leader-elect-config-namespace="kube-system"
-                               Leader election config map namespace
+                               Leader election lease object namespace
       --leader-elect-config-name="escalator-leader-elect"
-                               Leader election config map name
+                               Leader election lease object name
 ```
 
 ## Options
@@ -121,8 +121,8 @@ Sets how long all the clients will wait in between attempts of any action.
 
 ### `--leader-elect-config-namespace`
 
-Sets the namespace where the configmap used for locking will be created or looked for.
+Sets the namespace where the lease object used for locking will be created or looked for.
 
 ### `--leader-elect-config-name`
 
-Sets the name of the configmap used for locking.
+Sets the name of the lease object used for locking.

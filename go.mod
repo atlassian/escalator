@@ -1,57 +1,35 @@
 module github.com/atlassian/escalator
 
-go 1.13
+go 1.14
 
 require (
-	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
-	github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf
-	github.com/aws/aws-sdk-go v1.25.40
-	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
-	github.com/davecgh/go-spew v1.1.1
-	github.com/evanphx/json-patch v4.1.0+incompatible
-	github.com/gogo/protobuf v1.2.1
-	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef
-	github.com/golang/protobuf v1.2.0
-	github.com/google/btree v1.0.0
-	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
-	github.com/google/uuid v0.0.0-20161128191214-064e2069ce9c
-	github.com/googleapis/gnostic v0.2.0
-	github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc
-	github.com/hashicorp/golang-lru v0.5.0
-	github.com/imdario/mergo v0.3.7
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
-	github.com/json-iterator/go v1.1.5
-	github.com/konsorten/go-windows-terminal-sequences v1.0.1
-	github.com/matttproud/golang_protobuf_extensions v1.0.1
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
-	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
-	github.com/petar/GoLLRB v0.0.0-20130427215148-53be0d36a84c
-	github.com/peterbourgon/diskv v2.0.1+incompatible
-	github.com/pkg/errors v0.8.1
-	github.com/pmezard/go-difflib v1.0.0
-	github.com/prometheus/client_golang v0.9.2
-	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
-	github.com/prometheus/common v0.2.0
-	github.com/prometheus/procfs v0.0.0-20190225181712-6ed1f7e10411
-	github.com/sirupsen/logrus v1.3.0
-	github.com/spf13/pflag v1.0.3
+	github.com/101loops/bdd v0.0.0-20161224202746-3e71f58e2cc3 // indirect
+	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
+	github.com/aws/aws-sdk-go v1.30.7
+	github.com/evanphx/json-patch v4.5.0+incompatible // indirect
+	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
+	github.com/golang/protobuf v1.4.0 // indirect
+	github.com/google/uuid v1.1.1
+	github.com/googleapis/gnostic v0.4.0 // indirect
+	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/imdario/mergo v0.3.9 // indirect
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/kr/pretty v0.2.0 // indirect
+	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.5.1
+	github.com/prometheus/procfs v0.0.11 // indirect
+	github.com/sirupsen/logrus v1.5.0
 	github.com/stephanos/clock v0.0.0-20161224195152-e4ec0ab5053e
-	github.com/stretchr/testify v1.3.0
-	golang.org/x/crypto v0.0.0-20190225124518-7f87c0fbb88b
-	golang.org/x/net v0.0.0-20190225153610-fe579d43d832
-	golang.org/x/oauth2 v0.0.0-20190220154721-9b3c75971fc9
-	golang.org/x/sys v0.0.0-20190225065934-cc5685c2db12
-	golang.org/x/text v0.3.0
-	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c
-	google.golang.org/appengine v1.4.0
+	github.com/stretchr/testify v1.5.1
+	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904 // indirect
+	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
+	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
+	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
-	gopkg.in/inf.v0 v0.9.1
-	gopkg.in/yaml.v2 v2.2.2
-	k8s.io/api v0.0.0-20190111032252-67edc246be36
-	k8s.io/apimachinery v0.0.0-20181127025237-2b1284ed4c93
-	k8s.io/client-go v10.0.0+incompatible
-	k8s.io/klog v0.2.0
-	k8s.io/kube-openapi v0.0.0-20190225204428-d50a959ae76a
-	k8s.io/kubernetes v1.13.3
-	sigs.k8s.io/yaml v1.1.0
+	k8s.io/api v0.18.1
+	k8s.io/apimachinery v0.18.1
+	k8s.io/client-go v0.18.1
+	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
 )

@@ -1,4 +1,4 @@
-FROM golang:1.13 as builder
+FROM golang:1.14 as builder
 WORKDIR /go/src/github.com/atlassian/escalator/
 COPY go.mod go.sum ./
 COPY cmd cmd
