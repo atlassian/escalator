@@ -26,7 +26,7 @@ type MockAutoscalingService struct {
 	TerminateInstanceInAutoScalingGroupErr    error
 }
 
-// AttachInstance mock implementation for MockAutoscalingService
+// AttachInstances mock implementation for MockAutoscalingService
 func (m MockAutoscalingService) AttachInstances(*autoscaling.AttachInstancesInput) (*autoscaling.AttachInstancesOutput, error) {
 	return m.AttachInstanceOutput, m.AttachInstanceErr
 }

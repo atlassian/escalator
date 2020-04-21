@@ -19,9 +19,11 @@ import (
 
 const (
 	// ProviderName identifies this module as aws
-	ProviderName      = "aws"
+	ProviderName = "aws"
+	// LifecycleOnDemand string constant for On-Demand EC2 instances
 	LifecycleOnDemand = "on-demand"
-	LifecycleSpot     = "spot"
+	// LifecycleSpot string constant for Spot EC2 instances
+	LifecycleSpot = "spot"
 	// The AttachInstances API only supports adding 20 instances at a time
 	batchSize = 20
 )

@@ -186,7 +186,7 @@ func TestNodeGroup_IncreaseSize(t *testing.T) {
 
 func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 	setupAWSMocks()
-	fleetId := "fleet-1234"
+	fleetID := "fleet-1234"
 	errorCode := "error code"
 	errorMessage := "error message"
 	instanceID := "instanceID"
@@ -207,7 +207,7 @@ func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 			int64(1),
 			&ec2.CreateFleetOutput{
 				Errors:  nil,
-				FleetId: &fleetId,
+				FleetId: &fleetID,
 				Instances: []*ec2.CreateFleetInstance{
 					{
 						InstanceIds: []*string{&instanceID},
@@ -228,7 +228,7 @@ func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 						ErrorMessage:               &errorMessage,
 					},
 				},
-				FleetId: &fleetId,
+				FleetId: &fleetID,
 				Instances: []*ec2.CreateFleetInstance{
 					{
 						InstanceIds: []*string{&instanceID},
@@ -249,7 +249,7 @@ func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 						ErrorMessage:               &errorMessage,
 					},
 				},
-				FleetId:   &fleetId,
+				FleetId:   &fleetID,
 				Instances: make([]*ec2.CreateFleetInstance, 0),
 			},
 			errors.New(errorMessage),
@@ -259,7 +259,7 @@ func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 			int64(multipleBatches),
 			&ec2.CreateFleetOutput{
 				Errors:  nil,
-				FleetId: &fleetId,
+				FleetId: &fleetID,
 				Instances: []*ec2.CreateFleetInstance{
 					{
 						InstanceIds: multipleBatchesInstanceIDs,
