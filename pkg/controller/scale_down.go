@@ -12,6 +12,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+const (
+	// NodeEscalatorIgnoreAnnotation is the key of an annotation on a node that signifies it should be ignored from ASG deletion
+	// value does not matter, can be used for reason, as long as not empty
+	// if set, the node wil not be deleted. However it still can be tainted and factored into calculations
+	NodeEscalatorIgnoreAnnotation = "atlassian.com/no-delete"
+)
+
 // ScaleDown performs the taint and remove node logic
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	removed, err := c.TryRemoveTaintedNodes(opts)
@@ -29,12 +36,30 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	return c.scaleDownTaint(opts)
 }
 
+func safeFromDeletion(node *v1.Node) (string, bool) {
+	for key, val := range node.ObjectMeta.Annotations {
+		if key == NodeEscalatorIgnoreAnnotation && val != "" {
+			return val, true
+		}
+	}
+	return "", false
+}
+
 // TryRemoveTaintedNodes attempts to remove nodes are
 // * tainted and empty
 // * have passed their grace period
 func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 	var toBeDeleted []*v1.Node
 	for _, candidate := range opts.taintedNodes {
+
+		// skip any nodes marked with the NodeEscalatorIgnore condition which is true
+		// filter these nodes out as late as possible to ensure rest of escalator scaling calculations remain unaffected
+		// This is because the nodes still exist and use resources, we don't want any inconsistencies. This node is safe from deletion not tainting
+		if why, ok := safeFromDeletion(candidate); ok {
+			log.Infof("node %s has escalator ignore annotation %s: Reason: %s. Removing from deletion options", candidate.Name, NodeEscalatorIgnoreAnnotation, why)
+			continue
+		}
+
 		// if the time the node was tainted is larger than the hard period then it is deleted no matter what
 		// if the soft time is passed and the node is empty (excluding daemonsets) then it can be deleted
 		taintedTime, err := k8s.GetToBeRemovedTime(candidate)

@@ -365,3 +365,138 @@ func TestControllerTaintOldestN(t *testing.T) {
 func TestControllerScaleDown(t *testing.T) {
 	t.Skip("test not implemented")
 }
+
+func TestController_TryRemoveTaintedNodes(t *testing.T) {
+
+	minNodes := 10
+	maxNodes := 20
+	nodeGroup := NodeGroupOptions{
+		Name:                    "default",
+		CloudProviderGroupName:  "default",
+		MinNodes:                minNodes,
+		MaxNodes:                maxNodes,
+		ScaleUpThresholdPercent: 100,
+	}
+	nodeGroups := []NodeGroupOptions{nodeGroup}
+
+	nodes := test.BuildTestNodes(10, test.NodeOpts{
+		CPU:     1000,
+		Mem:     1000,
+		Tainted: true,
+	})
+
+	pods := buildTestPods(10, 1000, 1000)
+	client, opts := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+
+	// For these test cases we only use 1 node group/cloud provider node group
+	nodeGroupSize := 1
+
+	// Create a test (mock) cloud provider
+	testCloudProvider := test.NewCloudProvider(nodeGroupSize)
+	testNodeGroup := test.NewNodeGroup(
+		nodeGroup.CloudProviderGroupName,
+		nodeGroup.Name,
+		int64(minNodes),
+		int64(maxNodes),
+		int64(len(nodes)),
+	)
+
+	testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+	// Create a node group state with the mapping of node groups to the cloud providers node groups
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+		client:     *client,
+	})
+
+	nodeGroupsState[testNodeGroup.ID()].NodeInfoMap = k8s.CreateNodeNameToInfoMap(pods, nodes)
+
+	c := &Controller{
+		Client:        client,
+		Opts:          opts,
+		stopChan:      nil,
+		nodeGroups:    nodeGroupsState,
+		cloudProvider: testCloudProvider,
+	}
+
+	// taint the oldest N according to the controller
+	taintedIndex := c.taintOldestN(nodes, nodeGroupsState[testNodeGroup.ID()], 2)
+	assert.Equal(t, len(taintedIndex), 2)
+
+	// add the untainted the the untainted list
+	taintedNodes := []*v1.Node{nodes[taintedIndex[0]], nodes[taintedIndex[1]]}
+	var untaintedNodes []*v1.Node
+	for i, n := range nodes {
+		if n == taintedNodes[0] || n == taintedNodes[1] {
+			continue
+		}
+
+		untaintedNodes = append(untaintedNodes, nodes[i])
+	}
+	assert.Equal(t, len(nodes)-2, len(untaintedNodes))
+
+	tests := []struct {
+		name                 string
+		opts                 scaleOpts
+		annotateFirstTainted bool
+		want                 int
+		wantErr              bool
+	}{
+		{
+			"test normal delete all tainted",
+			scaleOpts{
+				nodes,
+				taintedNodes,
+				untaintedNodes,
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			-2,
+			false,
+		},
+		{
+			"test normal skip first tainted",
+			scaleOpts{
+				nodes,
+				taintedNodes,
+				untaintedNodes,
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			true,
+			-1,
+			false,
+		},
+		{
+			"test none tainted",
+			scaleOpts{
+				nodes,
+				[]*v1.Node{},
+				nodes,
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			0,
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.annotateFirstTainted {
+				tt.opts.taintedNodes[0].Annotations = map[string]string{
+					NodeEscalatorIgnoreAnnotation: "skip for testing",
+				}
+			}
+			got, err := c.TryRemoveTaintedNodes(tt.opts)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
