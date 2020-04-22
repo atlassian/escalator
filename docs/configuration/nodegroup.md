@@ -30,6 +30,8 @@ node_groups:
         fleet_instance_ready_timeout: 1m
         launch_template_version: lt-1a2b3c4d
         launch_template_id: "1"
+        lifecycle: on-demand
+        instance_type_overrides: ["t2.large", "t3.large"]
 ```
 
 ## Options
@@ -224,3 +226,19 @@ numeric string. This value can be obtained through the AWS EC2 console on the La
 `LatestVersionNumber` or `DefaultVersionNumber` field returned from the
 [create-launch-template](https://docs.aws.amazon.com/cli/latest/reference/ec2/create-launch-template.html) CLI command
 and AWS API call.
+
+### `aws.lifecyle`
+
+Dependent on Launch Template ID being specified.
+
+This optional value is the lifecycle of the instances that will be launched. The accepted values are strings of either
+`on-demand` or `spot` to request On-Demand or Spot instances respectively. If no value is specified this will default
+to `on-demand`.
+
+### `aws.instance_type_overrides`
+
+Dependent on Launch Template ID being specified.
+
+An optional list of instance types to override the instance type within the launch template. Providing multiple instance
+types here increases the likelihood of a Spot request being successful. If omitted the instance type to request will
+be taken from the launch template.

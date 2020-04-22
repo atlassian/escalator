@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/atlassian/escalator/pkg/cloudprovider/aws"
 	"github.com/atlassian/escalator/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -53,9 +54,11 @@ type NodeGroupOptions struct {
 // AWSNodeGroupOptions represents a nodegroup running on a cluster that is
 // using the AWS cloud provider
 type AWSNodeGroupOptions struct {
-	LaunchTemplateID          string `json:"launch_template_id,omitempty" yaml:"launch_template_id,omitempty"`
-	LaunchTemplateVersion     string `json:"launch_template_version,omitempty" yaml:"launch_template_version,omitempty"`
-	FleetInstanceReadyTimeout string `json:"fleet_instance_ready_timeout,omitempty" yaml:"fleet_instance_ready_timeout,omitempty"`
+	LaunchTemplateID          string   `json:"launch_template_id,omitempty" yaml:"launch_template_id,omitempty"`
+	LaunchTemplateVersion     string   `json:"launch_template_version,omitempty" yaml:"launch_template_version,omitempty"`
+	FleetInstanceReadyTimeout string   `json:"fleet_instance_ready_timeout,omitempty" yaml:"fleet_instance_ready_timeout,omitempty"`
+	Lifecycle                 string   `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
+	InstanceTypeOverrides     []string `json:"instance_type_overrides,omitempty" yaml:"instance_type_overrides,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
 	fleetInstanceReadyTimeout time.Duration
@@ -116,7 +119,14 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
 
 	checkThat(validTaintEffect(nodegroup.TaintEffect), "taint_effect must be valid kubernetes taint")
+
+	checkThat(validAWSLifecycle(nodegroup.AWS.Lifecycle), "aws.lifecycle must be '%v' or '%v' if provided.", aws.LifecycleOnDemand, aws.LifecycleSpot)
 	return problems
+}
+
+// Lifecycle must be either on-demand or spot if it's provided. An empty string is allowed to preserve backwards compatibility
+func validAWSLifecycle(lifecycle string) bool {
+	return len(lifecycle) == 0 || lifecycle == aws.LifecycleOnDemand || lifecycle == aws.LifecycleSpot
 }
 
 // Empty String is valid value for TaintEffect as AddToBeRemovedTaint method will default to NoSchedule
