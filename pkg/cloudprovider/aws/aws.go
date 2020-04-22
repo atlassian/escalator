@@ -17,8 +17,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ProviderName identifies this module as aws
-const ProviderName = "aws"
+const (
+	// ProviderName identifies this module as aws
+	ProviderName = "aws"
+	// LifecycleOnDemand string constant for On-Demand EC2 instances
+	LifecycleOnDemand = "on-demand"
+	// LifecycleSpot string constant for Spot EC2 instances
+	LifecycleSpot = "spot"
+	// The AttachInstances API only supports adding 20 instances at a time
+	batchSize = 20
+)
 
 func instanceToProviderID(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
@@ -236,7 +244,7 @@ func (n *NodeGroup) IncreaseSize(delta int64) error {
 		return n.setASGDesiredSizeOneShot(delta)
 	}
 
-	log.WithField("asg", n.id).Infof("Scaling with SetDesiredCapacity trategy")
+	log.WithField("asg", n.id).Infof("Scaling with SetDesiredCapacity strategy")
 	return n.setASGDesiredSize(n.TargetSize() + delta)
 
 }
@@ -343,36 +351,27 @@ func (n *NodeGroup) setASGDesiredSize(newSize int64) error {
 // setASGDesiredSizeOneShot uses the AWS fleet API to acquire all desired
 // capacity in one step and then add it to the existing auto-scaling group.
 func (n *NodeGroup) setASGDesiredSizeOneShot(addCount int64) error {
-	fleet, err := n.provider.ec2Service.CreateFleet(&ec2.CreateFleetInput{
-		Type:                             awsapi.String("instant"),
-		TerminateInstancesWithExpiration: awsapi.Bool(false),
-		OnDemandOptions: &ec2.OnDemandOptionsRequest{
-			MinTargetCapacity:  awsapi.Int64(addCount),
-			SingleInstanceType: awsapi.Bool(true),
-		},
-		TargetCapacitySpecification: &ec2.TargetCapacitySpecificationRequest{
-			OnDemandTargetCapacity:    awsapi.Int64(addCount),
-			TotalTargetCapacity:       awsapi.Int64(addCount),
-			DefaultTargetCapacityType: awsapi.String("on-demand"),
-		},
-		LaunchTemplateConfigs: []*ec2.FleetLaunchTemplateConfigRequest{
-			{
-				LaunchTemplateSpecification: &ec2.FleetLaunchTemplateSpecificationRequest{
-					LaunchTemplateId: awsapi.String(n.config.AWSConfig.LaunchTemplateID),
-					Version:          awsapi.String(n.config.AWSConfig.LaunchTemplateVersion),
-				},
-			},
-		},
-	})
+	// Parse the Escalator args into the correct format for a CreateFleet request, then make the request.
+	fleetInput, err := createFleetInput(*n, addCount)
 	if err != nil {
+		log.Error("Failed setup for CreateFleet call.")
 		return err
 	}
 
-	// This will hold any launch errors for the fleet. In the case of an
-	// instant fleet with a single instant type this will indicate that the
-	// entire fleet failed to launch.
-	for _, lerr := range fleet.Errors {
-		return errors.New(*lerr.ErrorMessage)
+	fleet, err := n.provider.ec2Service.CreateFleet(fleetInput)
+	if err != nil {
+		log.Errorf("Failed CreateFleet call. CreateFleetInput: %v", fleetInput)
+		return err
+	}
+
+	// CreateFleet returns an array of errors with the response. Sometimes errors are present even when instances were
+	// successfully provisioned. In this case, the min target capacity is the size of the full request, so if any
+	// instances are present this indicates we got them all and can ignore the errors.
+	if len(fleet.Instances) == 0 && len(fleet.Errors) > 0 {
+		for _, err := range fleet.Errors {
+			log.Error(*err.ErrorMessage)
+		}
+		return errors.New(*fleet.Errors[0].ErrorMessage)
 	}
 
 	instances := make([]*string, 0)
@@ -402,8 +401,6 @@ InstanceReadyLoop:
 		}
 	}
 
-	// The AttachInstances API only supports adding 20 instances at a time
-	batchSize := 20
 	var batch []*string
 	for batchSize < len(instances) {
 		instances, batch = instances[batchSize:], instances[0:batchSize:batchSize]
@@ -413,6 +410,7 @@ InstanceReadyLoop:
 			InstanceIds:          batch,
 		})
 		if err != nil {
+			log.Error("Failed AttachInstances call.")
 			return err
 		}
 	}
@@ -426,7 +424,12 @@ InstanceReadyLoop:
 
 	log.WithField("asg", n.id).Debugf("CurrentSize: %v", n.Size())
 	log.WithField("asg", n.id).Debugf("CurrentTargetSize: %v", n.TargetSize())
-	return err
+	if err != nil {
+		log.Error("Failed AttachInstances call.")
+		return err
+	}
+
+	return nil
 }
 
 func (n *NodeGroup) allInstancesReady(ids []*string) bool {
@@ -452,4 +455,95 @@ func (n *NodeGroup) allInstancesReady(ids []*string) bool {
 	})
 
 	return ready
+}
+
+// createFleetInput will parse Escalator input into the format needed for a CreateFleet request.
+func createFleetInput(n NodeGroup, addCount int64) (*ec2.CreateFleetInput, error) {
+	lifecycle := n.config.AWSConfig.Lifecycle
+	if lifecycle == "" {
+		lifecycle = LifecycleOnDemand
+	}
+
+	launchTemplateOverrides, err := createTemplateOverrides(n)
+	if err != nil {
+		return nil, err
+	}
+
+	fleetInput := &ec2.CreateFleetInput{
+		Type:                             awsapi.String("instant"),
+		TerminateInstancesWithExpiration: awsapi.Bool(false),
+		TargetCapacitySpecification: &ec2.TargetCapacitySpecificationRequest{
+			TotalTargetCapacity:       awsapi.Int64(addCount),
+			DefaultTargetCapacityType: awsapi.String(lifecycle),
+		},
+		LaunchTemplateConfigs: []*ec2.FleetLaunchTemplateConfigRequest{
+			{
+				LaunchTemplateSpecification: &ec2.FleetLaunchTemplateSpecificationRequest{
+					LaunchTemplateId: awsapi.String(n.config.AWSConfig.LaunchTemplateID),
+					Version:          awsapi.String(n.config.AWSConfig.LaunchTemplateVersion),
+				},
+				Overrides: launchTemplateOverrides,
+			},
+		},
+	}
+
+	if lifecycle == LifecycleOnDemand {
+		fleetInput.OnDemandOptions = &ec2.OnDemandOptionsRequest{
+			MinTargetCapacity:  awsapi.Int64(addCount),
+			SingleInstanceType: awsapi.Bool(true),
+		}
+	} else {
+		fleetInput.SpotOptions = &ec2.SpotOptionsRequest{
+			MinTargetCapacity:  awsapi.Int64(addCount),
+			SingleInstanceType: awsapi.Bool(true),
+		}
+	}
+
+	return fleetInput, nil
+}
+
+// createTemplateOverrides will parse the overrides into the FleetLaunchTemplateOverridesRequest format
+func createTemplateOverrides(n NodeGroup) ([]*ec2.FleetLaunchTemplateOverridesRequest, error) {
+	// Get subnetIDs from the ASG
+	describeASGOutput, err := n.provider.service.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
+		AutoScalingGroupNames: []*string{
+			awsapi.String(n.id),
+		},
+	})
+	if err != nil {
+		log.Errorf("Failed call to DescribeAutoScalingGroups for ASG %v", n.id)
+		return nil, err
+	}
+	if len(describeASGOutput.AutoScalingGroups) == 0 {
+		return nil, errors.New("failed to get an ASG from DescribeAutoscalingGroups response")
+	}
+	if *describeASGOutput.AutoScalingGroups[0].VPCZoneIdentifier == "" {
+		return nil, errors.New("failed to get any subnetIDs from DescribeAutoscalingGroups response")
+	}
+	vpcZoneIdentifier := describeASGOutput.AutoScalingGroups[0].VPCZoneIdentifier
+	subnetIDs := strings.Split(*vpcZoneIdentifier, ",")
+
+	instanceTypes := n.config.AWSConfig.InstanceTypeOverrides
+
+	var launchTemplateOverrides []*ec2.FleetLaunchTemplateOverridesRequest
+	if len(instanceTypes) > 0 {
+		for i := range subnetIDs {
+			for j := range instanceTypes {
+				overridesRequest := ec2.FleetLaunchTemplateOverridesRequest{
+					SubnetId:     &subnetIDs[i],
+					InstanceType: &instanceTypes[j],
+				}
+				launchTemplateOverrides = append(launchTemplateOverrides, &overridesRequest)
+			}
+		}
+	} else {
+		for i := range subnetIDs {
+			overridesRequest := ec2.FleetLaunchTemplateOverridesRequest{
+				SubnetId: &subnetIDs[i],
+			}
+			launchTemplateOverrides = append(launchTemplateOverrides, &overridesRequest)
+		}
+	}
+
+	return launchTemplateOverrides, nil
 }
