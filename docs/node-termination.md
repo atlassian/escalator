@@ -19,7 +19,7 @@ using the latest configuration.
 
 ### Annotating nodes / Stopping termination of selected nodes
 
-For most cases when wanting to exclude a node from termination for maintenance,you should first consider the [**cordon function**](./scale-process).
+For most cases when wanting to exclude a node from termination for maintenance, you should first consider the [**cordon function**](./scale-process).
 Cordoning a node filters it out from calculation **and** scaling processes (tainting and deletion). Additionally, cordoning a node in Kubernetes marks it Unschedule-able, so it won't accept workloads while in this state.
  
 In the cases where Cordoning is not acceptable, because you want your node to continue to receive workloads but not be deleted, you can annotate the node to tell escalator to treat it as normal, except for stopping it from being deleted.
