@@ -16,6 +16,9 @@ type MockAutoscalingService struct {
 	AttachInstanceOutput *autoscaling.AttachInstancesOutput
 	AttachInstanceErr    error
 
+	CreateOrUpdateTagsOutput *autoscaling.CreateOrUpdateTagsOutput
+	CreateOrUpdateTagsErr    error
+
 	DescribeAutoScalingGroupsOutput *autoscaling.DescribeAutoScalingGroupsOutput
 	DescribeAutoScalingGroupsErr    error
 
@@ -29,6 +32,11 @@ type MockAutoscalingService struct {
 // AttachInstances mock implementation for MockAutoscalingService
 func (m MockAutoscalingService) AttachInstances(*autoscaling.AttachInstancesInput) (*autoscaling.AttachInstancesOutput, error) {
 	return m.AttachInstanceOutput, m.AttachInstanceErr
+}
+
+// CreateOrUpdateTags mock implementation for MockAutoscalingService
+func (m MockAutoscalingService) CreateOrUpdateTags(*autoscaling.CreateOrUpdateTagsInput) (*autoscaling.CreateOrUpdateTagsOutput, error) {
+	return m.CreateOrUpdateTagsOutput, m.CreateOrUpdateTagsErr
 }
 
 // DescribeAutoScalingGroups mock implementation for MockAutoscalingService

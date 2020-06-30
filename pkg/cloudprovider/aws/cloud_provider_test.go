@@ -91,10 +91,12 @@ func TestCloudProvider_GetNodeGroup(t *testing.T) {
 
 func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 	tests := []struct {
-		name       string
-		nodeGroups map[string]bool
-		response   *autoscaling.DescribeAutoScalingGroupsOutput
-		err        error
+		name        string
+		nodeGroups  map[string]bool
+		response    *autoscaling.DescribeAutoScalingGroupsOutput
+		err         error
+		tagResponse *autoscaling.CreateOrUpdateTagsOutput
+		tagErr      error
 	}{
 		{
 			"register node group that does not exist",
@@ -102,6 +104,8 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				"1": false,
 			},
 			&autoscaling.DescribeAutoScalingGroupsOutput{},
+			nil,
+			&autoscaling.CreateOrUpdateTagsOutput{},
 			nil,
 		},
 		{
@@ -121,6 +125,8 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				},
 			},
 			nil,
+			&autoscaling.CreateOrUpdateTagsOutput{},
+			nil,
 		},
 		{
 			"register node groups, some don't exist",
@@ -136,12 +142,32 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 				},
 			},
 			nil,
+			&autoscaling.CreateOrUpdateTagsOutput{},
+			nil,
 		},
 		{
 			"register no node groups",
 			map[string]bool{},
 			&autoscaling.DescribeAutoScalingGroupsOutput{},
 			fmt.Errorf("no groups"),
+			&autoscaling.CreateOrUpdateTagsOutput{},
+			nil,
+		},
+		{
+			"register existing node group with error from CreateOrUpdateTags",
+			map[string]bool{
+				"1": true,
+			},
+			&autoscaling.DescribeAutoScalingGroupsOutput{
+				AutoScalingGroups: []*autoscaling.Group{
+					{
+						AutoScalingGroupName: aws.String("1"),
+					},
+				},
+			},
+			nil,
+			&autoscaling.CreateOrUpdateTagsOutput{},
+			fmt.Errorf("unauthorized operation"),
 		},
 	}
 
@@ -151,6 +177,8 @@ func TestCloudProvider_RegisterNodeGroups(t *testing.T) {
 			service := test.MockAutoscalingService{
 				DescribeAutoScalingGroupsOutput: tt.response,
 				DescribeAutoScalingGroupsErr:    tt.err,
+				CreateOrUpdateTagsOutput:        tt.tagResponse,
+				CreateOrUpdateTagsErr:           tt.tagErr,
 			}
 
 			var ids []string

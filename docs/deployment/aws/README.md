@@ -19,6 +19,7 @@ Escalator requires the following IAM policy to be able to properly integrate wit
       "Effect": "Allow",
       "Action": [
         "autoscaling:AttachInstances",
+        "autoscaling:CreateOrUpdateTags",
         "autoscaling:DescribeAutoScalingGroups",
         "autoscaling:SetDesiredCapacity",
         "autoscaling:TerminateInstanceInAutoScalingGroup",
