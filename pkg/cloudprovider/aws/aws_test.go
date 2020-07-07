@@ -28,6 +28,7 @@ func setupAWSMocks() {
 		MaxSize:              aws.Int64(int64(25)),
 		DesiredCapacity:      aws.Int64(int64(1)),
 		VPCZoneIdentifier:    aws.String("subnetID-1,subnetID-2"),
+		Tags:                 []*autoscaling.TagDescription{},
 	}
 
 	mockAWSConfig = cloudprovider.AWSNodeGroupConfig{
@@ -36,6 +37,7 @@ func setupAWSMocks() {
 		FleetInstanceReadyTimeout: tickerTimeout,
 		Lifecycle:                 LifecycleOnDemand,
 		InstanceTypeOverrides:     []string{"instance-1", "instance-2"},
+		ResourceTagging:           false,
 	}
 
 	mockNodeGroup = NodeGroup{
@@ -126,6 +128,29 @@ func TestCreateFleetInput(t *testing.T) {
 		_, err := createFleetInput(mockNodeGroup, addCount)
 		assert.Nil(t, err, "Expected no error from createFleetInput")
 	}
+}
+
+func TestCreateFleetInput_WithResourceTagging(t *testing.T) {
+	setupAWSMocks()
+	autoScalingGroups := []*autoscaling.Group{&mockASG}
+	nodeGroups := map[string]*NodeGroup{mockNodeGroup.id: &mockNodeGroup}
+	addCount := int64(2)
+
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nodeGroups,
+		&test.MockAutoscalingService{
+			DescribeAutoScalingGroupsOutput: &autoscaling.DescribeAutoScalingGroupsOutput{
+				AutoScalingGroups: autoScalingGroups,
+			},
+		},
+		&test.MockEc2Service{},
+	)
+	mockNodeGroup.provider = awsCloudProvider
+	mockAWSConfig.ResourceTagging = true
+	mockNodeGroupConfig.AWSConfig = mockAWSConfig
+
+	_, err := createFleetInput(mockNodeGroup, addCount)
+	assert.Nil(t, err, "Expected no error from createFleetInput")
 }
 
 func TestCreateTemplateOverrides_FailedCall(t *testing.T) {
@@ -233,4 +258,67 @@ func TestCreateTemplateOverrides_NoInstanceTypeOverrides_Success(t *testing.T) {
 
 	_, err := createTemplateOverrides(mockNodeGroup)
 	assert.Nil(t, err, "Expected no error from createTemplateOverrides")
+}
+func TestAddASGTags_ResourceTaggingFalse(t *testing.T) {
+	setupAWSMocks()
+	mockNodeGroupConfig.AWSConfig.ResourceTagging = false
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{},
+		&test.MockEc2Service{},
+	)
+	addASGTags(&mockNodeGroupConfig, &mockASG, awsCloudProvider)
+}
+
+func TestAddASGTags_ResourceTaggingTrue(t *testing.T) {
+	setupAWSMocks()
+	mockNodeGroupConfig.AWSConfig.ResourceTagging = true
+
+	// Mock service call
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{
+			CreateOrUpdateTagsOutput: &autoscaling.CreateOrUpdateTagsOutput{},
+		},
+		&test.MockEc2Service{},
+	)
+	addASGTags(&mockNodeGroupConfig, &mockASG, awsCloudProvider)
+}
+
+func TestAddASGTags_ASGAlreadyTagged(t *testing.T) {
+	setupAWSMocks()
+	mockNodeGroupConfig.AWSConfig.ResourceTagging = true
+
+	// Mock existing tags
+	key := tagKey
+	asgTag := autoscaling.TagDescription{
+		Key: &key,
+	}
+	mockASG.Tags = append(mockASG.Tags, &asgTag)
+
+	// Mock service call
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{
+			CreateOrUpdateTagsOutput: &autoscaling.CreateOrUpdateTagsOutput{},
+		},
+		&test.MockEc2Service{},
+	)
+	addASGTags(&mockNodeGroupConfig, &mockASG, awsCloudProvider)
+}
+
+func TestAddASGTags_WithErrorResponse(t *testing.T) {
+	setupAWSMocks()
+	mockNodeGroupConfig.AWSConfig.ResourceTagging = true
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{
+			CreateOrUpdateTagsOutput: &autoscaling.CreateOrUpdateTagsOutput{},
+			CreateOrUpdateTagsErr:    errors.New("unauthorized"),
+		},
+		&test.MockEc2Service{},
+	)
+	addASGTags(&mockNodeGroupConfig, &mockASG, awsCloudProvider)
 }

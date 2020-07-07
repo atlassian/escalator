@@ -59,6 +59,7 @@ type AWSNodeGroupOptions struct {
 	FleetInstanceReadyTimeout string   `json:"fleet_instance_ready_timeout,omitempty" yaml:"fleet_instance_ready_timeout,omitempty"`
 	Lifecycle                 string   `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
 	InstanceTypeOverrides     []string `json:"instance_type_overrides,omitempty" yaml:"instance_type_overrides,omitempty"`
+	ResourceTagging           bool     `json:"resource_tagging,omitempty" yaml:"resource_tagging,omitempty"`
 
 	// Private variables for storing the parsed duration from the string
 	fleetInstanceReadyTimeout time.Duration

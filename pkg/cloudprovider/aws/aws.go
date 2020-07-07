@@ -26,9 +26,9 @@ const (
 	LifecycleSpot = "spot"
 	// The AttachInstances API only supports adding 20 instances at a time
 	batchSize = 20
-	// tagKey is the key for the tag applied to the ASG
+	// tagKey is the key for the tag applied to ASGs and Fleet requests
 	tagKey = "k8s.io/atlassian-escalator/enabled"
-	// tagValue is the value for the tag applied to the ASG
+	// tagValue is the value for the tag applied to ASGs and Fleet requests
 	tagValue = "true"
 )
 
@@ -96,33 +96,7 @@ func (c *CloudProvider) RegisterNodeGroups(groups ...cloudprovider.NodeGroupConf
 			continue
 		}
 
-		// Search the asg for tagKey, then add it if it's not present
-		hasTag := false
-		tags := group.Tags
-		for _, tag := range tags {
-			if *tag.Key == tagKey {
-				hasTag = true
-				break
-			}
-		}
-		if !hasTag {
-			tagInput := &autoscaling.CreateOrUpdateTagsInput{
-				Tags: []*autoscaling.Tag{
-					{
-						Key:               awsapi.String(tagKey),
-						PropagateAtLaunch: awsapi.Bool(true),
-						ResourceId:        awsapi.String(id),
-						ResourceType:      awsapi.String("auto-scaling-group"),
-						Value:             awsapi.String(tagValue),
-					},
-				},
-			}
-			log.WithField("asg", id).Infof("creating auto scaling tag")
-			_, err := c.service.CreateOrUpdateTags(tagInput)
-			if err != nil {
-				log.Errorf("failed to create auto scaling tag for ASG %v", id)
-			}
-		}
+		addASGTags(configs[id], group, c)
 
 		c.nodeGroups[id] = NewNodeGroup(configs[id], group, c)
 	}
@@ -517,17 +491,6 @@ func createFleetInput(n NodeGroup, addCount int64) (*ec2.CreateFleetInput, error
 				Overrides: launchTemplateOverrides,
 			},
 		},
-		TagSpecifications: []*ec2.TagSpecification{
-			{
-				ResourceType: awsapi.String(ec2.ResourceTypeFleet),
-				Tags: []*ec2.Tag{
-					{
-						Key:   awsapi.String(tagKey),
-						Value: awsapi.String(tagValue),
-					},
-				},
-			},
-		},
 	}
 
 	if lifecycle == LifecycleOnDemand {
@@ -539,6 +502,20 @@ func createFleetInput(n NodeGroup, addCount int64) (*ec2.CreateFleetInput, error
 		fleetInput.SpotOptions = &ec2.SpotOptionsRequest{
 			MinTargetCapacity:  awsapi.Int64(addCount),
 			SingleInstanceType: awsapi.Bool(true),
+		}
+	}
+
+	if n.config.AWSConfig.ResourceTagging {
+		fleetInput.TagSpecifications = []*ec2.TagSpecification{
+			{
+				ResourceType: awsapi.String(ec2.ResourceTypeFleet),
+				Tags: []*ec2.Tag{
+					{
+						Key:   awsapi.String(tagKey),
+						Value: awsapi.String(tagValue),
+					},
+				},
+			},
 		}
 	}
 
@@ -589,4 +566,38 @@ func createTemplateOverrides(n NodeGroup) ([]*ec2.FleetLaunchTemplateOverridesRe
 	}
 
 	return launchTemplateOverrides, nil
+}
+
+// addASGTags will search an ASG for the tagKey and add the tag if it's not found
+func addASGTags(config *cloudprovider.NodeGroupConfig, asg *autoscaling.Group, provider *CloudProvider) {
+	if !config.AWSConfig.ResourceTagging {
+		return
+	}
+
+	tags := asg.Tags
+	for _, tag := range tags {
+		if *tag.Key == tagKey {
+			return
+		}
+	}
+
+	id := awsapi.StringValue(asg.AutoScalingGroupName)
+
+	tagInput := &autoscaling.CreateOrUpdateTagsInput{
+		Tags: []*autoscaling.Tag{
+			{
+				Key:               awsapi.String(tagKey),
+				PropagateAtLaunch: awsapi.Bool(true),
+				ResourceId:        awsapi.String(id),
+				ResourceType:      awsapi.String("auto-scaling-group"),
+				Value:             awsapi.String(tagValue),
+			},
+		},
+	}
+
+	log.WithField("asg", id).Infof("creating auto scaling tag")
+	_, err := provider.service.CreateOrUpdateTags(tagInput)
+	if err != nil {
+		log.Errorf("failed to create auto scaling tag for ASG %v", id)
+	}
 }

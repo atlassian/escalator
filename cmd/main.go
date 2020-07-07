@@ -77,6 +77,7 @@ func setupCloudProvider(nodegroups []controller.NodeGroupOptions) cloudprovider.
 				FleetInstanceReadyTimeout: n.AWS.FleetInstanceReadyTimeoutDuration(),
 				Lifecycle:                 n.AWS.Lifecycle,
 				InstanceTypeOverrides:     n.AWS.InstanceTypeOverrides,
+				ResourceTagging:           n.AWS.ResourceTagging,
 			},
 		})
 	}

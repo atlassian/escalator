@@ -117,4 +117,5 @@ type AWSNodeGroupConfig struct {
 	FleetInstanceReadyTimeout time.Duration
 	Lifecycle                 string
 	InstanceTypeOverrides     []string
+	ResourceTagging           bool
 }
