@@ -30,6 +30,14 @@ const (
 	tagKey = "k8s.io/atlassian-escalator/enabled"
 	// tagValue is the value for the tag applied to ASGs and Fleet requests
 	tagValue = "true"
+	// maxTerminateInstancesTries is the maximum number of times terminateOrphanedInstances can be called consecutively
+	maxTerminateInstancesTries = 3
+	// The TerminateInstances API only supports terminating 1000 instances at a time
+	terminateBatchSize = 1000
+)
+
+var (
+	terminateInstancesTries = 0
 )
 
 func instanceToProviderID(instance *autoscaling.Instance) string {
@@ -403,6 +411,8 @@ InstanceReadyLoop:
 				break InstanceReadyLoop
 			}
 		case <-deadline.C:
+			log.Info("Reached instance ready deadline but not all instances are ready")
+			terminateOrphanedInstances(n, instances)
 			return errors.New("Not all instances could be started")
 		}
 	}
@@ -417,6 +427,7 @@ InstanceReadyLoop:
 		})
 		if err != nil {
 			log.Error("Failed AttachInstances call.")
+			terminateOrphanedInstances(n, instances)
 			return err
 		}
 	}
@@ -432,9 +443,11 @@ InstanceReadyLoop:
 	log.WithField("asg", n.id).Debugf("CurrentTargetSize: %v", n.TargetSize())
 	if err != nil {
 		log.Error("Failed AttachInstances call.")
+		terminateOrphanedInstances(n, instances)
 		return err
 	}
 
+	terminateInstancesTries = 0
 	return nil
 }
 
@@ -600,4 +613,43 @@ func addASGTags(config *cloudprovider.NodeGroupConfig, asg *autoscaling.Group, p
 	if err != nil {
 		log.Errorf("failed to create auto scaling tag for ASG %v", id)
 	}
+}
+
+// terminateOrphanedInstances will attempt to terminate a list of instances
+func terminateOrphanedInstances(n *NodeGroup, instances []*string) {
+	if len(instances) == 0 {
+		return
+	}
+	log.WithField("asg", n.id).Infof("terminating %v instance(s) that could not be attached to the ASG", len(instances))
+
+	var instanceIds []string
+	for i := 0; i < len(instances); i += terminateBatchSize {
+		batch := instances[i:minInt(i+terminateBatchSize, len(instances))]
+
+		for _, id := range batch {
+			instanceIds = append(instanceIds, *id)
+		}
+
+		_, err := n.provider.ec2Service.TerminateInstances(&ec2.TerminateInstancesInput{
+			InstanceIds: awsapi.StringSlice(instanceIds),
+		})
+		if err != nil {
+			log.Warnf("failed to terminate instances %v", err)
+		}
+	}
+
+	// prevent an endless cycle of provisioning and terminating instances
+	terminateInstancesTries++
+	if terminateInstancesTries == maxTerminateInstancesTries {
+		log.Fatalf("reached maximum number of consecutive failures (%v) for provisioning nodes with CreateFleet",
+			maxTerminateInstancesTries)
+	}
+}
+
+// minInt returns the minimum of two ints
+func minInt(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -321,4 +322,52 @@ func TestAddASGTags_WithErrorResponse(t *testing.T) {
 		&test.MockEc2Service{},
 	)
 	addASGTags(&mockNodeGroupConfig, &mockASG, awsCloudProvider)
+}
+
+func TestTerminateInstances_Success(t *testing.T) {
+	setupAWSMocks()
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+		},
+	)
+
+	instance1 := "i-123456"
+	instances := []*string{&instance1}
+	mockNodeGroup.provider = awsCloudProvider
+
+	terminateOrphanedInstances(&mockNodeGroup, instances)
+}
+
+func TestTerminateInstances_WithErrorResponse(t *testing.T) {
+	setupAWSMocks()
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    errors.New("unauthorized"),
+		},
+	)
+
+	instance1 := "i-123456"
+	instances := []*string{&instance1}
+	mockNodeGroup.provider = awsCloudProvider
+
+	terminateOrphanedInstances(&mockNodeGroup, instances)
+}
+
+func TestMinInt(t *testing.T) {
+	x := 1
+	y := 2
+	assert.Equal(t, x, minInt(x, y))
+	assert.Equal(t, x, minInt(y, x))
+	assert.Equal(t, x, minInt(x, x))
 }
