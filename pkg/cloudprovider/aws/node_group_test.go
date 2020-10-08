@@ -294,6 +294,7 @@ func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 				&test.MockEc2Service{
 					CreateFleetOutput:       tt.createFleetOutput,
 					DescribeInstancesOutput: &ec2.DescribeInstancesOutput{},
+					AllInstancesReady:       true,
 				},
 			)
 

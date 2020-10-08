@@ -36,10 +36,6 @@ const (
 	terminateBatchSize = 1000
 )
 
-var (
-	terminateInstancesTries = 0
-)
-
 func instanceToProviderID(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
 }
@@ -183,16 +179,19 @@ type NodeGroup struct {
 
 	provider *CloudProvider
 	config   *cloudprovider.NodeGroupConfig
+
+	terminateInstancesTries int
 }
 
 // NewNodeGroup creates a new nodegroup from the aws group backing
 func NewNodeGroup(config *cloudprovider.NodeGroupConfig, asg *autoscaling.Group, provider *CloudProvider) *NodeGroup {
 	return &NodeGroup{
-		id:       config.GroupID,
-		name:     config.Name,
-		asg:      asg,
-		provider: provider,
-		config:   config,
+		id:                      config.GroupID,
+		name:                    config.Name,
+		asg:                     asg,
+		provider:                provider,
+		config:                  config,
+		terminateInstancesTries: 0,
 	}
 }
 
@@ -393,6 +392,11 @@ func (n *NodeGroup) setASGDesiredSizeOneShot(addCount int64) error {
 		instances = append(instances, i.InstanceIds...)
 	}
 
+	return n.attachInstancesToASG(instances, terminateOrphanedInstances)
+}
+
+// attachInstancesToASG takes a list of instances and attaches them onto the node group's ASG
+func (n *NodeGroup) attachInstancesToASG(instances []*string, terminate func(*NodeGroup, []*string)) error {
 	ticker := time.NewTicker(1 * time.Second)
 	deadline := time.NewTimer(n.config.AWSConfig.FleetInstanceReadyTimeout)
 	defer ticker.Stop()
@@ -412,7 +416,7 @@ InstanceReadyLoop:
 			}
 		case <-deadline.C:
 			log.Info("Reached instance ready deadline but not all instances are ready")
-			terminateOrphanedInstances(n, instances)
+			terminate(n, instances)
 			return errors.New("Not all instances could be started")
 		}
 	}
@@ -421,43 +425,44 @@ InstanceReadyLoop:
 	for batchSize < len(instances) {
 		instances, batch = instances[batchSize:], instances[0:batchSize:batchSize]
 
-		_, err = n.provider.service.AttachInstances(&autoscaling.AttachInstancesInput{
+		_, err := n.provider.service.AttachInstances(&autoscaling.AttachInstancesInput{
 			AutoScalingGroupName: awsapi.String(n.id),
 			InstanceIds:          batch,
 		})
 		if err != nil {
 			log.Error("Failed AttachInstances call.")
-			terminateOrphanedInstances(n, instances)
+			terminate(n, append(instances, batch...))
 			return err
 		}
 	}
 
 	// Attach the remainder for instance sets that are not evenly divisible by
 	// batchSize
-	_, err = n.provider.service.AttachInstances(&autoscaling.AttachInstancesInput{
+	_, err := n.provider.service.AttachInstances(&autoscaling.AttachInstancesInput{
 		AutoScalingGroupName: awsapi.String(n.id),
 		InstanceIds:          instances,
 	})
-
-	log.WithField("asg", n.id).Debugf("CurrentSize: %v", n.Size())
-	log.WithField("asg", n.id).Debugf("CurrentTargetSize: %v", n.TargetSize())
 	if err != nil {
 		log.Error("Failed AttachInstances call.")
-		terminateOrphanedInstances(n, instances)
+		terminate(n, instances)
 		return err
 	}
+	log.WithField("asg", n.id).Debugf("CurrentSize: %v", n.Size())
+	log.WithField("asg", n.id).Debugf("CurrentTargetSize: %v", n.TargetSize())
 
-	terminateInstancesTries = 0
+	n.terminateInstancesTries = 0
 	return nil
 }
 
 func (n *NodeGroup) allInstancesReady(ids []*string) bool {
 	ready := false
 
-	n.provider.ec2Service.DescribeInstanceStatusPages(&ec2.DescribeInstanceStatusInput{
+	input := &ec2.DescribeInstanceStatusInput{
 		InstanceIds:         ids,
 		IncludeAllInstances: awsapi.Bool(true),
-	}, func(r *ec2.DescribeInstanceStatusOutput, lastPage bool) bool {
+	}
+
+	n.provider.ec2Service.DescribeInstanceStatusPages(input, func(r *ec2.DescribeInstanceStatusOutput, lastPage bool) bool {
 		for _, i := range r.InstanceStatuses {
 			if *i.InstanceState.Name != "running" {
 				return false
@@ -617,14 +622,15 @@ func addASGTags(config *cloudprovider.NodeGroupConfig, asg *autoscaling.Group, p
 
 // terminateOrphanedInstances will attempt to terminate a list of instances
 func terminateOrphanedInstances(n *NodeGroup, instances []*string) {
-	if len(instances) == 0 {
+	numInstances := len(instances)
+	if numInstances == 0 {
 		return
 	}
-	log.WithField("asg", n.id).Infof("terminating %v instance(s) that could not be attached to the ASG", len(instances))
+	log.WithField("asg", n.id).Infof("terminating %v instance(s) that could not be attached to the ASG", numInstances)
 
 	var instanceIds []string
-	for i := 0; i < len(instances); i += terminateBatchSize {
-		batch := instances[i:minInt(i+terminateBatchSize, len(instances))]
+	for i := 0; i < numInstances; i += terminateBatchSize {
+		batch := instances[i:minInt(i+terminateBatchSize, numInstances)]
 
 		for _, id := range batch {
 			instanceIds = append(instanceIds, *id)
@@ -639,8 +645,8 @@ func terminateOrphanedInstances(n *NodeGroup, instances []*string) {
 	}
 
 	// prevent an endless cycle of provisioning and terminating instances
-	terminateInstancesTries++
-	if terminateInstancesTries == maxTerminateInstancesTries {
+	n.terminateInstancesTries++
+	if n.terminateInstancesTries >= maxTerminateInstancesTries {
 		log.Fatalf("reached maximum number of consecutive failures (%v) for provisioning nodes with CreateFleet",
 			maxTerminateInstancesTries)
 	}

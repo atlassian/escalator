@@ -67,6 +67,7 @@ type MockEc2Service struct {
 
 	DescribeInstanceStatusOutput *ec2.DescribeInstanceStatusOutput
 	DescribeInstanceStatusErr    error
+	AllInstancesReady            bool
 
 	TerminateInstancesOutput *ec2.TerminateInstancesOutput
 	TerminateInstancesErr    error
@@ -84,8 +85,8 @@ func (m MockEc2Service) CreateFleet(*ec2.CreateFleetInput) (*ec2.CreateFleetOutp
 
 // DescribeInstanceStatusPages mock implementation for MockEc2Service
 func (m MockEc2Service) DescribeInstanceStatusPages(statusInput *ec2.DescribeInstanceStatusInput, allInstancesReadyHelper func(*ec2.DescribeInstanceStatusOutput, bool) bool) error {
-	// Mocks successful execution of the anonymous function within cloudprovider/aws/aws.go:allInstancesReady
-	allInstancesReadyHelper(&ec2.DescribeInstanceStatusOutput{}, true)
+	// Mocks execution of the anonymous function within cloudprovider/aws/aws.go:allInstancesReady
+	allInstancesReadyHelper(&ec2.DescribeInstanceStatusOutput{}, m.AllInstancesReady)
 	return nil
 }
 
