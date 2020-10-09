@@ -2,13 +2,19 @@ package aws
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,6 +50,7 @@ func setupAWSMocks() {
 		id:     "id",
 		name:   "name",
 		config: &mockNodeGroupConfig,
+		asg:    &mockASG,
 	}
 
 	mockNodeGroupConfig = cloudprovider.NodeGroupConfig{
@@ -88,7 +95,7 @@ func newMockCloudProvider(nodeGroups []string, service *test.MockAutoscalingServ
 }
 
 // Similar to newMockCloudProvider but node groups are injected instead of created within this function
-func newMockCloudProviderUsingInjection(nodeGroups map[string]*NodeGroup, service *test.MockAutoscalingService, ec2Service *test.MockEc2Service) (*CloudProvider, error) {
+func newMockCloudProviderUsingInjection(nodeGroups map[string]*NodeGroup, service autoscalingiface.AutoScalingAPI, ec2Service ec2iface.EC2API) (*CloudProvider, error) {
 	var err error
 
 	cloudProvider := &CloudProvider{
@@ -321,4 +328,259 @@ func TestAddASGTags_WithErrorResponse(t *testing.T) {
 		&test.MockEc2Service{},
 	)
 	addASGTags(&mockNodeGroupConfig, &mockASG, awsCloudProvider)
+}
+
+// local mock of ASG service with custom AttachInstances method
+type mockAutoscalingService struct {
+	autoscalingiface.AutoScalingAPI
+	*client.Client
+
+	numCalls    int
+	numMaxCalls int
+}
+
+// fail the AttachInstances call after numMaxCalls have happened
+func (m *mockAutoscalingService) AttachInstances(*autoscaling.AttachInstancesInput) (*autoscaling.AttachInstancesOutput, error) {
+	if m.numCalls < m.numMaxCalls {
+		m.numCalls++
+		return &autoscaling.AttachInstancesOutput{}, nil
+	}
+	return &autoscaling.AttachInstancesOutput{}, fmt.Errorf("failed the AttachInstances call")
+}
+
+func TestAttachInstancesToASG_WithInstanceReadyTimeout_ExpectFailure(t *testing.T) {
+	setupAWSMocks()
+	instanceID := "instanceID"
+
+	numInstances := 123
+	var instanceIDs []*string
+	for i := 0; i < numInstances; i++ {
+		instanceIDs = append(instanceIDs, &instanceID)
+	}
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&mockAutoscalingService{
+			AutoScalingAPI: nil,
+			Client:         nil,
+			numCalls:       0,
+			numMaxCalls:    2,
+		},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+			AllInstancesReady:        false,
+		},
+	)
+
+	mockNodeGroup.provider = awsCloudProvider
+
+	// assert the terminate function is called with the correct number of instances
+	mockTerminateFunc := func(n *NodeGroup, i []*string) {
+		assert.Equal(t, numInstances, len(i))
+	}
+
+	err := mockNodeGroup.attachInstancesToASG(instanceIDs, mockTerminateFunc)
+	assert.Error(t, err)
+}
+
+func TestAttachInstancesToASG_NoSuccessfulBatches_ExpectFailure(t *testing.T) {
+	setupAWSMocks()
+	instanceID := "instanceID"
+
+	terminateSize := 50
+	numInstances := batchSize + terminateSize
+	var instanceIDs []*string
+	for i := 0; i < numInstances; i++ {
+		instanceIDs = append(instanceIDs, &instanceID)
+	}
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&mockAutoscalingService{
+			AutoScalingAPI: nil,
+			Client:         nil,
+			numCalls:       0,
+			numMaxCalls:    0,
+		},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+			AllInstancesReady:        true,
+		},
+	)
+
+	mockNodeGroup.provider = awsCloudProvider
+
+	// assert the terminate function is called with the correct number of instances
+	mockTerminateFunc := func(n *NodeGroup, i []*string) {
+		assert.Equal(t, numInstances, len(i), "Expected all instances to be terminated")
+	}
+
+	err := mockNodeGroup.attachInstancesToASG(instanceIDs, mockTerminateFunc)
+	assert.Error(t, err)
+}
+
+func TestAttachInstancesToASG_OneSuccessfulBatch_ExpectFailure(t *testing.T) {
+	setupAWSMocks()
+	instanceID := "instanceID"
+
+	terminateSize := 50
+	numInstances := batchSize + terminateSize
+	var instanceIDs []*string
+	for i := 0; i < numInstances; i++ {
+		instanceIDs = append(instanceIDs, &instanceID)
+	}
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&mockAutoscalingService{
+			AutoScalingAPI: nil,
+			Client:         nil,
+			numCalls:       0,
+			numMaxCalls:    1,
+		},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+			AllInstancesReady:        true,
+		},
+	)
+
+	mockNodeGroup.provider = awsCloudProvider
+
+	// assert the terminate function is called with the correct number of instances
+	mockTerminateFunc := func(n *NodeGroup, i []*string) {
+		assert.Equal(t, terminateSize, len(i), "Expected all instances except the first batch to be terminated")
+	}
+
+	err := mockNodeGroup.attachInstancesToASG(instanceIDs, mockTerminateFunc)
+	assert.Error(t, err)
+}
+
+func TestAttachInstancesToASG_NoBatches_ExpectFailure(t *testing.T) {
+	setupAWSMocks()
+	instanceID := "instanceID"
+
+	terminateSize := batchSize - 1
+	numInstances := terminateSize
+	var instanceIDs []*string
+	for i := 0; i < numInstances; i++ {
+		instanceIDs = append(instanceIDs, &instanceID)
+	}
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&mockAutoscalingService{
+			AutoScalingAPI: nil,
+			Client:         nil,
+			numCalls:       0,
+			numMaxCalls:    0,
+		},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+			AllInstancesReady:        true,
+		},
+	)
+
+	mockNodeGroup.provider = awsCloudProvider
+
+	// assert the terminate function is called with the correct number of instances
+	mockTerminateFunc := func(n *NodeGroup, i []*string) {
+		assert.Equal(t, terminateSize, len(i))
+	}
+
+	err := mockNodeGroup.attachInstancesToASG(instanceIDs, mockTerminateFunc)
+	assert.Error(t, err)
+}
+
+func TestAttachInstancesToASG_ExpectSuccess(t *testing.T) {
+	setupAWSMocks()
+	instanceID := "instanceID"
+
+	terminateSize := batchSize - 1
+	numInstances := terminateSize
+	var instanceIDs []*string
+	for i := 0; i < numInstances; i++ {
+		instanceIDs = append(instanceIDs, &instanceID)
+	}
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		map[string]*NodeGroup{mockNodeGroup.id: &mockNodeGroup},
+		&mockAutoscalingService{
+			AutoScalingAPI: nil,
+			Client:         nil,
+			numCalls:       0,
+			numMaxCalls:    1,
+		},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+			AllInstancesReady:        true,
+		},
+	)
+
+	mockNodeGroup.provider = awsCloudProvider
+
+	// the terminate function shouldn't get called - fail the test if it does
+	mockTerminateFunc := func(n *NodeGroup, i []*string) {
+		assert.Fail(t, "No instances should have been terminated")
+	}
+
+	err := mockNodeGroup.attachInstancesToASG(instanceIDs, mockTerminateFunc)
+	assert.NoError(t, err)
+}
+
+func TestTerminateInstances_Success(t *testing.T) {
+	setupAWSMocks()
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    nil,
+		},
+	)
+
+	instance1 := "i-123456"
+	instances := []*string{&instance1}
+	mockNodeGroup.provider = awsCloudProvider
+
+	terminateOrphanedInstances(&mockNodeGroup, instances)
+}
+
+func TestTerminateInstances_WithErrorResponse(t *testing.T) {
+	setupAWSMocks()
+
+	// Mock service call and error
+	awsCloudProvider, _ := newMockCloudProviderUsingInjection(
+		nil,
+		&test.MockAutoscalingService{},
+		&test.MockEc2Service{
+			TerminateInstancesOutput: &ec2.TerminateInstancesOutput{},
+			TerminateInstancesErr:    errors.New("unauthorized"),
+		},
+	)
+
+	instance1 := "i-123456"
+	instances := []*string{&instance1}
+	mockNodeGroup.provider = awsCloudProvider
+
+	terminateOrphanedInstances(&mockNodeGroup, instances)
+}
+
+func TestMinInt(t *testing.T) {
+	x := 1
+	y := 2
+	assert.Equal(t, x, minInt(x, y))
+	assert.Equal(t, x, minInt(y, x))
+	assert.Equal(t, x, minInt(x, x))
 }
