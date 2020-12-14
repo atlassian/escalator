@@ -1,4 +1,4 @@
-.PHONY: build test test-vet docker clean fmt lint
+.PHONY: build test test-vet docker clean lint
 
 TARGET=escalator
 # E.g. set this to -v (I.e. GOCMDOPTS=-v via shell) to get the go command to be verbose
@@ -23,13 +23,5 @@ docker: Dockerfile
 clean:
 	rm -f $(TARGET)
 
-# goreturns runs both gofmt and goimports.
-# This is used to pickup more comphrehnsive formatting/codestyle changes
-# https://github.com/sqs/goreturns
-fmt:
-	goreturns -w pkg/ cmd/
-
-# the linting also uses goreturns.
-# the lint.sh script reports formatting changes/errors
 lint:
-	./lint.sh
+	golangci-lint run

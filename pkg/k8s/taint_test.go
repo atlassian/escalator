@@ -135,7 +135,7 @@ func TestGetToBeRemovedTime(t *testing.T) {
 	// Get the taint to be removed time
 	val, err = GetToBeRemovedTime(updated)
 	assert.NoError(t, err)
-	assert.True(t, time.Now().Sub(*val) < 10*time.Second)
+	assert.True(t, time.Since(*val) < 10*time.Second)
 }
 
 func TestGetToBeRemovedTime_InvalidValue(t *testing.T) {

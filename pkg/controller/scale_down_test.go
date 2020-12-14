@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -176,7 +177,8 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			// untaint all
 			for _, node := range nodes {
 				if _, tainted := k8s.GetToBeRemovedTaint(node); tainted {
-					k8s.DeleteToBeRemovedTaint(node, client)
+					_, err := k8s.DeleteToBeRemovedTaint(node, client)
+					require.NoError(t, err)
 					<-updateChan
 				}
 			}
@@ -353,7 +355,8 @@ func TestControllerTaintOldestN(t *testing.T) {
 			// untaint all
 			for _, node := range nodes {
 				if _, tainted := k8s.GetToBeRemovedTaint(node); tainted {
-					k8s.DeleteToBeRemovedTaint(node, client)
+					_, err := k8s.DeleteToBeRemovedTaint(node, client)
+					require.NoError(t, err)
 					<-updateChan
 				}
 			}
@@ -386,7 +389,8 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 	})
 
 	pods := buildTestPods(10, 1000, 1000)
-	client, opts := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+	client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+	require.NoError(t, err)
 
 	// For these test cases we only use 1 node group/cloud provider node group
 	nodeGroupSize := 1

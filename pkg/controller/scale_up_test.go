@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -163,7 +164,8 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			var tc int
 			for _, node := range nodes {
 				if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
-					k8s.AddToBeRemovedTaint(node, client, "NoSchedule")
+					_, err := k8s.AddToBeRemovedTaint(node, client, "NoSchedule")
+					require.NoError(t, err)
 					nodeGroupsState["example"].taintTracker = append(nodeGroupsState["example"].taintTracker, node.Name)
 					<-updateChan
 					tc++

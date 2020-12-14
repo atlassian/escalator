@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -255,9 +256,13 @@ func init() {
 	prometheus.MustRegister(CloudProviderSize)
 }
 
-// Start starts the metrics endpoint on a new thread
+// Start starts the metrics endpoint on a new routine
 func Start(addr string) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(addr, mux)
+	go func() {
+		if err := http.ListenAndServe(addr, mux); err != nil {
+			log.Fatal(err)
+		}
+	}()
 }

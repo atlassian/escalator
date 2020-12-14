@@ -144,7 +144,9 @@ func (n *NodeGroup) DeleteNodes(nodes ...*v1.Node) error {
 	for range nodes {
 		// Here we would normally tell the actual provider (AWS etc.) to terminate the instance and also decrement the
 		// desired capacity, but we just decrement the internal size to reflect the remote change
-		n.setDesiredSize(n.targetSize - 1)
+		if err := n.setDesiredSize(n.targetSize - 1); err != nil {
+			return err
+		}
 	}
 	return nil
 }
