@@ -297,6 +297,7 @@ func TestNodeGroup_IncreaseSize_CreateFleet(t *testing.T) {
 					AllInstancesReady:       true,
 				},
 			)
+			require.NoError(t, err)
 
 			for _, nodeGroup := range awsCloudProvider.NodeGroups() {
 				err = nodeGroup.IncreaseSize(tt.increaseSize)

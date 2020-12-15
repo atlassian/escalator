@@ -33,7 +33,7 @@ func buildTestPods(amount int, CPU int64, Mem int64) []*v1.Pod {
 	})
 }
 
-func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOptions, listerOptions ListerOptions) (*Client, Opts) {
+func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOptions, listerOptions ListerOptions) (*Client, Opts, error) {
 	fakeClient, _ := test.BuildFakeClient(nodes, pods)
 	opts := Opts{
 		K8SClient:    fakeClient,
@@ -41,8 +41,15 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 		ScanInterval: 1 * duration.Minute,
 		DryMode:      false,
 	}
-	allPodLister := test.NewTestPodWatcher(pods, listerOptions.podListerOptions)
-	allNodeLister := test.NewTestNodeWatcher(nodes, listerOptions.nodeListerOptions)
+	allPodLister, err := test.NewTestPodWatcher(pods, listerOptions.podListerOptions)
+	if err != nil {
+		return nil, opts, err
+	}
+
+	allNodeLister, err := test.NewTestNodeWatcher(nodes, listerOptions.nodeListerOptions)
+	if err != nil {
+		return nil, opts, err
+	}
 
 	nodeGroupListerMap := make(map[string]*NodeGroupLister)
 	for _, ng := range nodeGroups {
@@ -60,7 +67,7 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 		allNodeLister,
 	}
 
-	return client, opts
+	return client, opts, nil
 }
 
 // Test the edge case where the min nodes gets changed to above the current number of untainted nodes
@@ -84,7 +91,8 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 			Tainted: true,
 		})
 
-		client, opts := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
+		client, opts, err := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
+		require.NoError(t, err)
 
 		// For these test cases we only use 1 node group/cloud provider node group
 		nodeGroupSize := 1
@@ -114,7 +122,7 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 			cloudProvider: testCloudProvider,
 		}
 
-		_, err := controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
 		assert.NoError(t, err)
 
 		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
@@ -150,7 +158,8 @@ func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 			Mem: 1000,
 		})...)
 
-		client, opts := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
+		client, opts, err := buildTestClient(nodes, buildTestPods(10, 1000, 1000), nodeGroups, ListerOptions{})
+		require.NoError(t, err)
 
 		// For these test cases we only use 1 node group/cloud provider node group
 		nodeGroupSize := 1
@@ -180,7 +189,8 @@ func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 			cloudProvider: testCloudProvider,
 		}
 
-		controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
 
 		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
 		// Ensure that the tainted nodes where untainted
@@ -457,7 +467,8 @@ func TestScaleNodeGroup(t *testing.T) {
 			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
 			ngName := tt.args.nodeGroupOptions.Name
 			nodes := buildTestNodes(tt.args.nodeArgs.initialAmount, tt.args.nodeArgs.cpu, tt.args.nodeArgs.mem)
-			client, opts := buildTestClient(nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			client, opts, err := buildTestClient(nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
 
 			// For these test cases we only use 1 node group/cloud provider node group
 			nodeGroupSize := 1
@@ -506,7 +517,9 @@ func TestScaleNodeGroup(t *testing.T) {
 			// Create the nodes to simulate the cloud provider bringing up the new nodes
 			newNodes := append(nodes, buildTestNodes(nodesDelta, tt.args.nodeArgs.cpu, tt.args.nodeArgs.mem)...)
 			// Create a new client with the new nodes and update everything that uses the client
-			client, opts = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			client, opts, err = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
+
 			controller.Client = client
 			controller.Opts = opts
 			nodeGroupsState[ngName].NodeGroupLister = client.Listers[ngName]
@@ -678,7 +691,8 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
-			client, opts := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			client, opts, err := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
 
 			// For these test cases we only use 1 node group/cloud provider node group
 			nodeGroupSize := 1

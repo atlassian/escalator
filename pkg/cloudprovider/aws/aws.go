@@ -462,7 +462,7 @@ func (n *NodeGroup) allInstancesReady(ids []*string) bool {
 		IncludeAllInstances: awsapi.Bool(true),
 	}
 
-	n.provider.ec2Service.DescribeInstanceStatusPages(input, func(r *ec2.DescribeInstanceStatusOutput, lastPage bool) bool {
+	err := n.provider.ec2Service.DescribeInstanceStatusPages(input, func(r *ec2.DescribeInstanceStatusOutput, lastPage bool) bool {
 		for _, i := range r.InstanceStatuses {
 			if *i.InstanceState.Name != "running" {
 				return false
@@ -477,6 +477,9 @@ func (n *NodeGroup) allInstancesReady(ids []*string) bool {
 
 		return true
 	})
+	if err != nil {
+		return false
+	}
 
 	return ready
 }

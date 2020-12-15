@@ -9,12 +9,14 @@ import (
 )
 
 // NewTestPodWatcher creates a new test PodLister with given pods and options
-func NewTestPodWatcher(pods []*v1.Pod, opts PodListerOptions) listerv1.PodLister {
+func NewTestPodWatcher(pods []*v1.Pod, opts PodListerOptions) (listerv1.PodLister, error) {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	for _, pod := range pods {
-		store.Add(pod)
+		if err := store.Add(pod); err != nil {
+			return nil, err
+		}
 	}
-	return &podLister{store, opts}
+	return &podLister{store, opts}, nil
 }
 
 // PodListerOptions for creating a new test PodLister

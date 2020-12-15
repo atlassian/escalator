@@ -9,12 +9,14 @@ import (
 )
 
 // NewTestNodeWatcher creates a new mock NodeLister with the given nodes and options
-func NewTestNodeWatcher(nodes []*v1.Node, opts NodeListerOptions) listerv1.NodeLister {
+func NewTestNodeWatcher(nodes []*v1.Node, opts NodeListerOptions) (listerv1.NodeLister, error) {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	for _, node := range nodes {
-		store.Add(node)
+		if err := store.Add(node); err != nil {
+			return nil, err
+		}
 	}
-	return &nodeLister{store, opts}
+	return &nodeLister{store, opts}, nil
 }
 
 // NodeListerOptions options for creating test NodeLister

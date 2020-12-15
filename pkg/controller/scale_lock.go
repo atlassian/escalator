@@ -20,7 +20,7 @@ type scaleLock struct {
 
 // locked returns whether the scale lock is locked
 func (l *scaleLock) locked() bool {
-	if time.Now().Sub(l.lockTime) < l.minimumLockDuration {
+	if time.Since(l.lockTime) < l.minimumLockDuration {
 		metrics.NodeGroupScaleLockCheckWasLocked.WithLabelValues(l.nodegroup).Add(1.0)
 		return true
 	}
@@ -46,7 +46,7 @@ func (l *scaleLock) unlock() {
 	// Only if it's already locked, otherwise noop; handles frequent forced unlocking from the locked() call to avoid spurious metrics submission
 	if l.isLocked {
 		// Recording the lock duration in seconds, if $cloud provider could do scaling in nanosecond resolution; good problem to have.
-		lockDuration := time.Now().Sub(l.lockTime).Seconds()
+		lockDuration := time.Since(l.lockTime).Seconds()
 		log.Debug(fmt.Sprintf("Unlocking scale lock. Lock Duration: %0.0f s Node Group: %s", lockDuration, l.nodegroup))
 		l.isLocked = false
 		l.requestedNodes = 0
@@ -57,7 +57,7 @@ func (l *scaleLock) unlock() {
 
 // timeUntilMinimumUnlock returns the the time until the minimum unlock
 func (l *scaleLock) timeUntilMinimumUnlock() time.Duration {
-	return l.lockTime.Add(l.minimumLockDuration).Sub(time.Now())
+	return time.Until(l.lockTime.Add(l.minimumLockDuration))
 }
 
 func (l scaleLock) String() string {
