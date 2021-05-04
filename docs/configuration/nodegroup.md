@@ -176,7 +176,7 @@ nodes enough time to finish before the node is terminated.
 
 Logic for determining if a node is empty can be found in `pkg/k8s` `NodeEmpty()`
 
-### `taint-effect`
+### `taint_effect`
 
 This is an optional field and the value defines the taint effect that will be applied to the nodes when scaling down.
 The valid values are :
