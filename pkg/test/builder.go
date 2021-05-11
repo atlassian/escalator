@@ -170,6 +170,8 @@ type PodOpts struct {
 	NodeAffinityValue string
 	NodeAffinityOp    v1.NodeSelectorOperator
 	NodeName          string
+	CPUOverhead       int64
+	MemOverhead       int64
 }
 
 // BuildTestPod builds a pod for testing
@@ -223,6 +225,14 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		}
 	}
 
+	overhead := v1.ResourceList{}
+	if opts.CPUOverhead > 0 {
+		overhead[v1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPUOverhead, resource.DecimalSI)
+	}
+	if opts.MemOverhead > 0 {
+		overhead[v1.ResourceMemory] = *resource.NewQuantity(opts.MemOverhead, resource.DecimalSI)
+	}
+
 	pod := &apiv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       opts.Namespace,
@@ -234,6 +244,7 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 			Containers:   containers,
 			NodeSelector: nodeSelector,
 			Affinity:     affinity,
+			Overhead:     overhead,
 		},
 	}
 
