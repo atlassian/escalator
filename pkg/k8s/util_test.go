@@ -60,6 +60,18 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 		CPU: []int64{22, 60, 430, 1000},
 		Mem: []int64{225, 100, 430, 1000},
 	})
+	p8 := test.BuildTestPod(test.PodOpts{
+		CPU: []int64{22, 60, 430, 1000},
+		Mem: []int64{225, 100, 430, 1000},
+		CPUOverhead: 1000,
+		MemOverhead: 2000,
+	})
+	p9 := test.BuildTestPod(test.PodOpts{
+		CPU: []int64{100, 200, 300},
+		Mem: []int64{100, 100, 100},
+		CPUOverhead: 10000,
+		MemOverhead: 3000,
+	})
 
 	type args struct {
 		pods []*v1.Pod
@@ -133,6 +145,22 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 			},
 			*resource.NewQuantity(2055, resource.DecimalSI),
 			*resource.NewMilliQuantity(2112, resource.DecimalSI),
+		},
+		{
+			"test pod overhead",
+			args{
+				[]*v1.Pod{p8},
+			},
+			*resource.NewQuantity(3755, resource.DecimalSI),
+			*resource.NewMilliQuantity(2512, resource.DecimalSI),
+		},
+		{
+			"test pod overhead, multiple pods",
+			args{
+				[]*v1.Pod{p8, p9},
+			},
+			*resource.NewQuantity(7055, resource.DecimalSI),
+			*resource.NewMilliQuantity(13112, resource.DecimalSI),
 		},
 	}
 	for _, tt := range tests {

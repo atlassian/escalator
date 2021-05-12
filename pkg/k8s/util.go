@@ -23,17 +23,22 @@ func PodIsStatic(pod *v1.Pod) bool {
 
 // CalculatePodsRequestsTotal returns the total capacity of all pods
 func CalculatePodsRequestsTotal(pods []*v1.Pod) (resource.Quantity, resource.Quantity, error) {
-	var memoryRequest resource.Quantity
+	var memoryRequests resource.Quantity
 	var cpuRequests resource.Quantity
 
+	// todo: what about initContainers? what happens if the requests from the initContainers is larger than the containers?
 	for _, pod := range pods {
+		// Include the pod overhead, if configured
+		memoryRequests.Add(*pod.Spec.Overhead.Memory())
+		cpuRequests.Add(*pod.Spec.Overhead.Cpu())
+
 		for _, container := range pod.Spec.Containers {
-			memoryRequest.Add(*container.Resources.Requests.Memory())
+			memoryRequests.Add(*container.Resources.Requests.Memory())
 			cpuRequests.Add(*container.Resources.Requests.Cpu())
 		}
 	}
 
-	return memoryRequest, cpuRequests, nil
+	return memoryRequests, cpuRequests, nil
 }
 
 // CalculateNodesCapacityTotal calculates the total Allocatable node capacity for all nodes
