@@ -2,13 +2,15 @@ package controller
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
+	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -245,6 +247,64 @@ func TestCalculateNodesToAdd(t *testing.T) {
 			c := &Controller{}
 			nodesToAdd := c.calculateNodesToAdd(tt.args.nodesToAdd, tt.args.TargetSize, tt.args.MaxNodes)
 			assert.Equal(t, tt.want, nodesToAdd)
+		})
+	}
+}
+
+func Test_weightedSelect(t *testing.T) {
+	type args struct {
+		groups     []WeightedNodeGroup
+		nodesDelta int
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]int
+	}{
+		{
+			"test one only",
+			args{
+				[]WeightedNodeGroup{
+					{
+						"testA",
+						100,
+					},
+				},
+				100,
+			},
+			map[string]int{
+				"testA": 100,
+			},
+		},
+		{
+			"test 25%",
+			args{
+				[]WeightedNodeGroup{
+					{
+						"testA",
+						25,
+					},
+					{
+						"testB",
+						75,
+					},
+				},
+				100,
+			},
+			map[string]int{
+				"testA": 22,
+				"testB": 73,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		rand.Seed(4)
+
+		t.Run(tt.name, func(t *testing.T) {
+			if got := weightedSelect(tt.args.groups, tt.args.nodesDelta); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("weightedSelect() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

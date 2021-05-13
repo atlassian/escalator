@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 
 	"github.com/atlassian/escalator/pkg/k8s"
@@ -9,6 +10,27 @@ import (
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
+
+// weightedSelect randomly allocates each node in the nodeDelta to the weighted map of groups
+func weightedSelect(groups []WeightedNodeGroup, nodesDelta int) map[string]int {
+	totalsMap := make(map[string]int)
+
+	weightedIndices := make([]int, len(groups))
+	for i, g := range groups {
+		weightedIndices[i] = g.WeightPrecent
+	}
+	sort.Ints(weightedIndices)
+	for nodeIndex := 0; nodeIndex < nodesDelta; nodeIndex++ {
+		r := rand.Intn(100)
+		for i, weightValue := range weightedIndices {
+			if r <= weightValue {
+				totalsMap[groups[i].Name]++
+			}
+		}
+	}
+
+	return totalsMap
+}
 
 // ScaleUp performs the untaint and increase cloud provider node group logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
@@ -31,13 +53,31 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 		}
 
 		if opts.nodesDelta > 0 {
-			added, err := c.scaleUpCloudProviderNodeGroup(opts)
-			if err != nil {
-				log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
-				return 0, err
+			// keep the old path the same, even though we could use the same path by putting CloudProviderGroupName into the weighted with 100
+			if len(opts.nodeGroup.Opts.CloudProviderGroupName) > 0 {
+				added, err := c.scaleUpCloudProviderNodeGroup(opts, opts.nodesDelta, opts.nodeGroup.Opts.CloudProviderGroupName)
+				if err != nil {
+					log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
+					return 0, err
+				}
+				opts.nodeGroup.scaleUpLock.lock(added)
+				return untainted + added, nil
+			}
+
+			// multi-asg
+			var added int
+			weightedGroups := weightedSelect(opts.nodeGroup.Opts.WeightedCloudProviderGroups, opts.nodesDelta)
+			for group, nodesDelta := range weightedGroups {
+				a, err := c.scaleUpCloudProviderNodeGroup(opts, nodesDelta, group)
+				added += a
+				if err != nil {
+					log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
+					continue
+				}
 			}
 			opts.nodeGroup.scaleUpLock.lock(added)
 			return untainted + added, nil
+
 		}
 	}
 
@@ -55,15 +95,15 @@ func (c *Controller) calculateNodesToAdd(nodesToAdd int64, TargetSize int64, Max
 }
 
 // scaleUpCloudProviderNodeGroup increases the size of the cloud provider node group by opts.nodesDelta
-func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) {
+func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts, nodesDelta int, nodeGroupName string) (int, error) {
 
-	cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(opts.nodeGroup.Opts.CloudProviderGroupName)
+	cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(nodeGroupName)
 	if !ok {
-		return 0, fmt.Errorf("cloud provider node group does not exist: %s", opts.nodeGroup.Opts.CloudProviderGroupName)
+		return 0, fmt.Errorf("cloud provider node group does not exist: %s", nodeGroupName)
 	}
 
 	nodegroupName := opts.nodeGroup.Opts.Name
-	nodesToAdd := c.calculateNodesToAdd(int64(opts.nodesDelta), cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.MaxSize())
+	nodesToAdd := c.calculateNodesToAdd(int64(nodesDelta), cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.MaxSize())
 	if nodesToAdd <= 0 {
 		err := fmt.Errorf(
 			"refusing to scaleup up beyond the maximum size of the autoscaling group (TargetSize: %v; MaxNodes: %v). Taking no action",
