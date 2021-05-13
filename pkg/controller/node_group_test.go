@@ -453,6 +453,129 @@ func TestValidateNodeGroup(t *testing.T) {
 			nil,
 		},
 		{
+			"nodegroup CloudProviderGroupName empty",
+			args{
+				NodeGroupOptions{
+					Name:                               "test",
+					LabelKey:                           "customer",
+					LabelValue:                         "buileng",
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
+					TaintEffect:                        "NoExecute",
+				},
+			},
+			[]string{
+				"cloud_provider_group_name cannot be empty if not using weighted_cloud_provider_group",
+			},
+		},
+		{
+			"nodegroup WeightedCloudProviderGroups sum not 100",
+			args{
+				NodeGroupOptions{
+					Name:       "test",
+					LabelKey:   "customer",
+					LabelValue: "buileng",
+					WeightedCloudProviderGroups: []WeightedNodeGroup{
+						{
+							Name:          "testA",
+							WeightPrecent: 10,
+						},
+						{
+							Name:          "testB",
+							WeightPrecent: 10,
+						},
+					},
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
+					TaintEffect:                        "NoExecute",
+				},
+			},
+			[]string{
+				"weighted_cloud_provider_group weights sum is 20. The sum of all weights should equal exactly 100",
+			},
+		},
+		{
+			"nodegroup WeightedCloudProviderGroups name missing",
+			args{
+				NodeGroupOptions{
+					Name:       "test",
+					LabelKey:   "customer",
+					LabelValue: "buileng",
+					WeightedCloudProviderGroups: []WeightedNodeGroup{
+						{
+							WeightPrecent: 90,
+						},
+						{
+							Name:          "testB",
+							WeightPrecent: 10,
+						},
+					},
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
+					TaintEffect:                        "NoExecute",
+				},
+			},
+			[]string{
+				"weighted_cloud_provider_group[0].name must not be empty",
+			},
+		},
+		{
+			"nodegroup WeightedCloudProviderGroups okay",
+			args{
+				NodeGroupOptions{
+					Name:       "test",
+					LabelKey:   "customer",
+					LabelValue: "buileng",
+					WeightedCloudProviderGroups: []WeightedNodeGroup{
+						{
+							Name:          "testA",
+							WeightPrecent: 90,
+						},
+						{
+							Name:          "testB",
+							WeightPrecent: 10,
+						},
+					},
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
+					TaintEffect:                        "NoExecute",
+				},
+			},
+			nil,
+		},
+		{
 			"valid nodegroup with empty TaintEffect",
 			args{
 				NodeGroupOptions{

@@ -15,13 +15,19 @@ import (
 // DefaultNodeGroup is used for any pods that don't have a node selector defined
 const DefaultNodeGroup = "default"
 
+type WeightedNodeGroup struct {
+	Name          string `json:"name,omitempty" yaml:"name,omitempty"`
+	WeightPrecent int    `json:"weight_precent,omitempty" yaml:"weight_precent,omitempty"`
+}
+
 // NodeGroupOptions represents a nodegroup running on our cluster
 // We differentiate nodegroups by their node label
 type NodeGroupOptions struct {
-	Name                   string `json:"name,omitempty" yaml:"name,omitempty"`
-	LabelKey               string `json:"label_key,omitempty" yaml:"label_key,omitempty"`
-	LabelValue             string `json:"label_value,omitempty" yaml:"label_value,omitempty"`
-	CloudProviderGroupName string `json:"cloud_provider_group_name,omitempty" yaml:"cloud_provider_group_name,omitempty"`
+	Name                        string              `json:"name,omitempty" yaml:"name,omitempty"`
+	LabelKey                    string              `json:"label_key,omitempty" yaml:"label_key,omitempty"`
+	LabelValue                  string              `json:"label_value,omitempty" yaml:"label_value,omitempty"`
+	CloudProviderGroupName      string              `json:"cloud_provider_group_name,omitempty" yaml:"cloud_provider_group_name,omitempty"`
+	WeightedCloudProviderGroups []WeightedNodeGroup `json:"weighted_cloud_provider_groups,omitempty" yaml:"weighted_cloud_provider_groups,omitempty"`
 
 	MinNodes int `json:"min_nodes,omitempty" yaml:"min_nodes,omitempty"`
 	MaxNodes int `json:"max_nodes,omitempty" yaml:"max_nodes,omitempty"`
@@ -89,7 +95,19 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.Name) > 0, "name cannot be empty")
 	checkThat(len(nodegroup.LabelKey) > 0, "label_key cannot be empty")
 	checkThat(len(nodegroup.LabelValue) > 0, "label_value cannot be empty")
-	checkThat(len(nodegroup.CloudProviderGroupName) > 0, "cloud_provider_group_name cannot be empty")
+
+	if len(nodegroup.WeightedCloudProviderGroups) == 0 {
+		checkThat(len(nodegroup.CloudProviderGroupName) > 0, "cloud_provider_group_name cannot be empty if not using weighted_cloud_provider_group")
+	} else {
+		checkThat(len(nodegroup.CloudProviderGroupName) == 0, "cloud_provider_group_name must be empty if using weighted_cloud_provider_group")
+
+		var sum int
+		for i, group := range nodegroup.WeightedCloudProviderGroups {
+			checkThat(len(group.Name) > 0, "weighted_cloud_provider_group[%v].name must not be empty", i)
+			sum += group.WeightPrecent
+		}
+		checkThat(sum == 100, "weighted_cloud_provider_group weights sum is %v. The sum of all weights should equal exactly 100", sum)
+	}
 
 	checkThat(nodegroup.TaintUpperCapacityThresholdPercent > 0, "taint_upper_capacity_threshold_percent must be larger than 0")
 	checkThat(nodegroup.TaintLowerCapacityThresholdPercent > 0, "taint_lower_capacity_threshold_percent must be larger than 0")
