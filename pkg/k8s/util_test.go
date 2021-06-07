@@ -4,11 +4,10 @@ import (
 	"testing"
 
 	"github.com/atlassian/escalator/pkg/k8s"
+	"github.com/atlassian/escalator/pkg/k8s/resource"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestPodIsDaemonSet(t *testing.T) {
@@ -72,6 +71,26 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 		CPUOverhead: 10000,
 		MemOverhead: 3000,
 	})
+	p10 := test.BuildTestPod(test.PodOpts{
+		InitContainersCPU: []int64{20000},
+		InitContainersMem: []int64{500},
+		CPU: []int64{100, 200, 300},
+		Mem: []int64{100, 100, 100},
+	})
+	p11 := test.BuildTestPod(test.PodOpts{
+		InitContainersCPU: []int64{100},
+		InitContainersMem: []int64{500},
+		CPU: []int64{100, 200, 300},
+		Mem: []int64{100, 100, 100},
+	})
+	p12 := test.BuildTestPod(test.PodOpts{
+		InitContainersCPU: []int64{20000},
+		InitContainersMem: []int64{500},
+		CPU: []int64{100, 200, 300},
+		Mem: []int64{100, 100, 100},
+		CPUOverhead: 10000,
+		MemOverhead: 3000,
+	})
 
 	type args struct {
 		pods []*v1.Pod
@@ -79,95 +98,121 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		mem  resource.Quantity
-		cpu  resource.Quantity
+		mem  int64
+		cpu  int64
 	}{
 		{
 			"test 1000 + 1000 == 2000",
 			args{
 				[]*v1.Pod{p1, p2},
 			},
-			*resource.NewQuantity(2000, resource.DecimalSI),
-			*resource.NewMilliQuantity(2000, resource.DecimalSI),
+			2000,
+			2000,
 		},
 		{
 			"test 1000,1000 + 300,800 == 1300,1800",
 			args{
 				[]*v1.Pod{p1, p3},
 			},
-			*resource.NewQuantity(1800, resource.DecimalSI),
-			*resource.NewMilliQuantity(1300, resource.DecimalSI),
+			1800,
+			1300,
 		},
 		{
 			"test 1000,1000 + 300,800 + 200,50000 == 1500,51800",
 			args{
 				[]*v1.Pod{p1, p3, p4},
 			},
-			*resource.NewQuantity(51800, resource.DecimalSI),
-			*resource.NewMilliQuantity(1500, resource.DecimalSI),
+			51800,
+			1500,
 		},
 		{
 			"test 1000+0 = 1000",
 			args{
 				[]*v1.Pod{p1, p5},
 			},
-			*resource.NewQuantity(1000, resource.DecimalSI),
-			*resource.NewMilliQuantity(1000, resource.DecimalSI),
+			1000,
+			1000,
 		},
 		{
 			"test 0+1000 = 1000",
 			args{
 				[]*v1.Pod{p5, p1},
 			},
-			*resource.NewQuantity(1000, resource.DecimalSI),
-			*resource.NewMilliQuantity(1000, resource.DecimalSI),
+			1000,
+			1000,
 		},
 		{
 			"test 0",
 			args{
 				[]*v1.Pod{p5},
 			},
-			*resource.NewQuantity(0, resource.DecimalSI),
-			*resource.NewQuantity(0, resource.DecimalSI),
+			0,
+			0,
 		},
 		{
 			"test 0+0",
 			args{
 				[]*v1.Pod{p5, p5},
 			},
-			*resource.NewQuantity(0, resource.DecimalSI),
-			*resource.NewQuantity(0, resource.DecimalSI),
+			0,
+			0,
 		},
 		{
 			"test multiple containers",
 			args{
 				[]*v1.Pod{p6, p7},
 			},
-			*resource.NewQuantity(2055, resource.DecimalSI),
-			*resource.NewMilliQuantity(2112, resource.DecimalSI),
+			2055,
+			2112,
 		},
 		{
 			"test pod overhead",
 			args{
 				[]*v1.Pod{p8},
 			},
-			*resource.NewQuantity(3755, resource.DecimalSI),
-			*resource.NewMilliQuantity(2512, resource.DecimalSI),
+			3755,
+			2512,
 		},
 		{
 			"test pod overhead, multiple pods",
 			args{
 				[]*v1.Pod{p8, p9},
 			},
-			*resource.NewQuantity(7055, resource.DecimalSI),
-			*resource.NewMilliQuantity(13112, resource.DecimalSI),
+			7055,
+			13112,
+		},
+		{
+			"test init containers",
+			args{
+				[]*v1.Pod{p10},
+			},
+			500,
+			20000,
+		},
+		{
+			"test init containers 2",
+			args{
+				[]*v1.Pod{p11},
+			},
+			500,
+			600,
+		},
+		{
+			"test init containers with pod overhead",
+			args{
+				[]*v1.Pod{p12},
+			},
+			3500,
+			30000,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mem, cpu, err := k8s.CalculatePodsRequestsTotal(tt.args.pods)
-			assert.Equal(t, tt.mem, mem)
-			assert.Equal(t, tt.cpu, cpu)
+			expectedMem := *resource.NewMemoryQuantity(tt.mem)
+			expectedCPU := *resource.NewCPUQuantity(tt.cpu)
+			assert.Equal(t, expectedMem, mem)
+			assert.Equal(t, expectedCPU, cpu)
 			assert.NoError(t, err)
 		})
 	}
@@ -201,71 +246,73 @@ func TestCalculateNodesCapacityTotal(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		mem  resource.Quantity
-		cpu  resource.Quantity
+		mem  int64
+		cpu  int64
 	}{
 		{
 			"test 1000 + 1000 == 2000",
 			args{
 				[]*v1.Node{n1, n2},
 			},
-			*resource.NewQuantity(2000, resource.DecimalSI),
-			*resource.NewMilliQuantity(2000, resource.DecimalSI),
+			2000,
+			2000,
 		},
 		{
 			"test 1000,1000 + 300,800 == 1300,1800",
 			args{
 				[]*v1.Node{n1, n3},
 			},
-			*resource.NewQuantity(1800, resource.DecimalSI),
-			*resource.NewMilliQuantity(1300, resource.DecimalSI),
+			1800,
+			1300,
 		},
 		{
 			"test 1000,1000 + 300,800 + 200,50000 == 1500,51800",
 			args{
 				[]*v1.Node{n1, n3, n4},
 			},
-			*resource.NewQuantity(51800, resource.DecimalSI),
-			*resource.NewMilliQuantity(1500, resource.DecimalSI),
+			51800,
+			1500,
 		},
 		{
 			"test 1000+0 = 1000",
 			args{
 				[]*v1.Node{n1, n5},
 			},
-			*resource.NewQuantity(1000, resource.DecimalSI),
-			*resource.NewMilliQuantity(1000, resource.DecimalSI),
+			1000,
+			1000,
 		},
 		{
 			"test 0+1000 = 1000",
 			args{
 				[]*v1.Node{n5, n1},
 			},
-			*resource.NewQuantity(1000, resource.DecimalSI),
-			*resource.NewMilliQuantity(1000, resource.DecimalSI),
+			1000,
+			1000,
 		},
 		{
 			"test 0",
 			args{
 				[]*v1.Node{n5},
 			},
-			*resource.NewQuantity(0, resource.DecimalSI),
-			*resource.NewQuantity(0, resource.DecimalSI),
+			0,
+			0,
 		},
 		{
 			"test 0+0",
 			args{
 				[]*v1.Node{n5, n5},
 			},
-			*resource.NewQuantity(0, resource.DecimalSI),
-			*resource.NewQuantity(0, resource.DecimalSI),
+			0,
+			0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			expectedCpu := *resource.NewCPUQuantity(tt.cpu)
+			expectedMem := *resource.NewMemoryQuantity(tt.mem)
 			mem, cpu, err := k8s.CalculateNodesCapacityTotal(tt.args.nodes)
-			assert.Equal(t, tt.mem, mem)
-			assert.Equal(t, tt.cpu, cpu)
+			assert.Equal(t, expectedMem, mem)
+			assert.Equal(t, expectedCpu, cpu)
 			assert.NoError(t, err)
 		})
 	}
