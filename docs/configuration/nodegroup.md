@@ -28,8 +28,8 @@ node_groups:
     taint_effect: NoExecute
     aws:
         fleet_instance_ready_timeout: 1m
-        launch_template_version: lt-1a2b3c4d
-        launch_template_id: "1"
+        launch_template_id: lt-1a2b3c4d
+        launch_template_version: "1"
         lifecycle: on-demand
         instance_type_overrides: ["t2.large", "t3.large"]
         resource_tagging: false
