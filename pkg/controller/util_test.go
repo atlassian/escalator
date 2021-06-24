@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/atlassian/escalator/pkg/k8s"
+	"github.com/atlassian/escalator/pkg/k8s/resource"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
@@ -203,10 +203,10 @@ func calculatePercentageUsage(pods []*v1.Pod, nodes []*v1.Node) (float64, float6
 
 func TestCalcPercentUsage(t *testing.T) {
 	type args struct {
-		cpuRequest             resource.Quantity
-		memRequest             resource.Quantity
-		cpuCapacity            resource.Quantity
-		memCapacity            resource.Quantity
+		cpuRequest             int64
+		memRequest             int64
+		cpuCapacity            int64
+		memCapacity            int64
 		numberOfUntaintedNodes int64
 	}
 	tests := []struct {
@@ -219,10 +219,10 @@ func TestCalcPercentUsage(t *testing.T) {
 		{
 			"basic test",
 			args{
-				*resource.NewMilliQuantity(50, resource.DecimalSI),
-				*resource.NewQuantity(50, resource.DecimalSI),
-				*resource.NewMilliQuantity(100, resource.DecimalSI),
-				*resource.NewQuantity(100, resource.DecimalSI),
+				50,
+				50,
+				100,
+				100,
 				1,
 			},
 			50,
@@ -232,10 +232,10 @@ func TestCalcPercentUsage(t *testing.T) {
 		{
 			"divide by zero test",
 			args{
-				*resource.NewMilliQuantity(50, resource.DecimalSI),
-				*resource.NewQuantity(50, resource.DecimalSI),
-				*resource.NewMilliQuantity(0, resource.DecimalSI),
-				*resource.NewQuantity(0, resource.DecimalSI),
+				50,
+				50,
+				0,
+				0,
 				10,
 			},
 			0,
@@ -245,10 +245,10 @@ func TestCalcPercentUsage(t *testing.T) {
 		{
 			"no pods request while number of nodes is not 0",
 			args{
-				*resource.NewMilliQuantity(0, resource.DecimalSI),
-				*resource.NewQuantity(0, resource.DecimalSI),
-				*resource.NewMilliQuantity(0, resource.DecimalSI),
-				*resource.NewQuantity(0, resource.DecimalSI),
+				0,
+				0,
+				0,
+				0,
 				1,
 			},
 			0,
@@ -258,10 +258,10 @@ func TestCalcPercentUsage(t *testing.T) {
 		{
 			"zero numerator test",
 			args{
-				*resource.NewMilliQuantity(0, resource.DecimalSI),
-				*resource.NewQuantity(0, resource.DecimalSI),
-				*resource.NewMilliQuantity(66, resource.DecimalSI),
-				*resource.NewQuantity(66, resource.DecimalSI),
+				0,
+				0,
+				66,
+				66,
 				1,
 			},
 			0,
@@ -271,10 +271,10 @@ func TestCalcPercentUsage(t *testing.T) {
 		{
 			"zero all test",
 			args{
-				*resource.NewMilliQuantity(0, resource.DecimalSI),
-				*resource.NewQuantity(0, resource.DecimalSI),
-				*resource.NewMilliQuantity(0, resource.DecimalSI),
-				*resource.NewQuantity(0, resource.DecimalSI),
+				0,
+				0,
+				0,
+				0,
 				0,
 			},
 			0,
@@ -284,7 +284,12 @@ func TestCalcPercentUsage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cpu, mem, err := calcPercentUsage(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuCapacity, tt.args.memCapacity, tt.args.numberOfUntaintedNodes)
+			cpuRequest := *resource.NewCPUQuantity(tt.args.cpuRequest)
+			cpuCapacity := *resource.NewCPUQuantity(tt.args.cpuCapacity)
+			memRequest := *resource.NewMemoryQuantity(tt.args.memRequest)
+			memCapacity := *resource.NewMemoryQuantity(tt.args.memCapacity)
+
+			cpu, mem, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity, tt.args.numberOfUntaintedNodes)
 			if tt.err == nil {
 				require.NoError(t, err)
 			} else {

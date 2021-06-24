@@ -4,6 +4,7 @@ import (
 	"testing"
 	duration "time"
 
+	"github.com/atlassian/escalator/pkg/k8s/resource"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type ListerOptions struct {
@@ -215,9 +215,10 @@ func TestScaleNodeGroup(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		args args
-		err  error
+		name              string
+		args              args
+		expectedNodeDelta int
+		err               error
 	}{
 		{
 			"100% cpu, 50% threshold",
@@ -233,6 +234,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			10,
 			nil,
 		},
 		{
@@ -249,6 +251,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			10,
 			nil,
 		},
 		{
@@ -265,6 +268,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			5,
 			nil,
 		},
 		{
@@ -281,6 +285,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			12,
 			nil,
 		},
 		{
@@ -297,6 +302,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			nil,
 		},
 		{
@@ -313,6 +319,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			1,
 			nil,
 		},
 		{
@@ -327,6 +334,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			errors.New("node count less than the minimum"),
 		},
 		{
@@ -341,6 +349,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			errors.New("node count larger than the maximum"),
 		},
 		{
@@ -356,6 +365,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
@@ -371,6 +381,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
@@ -386,6 +397,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			errors.New("cannot divide by zero in percent calculation"),
 		},
 		{
@@ -406,6 +418,7 @@ func TestScaleNodeGroup(t *testing.T) {
 					},
 				},
 			},
+			0,
 			errors.New("unable to list pods"),
 		},
 		{
@@ -426,6 +439,7 @@ func TestScaleNodeGroup(t *testing.T) {
 					},
 				},
 			},
+			0,
 			errors.New("unable to list nodes"),
 		},
 		{
@@ -442,6 +456,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			0,
 			nil,
 		},
 		{
@@ -458,6 +473,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				},
 				ListerOptions{},
 			},
+			38,
 			nil,
 		},
 	}
@@ -507,6 +523,7 @@ func TestScaleNodeGroup(t *testing.T) {
 				require.EqualError(t, tt.err, err.Error())
 			}
 
+			assert.Equal(t, tt.expectedNodeDelta, nodesDelta)
 			if nodesDelta <= 0 {
 				return
 			}
@@ -542,7 +559,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		nodeGroupOptions NodeGroupOptions
 		listerOptions    ListerOptions
 	}
-	var defaultNodeCPUCapaity int64 = 2000
+	var defaultNodeCPUCapacity int64 = 2000
 	var defaultNodeMemCapacity int64 = 8000
 
 	tests := []struct {
@@ -557,7 +574,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		{
 			"10 nodes, 0 pods, min nodes 5, fast node removal",
 			args{
-				buildTestNodes(10, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestNodes(10, defaultNodeCPUCapacity, defaultNodeMemCapacity),
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -583,7 +600,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		{
 			"10 nodes, 10 pods, slow node removal",
 			args{
-				buildTestNodes(10, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestNodes(10, defaultNodeCPUCapacity, defaultNodeMemCapacity),
 				buildTestPods(10, 1000, 1000),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -609,7 +626,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		{
 			"4 nodes, 0 pods, min nodes 0, fast node removal to scale down to 0",
 			args{
-				buildTestNodes(4, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestNodes(4, defaultNodeCPUCapacity, defaultNodeMemCapacity),
 				buildTestPods(0, 0, 0),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -635,7 +652,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		{
 			"0 nodes, 10 pods, min nodes 0, scale up from 0 without cache",
 			args{
-				buildTestNodes(0, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestNodes(0, defaultNodeCPUCapacity, defaultNodeMemCapacity),
 				buildTestPods(40, 200, 800),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -662,7 +679,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		{
 			"0 nodes, 10 pods, min nodes 0, scale up from 0 with cache",
 			args{
-				buildTestNodes(0, defaultNodeCPUCapaity, defaultNodeMemCapacity),
+				buildTestNodes(0, defaultNodeCPUCapacity, defaultNodeMemCapacity),
 				buildTestPods(40, 200, 800),
 				NodeGroupOptions{
 					Name:                               "default",
@@ -717,8 +734,8 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			// add cached node allocatable capacity when configured
 			if tt.scaleUpWithCachedCapacity {
 				defaultNodeGroupState := nodeGroupsState[tt.args.nodeGroupOptions.Name]
-				defaultNodeGroupState.cpuCapacity = *resource.NewMilliQuantity(defaultNodeCPUCapaity, resource.DecimalSI)
-				defaultNodeGroupState.memCapacity = *resource.NewQuantity(defaultNodeMemCapacity, resource.DecimalSI)
+				defaultNodeGroupState.cpuCapacity = *resource.NewCPUQuantity(defaultNodeCPUCapacity)
+				defaultNodeGroupState.memCapacity = *resource.NewMemoryQuantity(defaultNodeMemCapacity)
 				nodeGroupsState[tt.args.nodeGroupOptions.Name] = defaultNodeGroupState
 			}
 

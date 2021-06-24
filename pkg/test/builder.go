@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/atlassian/escalator/pkg/k8s/resource"
 	"github.com/google/uuid"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -127,16 +127,16 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 		},
 		Status: apiv1.NodeStatus{
 			Capacity: apiv1.ResourceList{
-				apiv1.ResourcePods: *resource.NewQuantity(100, resource.DecimalSI),
+				apiv1.ResourcePods: *resource.NewPodQuantity(100),
 			},
 		},
 	}
 
 	if opts.CPU >= 0 {
-		node.Status.Capacity[apiv1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPU, resource.DecimalSI)
+		node.Status.Capacity[apiv1.ResourceCPU] = *resource.NewCPUQuantity(opts.CPU)
 	}
 	if opts.Mem >= 0 {
-		node.Status.Capacity[apiv1.ResourceMemory] = *resource.NewQuantity(opts.Mem, resource.DecimalSI)
+		node.Status.Capacity[apiv1.ResourceMemory] = *resource.NewMemoryQuantity(opts.Mem)
 	}
 
 	node.Status.Allocatable = apiv1.ResourceList{}
@@ -172,13 +172,24 @@ type PodOpts struct {
 	NodeName          string
 	CPUOverhead       int64
 	MemOverhead       int64
+	InitContainersCPU []int64
+	InitContainersMem []int64
 }
 
 // BuildTestPod builds a pod for testing
 func BuildTestPod(opts PodOpts) *apiv1.Pod {
 	containers := make([]apiv1.Container, 0, len(opts.CPU))
+	initContainers := make([]apiv1.Container, 0, len(opts.InitContainersCPU))
 	for range opts.CPU {
 		containers = append(containers, apiv1.Container{
+			Resources: apiv1.ResourceRequirements{
+				Requests: apiv1.ResourceList{},
+			},
+		})
+	}
+
+	for range opts.InitContainersCPU {
+		initContainers = append(initContainers, apiv1.Container{
 			Resources: apiv1.ResourceRequirements{
 				Requests: apiv1.ResourceList{},
 			},
@@ -227,10 +238,10 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 
 	overhead := v1.ResourceList{}
 	if opts.CPUOverhead > 0 {
-		overhead[v1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPUOverhead, resource.DecimalSI)
+		overhead[v1.ResourceCPU] = *resource.NewCPUQuantity(opts.CPUOverhead)
 	}
 	if opts.MemOverhead > 0 {
-		overhead[v1.ResourceMemory] = *resource.NewQuantity(opts.MemOverhead, resource.DecimalSI)
+		overhead[v1.ResourceMemory] = *resource.NewMemoryQuantity(opts.MemOverhead)
 	}
 
 	pod := &apiv1.Pod{
@@ -241,10 +252,11 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 			OwnerReferences: owners,
 		},
 		Spec: apiv1.PodSpec{
-			Containers:   containers,
-			NodeSelector: nodeSelector,
-			Affinity:     affinity,
-			Overhead:     overhead,
+			Containers:     containers,
+			InitContainers: initContainers,
+			NodeSelector:   nodeSelector,
+			Affinity:       affinity,
+			Overhead:       overhead,
 		},
 	}
 
@@ -254,10 +266,19 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 
 	for i := range containers {
 		if opts.CPU[i] >= 0 {
-			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceCPU] = *resource.NewMilliQuantity(opts.CPU[i], resource.DecimalSI)
+			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceCPU] = *resource.NewCPUQuantity(opts.CPU[i])
 		}
 		if opts.Mem[i] >= 0 {
-			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceMemory] = *resource.NewQuantity(opts.Mem[i], resource.DecimalSI)
+			pod.Spec.Containers[i].Resources.Requests[apiv1.ResourceMemory] = *resource.NewMemoryQuantity(opts.Mem[i])
+		}
+	}
+
+	for i := range initContainers {
+		if opts.CPU[i] >= 0 {
+			pod.Spec.InitContainers[i].Resources.Requests[apiv1.ResourceCPU] = *resource.NewCPUQuantity(opts.InitContainersCPU[i])
+		}
+		if opts.Mem[i] >= 0 {
+			pod.Spec.InitContainers[i].Resources.Requests[apiv1.ResourceMemory] = *resource.NewMemoryQuantity(opts.InitContainersMem[i])
 		}
 	}
 
