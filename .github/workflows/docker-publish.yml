@@ -21,12 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
       - name: Set short sha variable
         id: vars
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-
-      - name: Build image
-        run: docker build . --file Dockerfile --tag $IMAGE_NAME
 
       - name: Log into GitHub Container Registry
         # a PAT with `read:packages` and `write:packages` scopes is an Actions secret `CR_PAT`.
@@ -49,5 +53,10 @@ jobs:
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
 
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:$VERSION
+          for ARCH in amd64 arm64; do
+            docker buildx build -t $IMAGE_ID:$VERSION-$ARCH --platform=linux/${ARCH} --push .
+          done
+
+          docker manifest create $IMAGE_ID:$VERSION \
+            $(for ARCH in amd64 arm64; do echo $IMAGE_ID:$VERSION-$ARCH; done)
+          docker manifest push $IMAGE_ID:$VERSION
