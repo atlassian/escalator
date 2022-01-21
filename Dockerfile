@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.14 as builder
+FROM --platform=$BUILDPLATFORM golang:1.17 as builder
 ARG TARGETPLATFORM
 WORKDIR /go/src/github.com/atlassian/escalator/
 COPY go.mod go.sum Makefile ./
