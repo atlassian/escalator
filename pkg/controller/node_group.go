@@ -268,7 +268,9 @@ func NewPodDefaultFilterFunc() k8s.PodFilterFunc {
 		// Only include pods that pass the following:
 		// - Don't have a nodeSelector
 		// - Don't have an affinity
-		return len(pod.Spec.NodeSelector) == 0 && pod.Spec.Affinity == nil
+		return len(pod.Spec.NodeSelector) == 0 && (pod.Spec.Affinity == nil ||
+			(pod.Spec.Affinity.NodeAffinity == nil && pod.Spec.Affinity.PodAffinity == nil &&
+				pod.Spec.Affinity.PodAntiAffinity == nil))
 	}
 }
 
