@@ -36,7 +36,4 @@
  - Escalator only supports running the same type of instance (e.g. instances with different CPU and memory
    configurations) in a node group in the cloud provider. If you would like to use different types of instances and
    still have have Escalator manage them, you will need to place each instance type in it's own node group in the
-   cloud provider. Pods
-
- - Escalator does not support scaling down to zero nodes. This is because we require at least one node to calculate the
-   current utilisation.
+   cloud provider.
