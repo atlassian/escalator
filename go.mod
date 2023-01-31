@@ -3,7 +3,7 @@ module github.com/atlassian/escalator
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go v1.30.7
+	github.com/aws/aws-sdk-go v1.33.0
 	github.com/google/uuid v1.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	github.com/101loops/bdd v0.0.0-20161224202746-3e71f58e2cc3 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
