@@ -72,7 +72,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		if now.Sub(*taintedTime) > opts.nodeGroup.Opts.SoftDeleteGracePeriodDuration() {
 			if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfoMap) || now.Sub(*taintedTime) > opts.nodeGroup.Opts.HardDeleteGracePeriodDuration() {
 				drymode := c.dryMode(opts.nodeGroup)
-				log.WithField("drymode", drymode).Infof("Node %v, %v ready to be deleted", candidate.Name, candidate.Spec.ProviderID)
+				log.WithField("drymode", drymode).WithField("nodegroup", opts.nodeGroup.Opts.Name).Infof("Node %v, %v ready to be deleted", candidate.Name, candidate.Spec.ProviderID)
 				if !drymode {
 					toBeDeleted = append(toBeDeleted, candidate)
 				}
@@ -128,7 +128,7 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 			log.WithError(err).Errorf("failed to delete nodes from kubernetes")
 			return 0, err
 		}
-		log.Infof("Sent delete request to %v nodes", len(toBeDeleted))
+		log.WithField("nodegroup", opts.nodeGroup.Opts.Name).Infof("Sent delete request to %v nodes", len(toBeDeleted))
 		metrics.NodeGroupPodsEvicted.WithLabelValues(opts.nodeGroup.Opts.Name).Add(float64(podsRemaining))
 	}
 
@@ -162,7 +162,7 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	// Perform the tainting loop with the fail safe around it
 	tainted := c.taintOldestN(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
 
-	log.Infof("Tainted a total of %v nodes", len(tainted))
+	log.WithField("nodegroup", nodegroupName).Infof("Tainted a total of %v nodes", len(tainted))
 	return len(tainted), nil
 }
 
@@ -184,7 +184,7 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 
 		// only actually taint in dry mode
 		if !c.dryMode(nodeGroup) {
-			log.WithField("drymode", "off").Infof("Tainting node %v", bundle.node.Name)
+			log.WithField("drymode", "off").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
 
 			// Taint the node
 			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client, nodeGroup.Opts.TaintEffect)
@@ -197,7 +197,7 @@ func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n
 		} else {
 			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
 			taintedIndices = append(taintedIndices, bundle.index)
-			log.WithField("drymode", "on").Infof("Tainting node %v", bundle.node.Name)
+			log.WithField("drymode", "on").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
 		}
 	}
 
