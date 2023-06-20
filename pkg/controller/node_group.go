@@ -28,6 +28,8 @@ type NodeGroupOptions struct {
 
 	DryMode bool `json:"dry_mode,omitempty" yaml:"dry_mode,omitempty"`
 
+	ScaleOnStarve bool `json:"scale_on_starve,omitempty" yaml:"scale_on_starve,omitempty"`
+
 	TaintUpperCapacityThresholdPercent int `json:"taint_upper_capacity_threshold_percent,omitempty" yaml:"taint_upper_capacity_threshold_percent,omitempty"`
 	TaintLowerCapacityThresholdPercent int `json:"taint_lower_capacity_threshold_percent,omitempty" yaml:"taint_lower_capacity_threshold_percent,omitempty"`
 

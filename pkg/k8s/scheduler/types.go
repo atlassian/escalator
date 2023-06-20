@@ -1,13 +1,29 @@
 package scheduler
 
 import (
+	k8s_resource "github.com/atlassian/escalator/pkg/k8s/resource"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Resource is a collection of compute resource.
 type Resource struct {
-	MilliCPU         int64
-	Memory           int64
+	MilliCPU int64
+	Memory   int64
+}
+
+func NewEmptyResource() Resource {
+	return Resource{
+		MilliCPU: 0,
+		Memory:   0,
+	}
+}
+
+func NewResource(cpu int64, memory int64) Resource {
+	return Resource{
+		MilliCPU: cpu,
+		Memory:   memory,
+	}
 }
 
 // Add adds ResourceList into Resource.
@@ -24,6 +40,14 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			r.Memory += rQuant.Value()
 		}
 	}
+}
+
+func (r *Resource) GetCPUQuantity() *resource.Quantity {
+	return k8s_resource.NewCPUQuantity(r.MilliCPU)
+}
+
+func (r *Resource) GetMemoryQuantity() *resource.Quantity {
+	return k8s_resource.NewMemoryQuantity(r.Memory)
 }
 
 // SetMaxResource compares with ResourceList and takes max value for each Resource.
@@ -53,20 +77,21 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 // Example:
 //
 // Pod:
-//   InitContainers
-//     IC1:
-//       CPU: 2
-//       Memory: 1G
-//     IC2:
-//       CPU: 2
-//       Memory: 3G
-//   Containers
-//     C1:
-//       CPU: 2
-//       Memory: 1G
-//     C2:
-//       CPU: 1
-//       Memory: 1G
+//
+//	InitContainers
+//	  IC1:
+//	    CPU: 2
+//	    Memory: 1G
+//	  IC2:
+//	    CPU: 2
+//	    Memory: 3G
+//	Containers
+//	  C1:
+//	    CPU: 2
+//	    Memory: 1G
+//	  C2:
+//	    CPU: 1
+//	    Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
 func ComputePodResourceRequest(pod *v1.Pod) *Resource {

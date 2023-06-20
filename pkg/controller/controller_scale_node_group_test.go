@@ -132,7 +132,7 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 	})
 }
 
-//Test if when the cluster has nodes = MaxNodes but some of these nodes are tainted
+// Test if when the cluster has nodes = MaxNodes but some of these nodes are tainted
 // it will untaint them before trying to scale up the cloud provider
 func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 	t.Run("10 maxNodes, 5 tainted, 5 untainted - scale up", func(t *testing.T) {
@@ -533,6 +533,173 @@ func TestScaleNodeGroup(t *testing.T) {
 
 			// Create the nodes to simulate the cloud provider bringing up the new nodes
 			newNodes := append(nodes, buildTestNodes(nodesDelta, tt.args.nodeArgs.cpu, tt.args.nodeArgs.mem)...)
+			// Create a new client with the new nodes and update everything that uses the client
+			client, opts, err = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
+
+			controller.Client = client
+			controller.Opts = opts
+			nodeGroupsState[ngName].NodeGroupLister = client.Listers[ngName]
+
+			// Re-run the scale, ensure the result is 0 as we shouldn't need to scale up again
+			newNodesDelta, _ := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
+			assert.Equal(t, 0, newNodesDelta)
+
+		})
+	}
+
+}
+
+func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
+	type args struct {
+		nodes            []*v1.Node
+		pods             []*v1.Pod
+		nodeGroupOptions NodeGroupOptions
+		listerOptions    ListerOptions
+	}
+	cpuArgs := int64(1000)
+	memArgs := int64(1000)
+
+	nodes := buildTestNodes(5, 1000, 1000)
+	pods := make([]*v1.Pod, 0, 51)
+	for _, pod := range test.BuildTestPods(50, test.PodOpts{
+		CPU:      []int64{50},
+		Mem:      []int64{50},
+		NodeName: nodes[0].Name,
+		Running:  true,
+		Phase:    v1.PodPending,
+	}) {
+		pods = append(pods, pod)
+	}
+	for i := 0; i < 5; i++ {
+		for j := 0; j < 10; j++ {
+			pods[i*10+j].Spec.NodeName = nodes[i].Name
+		}
+	}
+	pods = append(pods, test.BuildTestPod(test.PodOpts{
+		CPU:     []int64{550},
+		Mem:     []int64{550},
+		Phase:   v1.PodPending,
+		Running: false,
+	}))
+	log.Infof("Total pods: %d", len(pods))
+
+	tests := []struct {
+		name              string
+		args              args
+		expectedNodeDelta int
+		err               error
+	}{
+		{
+			"scaleOnStarve enabled with a starved pod",
+			args{
+				nodes,
+				pods,
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                2,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					ScaleOnStarve:           true,
+				},
+				ListerOptions{},
+			},
+			1,
+			nil,
+		},
+		{
+			"scaleOnStarve disabled with a starved pod",
+			args{
+				nodes,
+				pods,
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                2,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					ScaleOnStarve:           false,
+				},
+				ListerOptions{},
+			},
+			1,
+			nil,
+		},
+		{
+			"scaleOnStarve enabled with a starved pod but max nodes",
+			args{
+				nodes,
+				pods,
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                2,
+					MaxNodes:                5,
+					ScaleUpThresholdPercent: 70,
+					ScaleOnStarve:           false,
+				},
+				ListerOptions{},
+			},
+			1,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
+			ngName := tt.args.nodeGroupOptions.Name
+			client, opts, err := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
+
+			// For these test cases we only use 1 node group/cloud provider node group
+			nodeGroupSize := 1
+
+			// Create a test (mock) cloud provider
+			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
+			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.CloudProviderGroupName,
+				tt.args.nodeGroupOptions.Name,
+				int64(tt.args.nodeGroupOptions.MinNodes),
+				int64(tt.args.nodeGroupOptions.MaxNodes),
+				int64(len(nodes)),
+			)
+			testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+			// Create a node group state with the mapping of node groups to the cloud providers node groups
+			nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+				nodeGroups: nodeGroups,
+				client:     *client,
+			})
+
+			controller := &Controller{
+				Client:        client,
+				Opts:          opts,
+				stopChan:      nil,
+				nodeGroups:    nodeGroupsState,
+				cloudProvider: testCloudProvider,
+			}
+
+			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
+
+			// Ensure there were no errors
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, tt.err, err.Error())
+			}
+
+			assert.Equal(t, tt.expectedNodeDelta, nodesDelta)
+			if nodesDelta <= 0 {
+				return
+			}
+
+			// Ensure the node group on the cloud provider side scales up to the correct amount
+			assert.Equal(t, int64(len(nodes)+nodesDelta), testNodeGroup.TargetSize())
+
+			// Create the nodes to simulate the cloud provider bringing up the new nodes
+			newNodes := append(nodes, buildTestNodes(nodesDelta, cpuArgs, memArgs)...)
 			// Create a new client with the new nodes and update everything that uses the client
 			client, opts, err = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
 			require.NoError(t, err)
