@@ -562,15 +562,13 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 
 	nodes := buildTestNodes(5, 1000, 1000)
 	pods := make([]*v1.Pod, 0, 51)
-	for _, pod := range test.BuildTestPods(50, test.PodOpts{
+	pods = append(pods, test.BuildTestPods(50, test.PodOpts{
 		CPU:      []int64{50},
 		Mem:      []int64{50},
 		NodeName: nodes[0].Name,
 		Running:  true,
 		Phase:    v1.PodPending,
-	}) {
-		pods = append(pods, pod)
-	}
+	})...)
 	for i := 0; i < 5; i++ {
 		for j := 0; j < 10; j++ {
 			pods[i*10+j].Spec.NodeName = nodes[i].Name
@@ -623,7 +621,7 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 				},
 				ListerOptions{},
 			},
-			1,
+			0,
 			nil,
 		},
 		{
@@ -637,11 +635,11 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 					MinNodes:                2,
 					MaxNodes:                5,
 					ScaleUpThresholdPercent: 70,
-					ScaleOnStarve:           false,
+					ScaleOnStarve:           true,
 				},
 				ListerOptions{},
 			},
-			1,
+			0,
 			nil,
 		},
 	}
