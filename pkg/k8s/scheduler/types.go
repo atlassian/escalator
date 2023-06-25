@@ -50,6 +50,10 @@ func (r *Resource) GetMemoryQuantity() *resource.Quantity {
 	return k8s_resource.NewMemoryQuantity(r.Memory)
 }
 
+func (r *Resource) IsEmpty() bool {
+	return r.MilliCPU == 0 && r.Memory == 0
+}
+
 // SetMaxResource compares with ResourceList and takes max value for each Resource.
 func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	if r == nil {

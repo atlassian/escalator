@@ -4,6 +4,7 @@ import (
 	"testing"
 	duration "time"
 
+	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/k8s/resource"
 	"github.com/atlassian/escalator/pkg/test"
 	"github.com/pkg/errors"
@@ -561,17 +562,27 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 	memArgs := int64(1000)
 
 	nodes := buildTestNodes(5, 1000, 1000)
-	pods := make([]*v1.Pod, 0, 51)
-	pods = append(pods, test.BuildTestPods(50, test.PodOpts{
+	pods := test.BuildTestPods(50, test.PodOpts{
 		CPU:      []int64{50},
 		Mem:      []int64{50},
 		NodeName: nodes[0].Name,
 		Running:  true,
 		Phase:    v1.PodPending,
-	})...)
+	})
+	no_pods := make([]*v1.Pod, 0)
+	scale_down_pods := test.BuildTestPods(10, test.PodOpts{
+		CPU:      []int64{50},
+		Mem:      []int64{50},
+		NodeName: nodes[0].Name,
+		Running:  true,
+		Phase:    v1.PodPending,
+	})
 	for i := 0; i < 5; i++ {
 		for j := 0; j < 10; j++ {
 			pods[i*10+j].Spec.NodeName = nodes[i].Name
+		}
+		for j := 0; j < 2; j++ {
+			scale_down_pods[i*2+j].Spec.NodeName = nodes[i].Name
 		}
 	}
 	pods = append(pods, test.BuildTestPod(test.PodOpts{
@@ -580,12 +591,18 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 		Phase:   v1.PodPending,
 		Running: false,
 	}))
-	log.Infof("Total pods: %d", len(pods))
+	scale_down_pods = append(scale_down_pods, test.BuildTestPod(test.PodOpts{
+		CPU:     []int64{950},
+		Mem:     []int64{950},
+		Phase:   v1.PodPending,
+		Running: false,
+	}))
 
 	tests := []struct {
 		name              string
 		args              args
 		expectedNodeDelta int
+		checkSecond       bool
 		err               error
 	}{
 		{
@@ -604,6 +621,7 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 				ListerOptions{},
 			},
 			1,
+			true,
 			nil,
 		},
 		{
@@ -622,6 +640,7 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 				ListerOptions{},
 			},
 			0,
+			true,
 			nil,
 		},
 		{
@@ -640,6 +659,68 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 				ListerOptions{},
 			},
 			0,
+			true,
+			nil,
+		},
+		{
+			"We don't scale up when no pods exist",
+			args{
+				nodes,
+				no_pods,
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                2,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					ScaleOnStarve:           true,
+				},
+				ListerOptions{},
+			},
+			0,
+			true,
+			nil,
+		},
+		{
+			"Scale down with ScaleOnStarve disabled (but starved pod) still scales down",
+			args{
+				nodes,
+				scale_down_pods,
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           2,
+					MaxNodes:                           10,
+					ScaleUpThresholdPercent:            70,
+					ScaleOnStarve:                      false,
+					TaintUpperCapacityThresholdPercent: 40,
+					SlowNodeRemovalRate:                1,
+				},
+				ListerOptions{},
+			},
+			-1,
+			true,
+			nil,
+		},
+		{
+			"Scale down with ScaleOnStarve enabled (and starved pod) still scales up",
+			args{
+				nodes,
+				scale_down_pods,
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           2,
+					MaxNodes:                           10,
+					ScaleUpThresholdPercent:            70,
+					ScaleOnStarve:                      true,
+					TaintUpperCapacityThresholdPercent: 40,
+					SlowNodeRemovalRate:                1,
+				},
+				ListerOptions{},
+			},
+			1,
+			false, // second run will scale down instead of neutral
 			nil,
 		},
 	}
@@ -650,6 +731,11 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 			ngName := tt.args.nodeGroupOptions.Name
 			client, opts, err := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
 			require.NoError(t, err)
+			// Reset node taints from previous tests
+			for _, node := range tt.args.nodes {
+				_, err := k8s.DeleteToBeRemovedTaint(node, client)
+				require.NoError(t, err)
+			}
 
 			// For these test cases we only use 1 node group/cloud provider node group
 			nodeGroupSize := 1
@@ -698,17 +784,19 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 
 			// Create the nodes to simulate the cloud provider bringing up the new nodes
 			newNodes := append(nodes, buildTestNodes(nodesDelta, cpuArgs, memArgs)...)
-			// Create a new client with the new nodes and update everything that uses the client
-			client, opts, err = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
-			require.NoError(t, err)
+			if tt.checkSecond {
+				// Create a new client with the new nodes and update everything that uses the client
+				client, opts, err = buildTestClient(newNodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+				require.NoError(t, err)
 
-			controller.Client = client
-			controller.Opts = opts
-			nodeGroupsState[ngName].NodeGroupLister = client.Listers[ngName]
+				controller.Client = client
+				controller.Opts = opts
+				nodeGroupsState[ngName].NodeGroupLister = client.Listers[ngName]
 
-			// Re-run the scale, ensure the result is 0 as we shouldn't need to scale up again
-			newNodesDelta, _ := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
-			assert.Equal(t, 0, newNodesDelta)
+				// Re-run the scale, ensure the result is 0 as we shouldn't need to scale up again
+				newNodesDelta, _ := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
+				assert.Equal(t, 0, newNodesDelta)
+			}
 
 		})
 	}

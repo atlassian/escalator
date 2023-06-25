@@ -361,8 +361,8 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	if nodeGroup.Opts.ScaleOnStarve &&
-		(podRequests.LargestCPU.MilliCPU > nodeCapacity.LargestAvailableCPU.MilliCPU ||
-			podRequests.LargestMemory.Memory > nodeCapacity.LargestAvailableMemory.Memory) &&
+		((!podRequests.LargestPendingCPU.IsEmpty() && podRequests.LargestPendingCPU.MilliCPU > nodeCapacity.LargestAvailableCPU.MilliCPU) ||
+			(!podRequests.LargestPendingMemory.IsEmpty() && podRequests.LargestPendingMemory.Memory > nodeCapacity.LargestAvailableMemory.Memory)) &&
 		len(untaintedNodes) < nodeGroup.Opts.MaxNodes {
 		log.WithField("nodegroup", nodegroup).Info("Setting scale to minimum of 1 due to a starved pod")
 		nodesDelta = int(math.Max(float64(nodesDelta), 1))

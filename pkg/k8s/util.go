@@ -6,9 +6,9 @@ import (
 )
 
 type PodRequestedUsage struct {
-	Total         scheduler.Resource
-	LargestMemory scheduler.Resource
-	LargestCPU    scheduler.Resource
+	Total                scheduler.Resource
+	LargestPendingMemory scheduler.Resource
+	LargestPendingCPU    scheduler.Resource
 }
 
 type NodeAvailableCapacity struct {
@@ -19,9 +19,9 @@ type NodeAvailableCapacity struct {
 
 func newPodRequestedUsage() PodRequestedUsage {
 	return PodRequestedUsage{
-		Total:         scheduler.NewEmptyResource(),
-		LargestMemory: scheduler.NewEmptyResource(),
-		LargestCPU:    scheduler.NewEmptyResource(),
+		Total:                scheduler.NewEmptyResource(),
+		LargestPendingMemory: scheduler.NewEmptyResource(),
+		LargestPendingCPU:    scheduler.NewEmptyResource(),
 	}
 }
 
@@ -49,7 +49,8 @@ func PodIsStatic(pod *v1.Pod) bool {
 	return ok && configSource == "file"
 }
 
-// CalculatePodsRequestedUsage returns the total capacity of all pods
+// CalculatePodsRequestedUsage returns the requested usage of all pods, both as Total across all nodes,
+// as well as the largest pod by CPU and Memory
 func CalculatePodsRequestedUsage(pods []*v1.Pod) (PodRequestedUsage, error) {
 	ret := newPodRequestedUsage()
 
@@ -58,11 +59,11 @@ func CalculatePodsRequestedUsage(pods []*v1.Pod) (PodRequestedUsage, error) {
 		ret.Total.Memory += podResources.Memory
 		ret.Total.MilliCPU += podResources.MilliCPU
 		if pod.Status.Phase == v1.PodPending {
-			if podResources.Memory > ret.LargestMemory.Memory {
-				ret.LargestMemory = scheduler.NewResource(podResources.MilliCPU, podResources.Memory)
+			if podResources.Memory > ret.LargestPendingMemory.Memory {
+				ret.LargestPendingMemory = scheduler.NewResource(podResources.MilliCPU, podResources.Memory)
 			}
-			if podResources.MilliCPU > ret.LargestCPU.MilliCPU {
-				ret.LargestCPU = scheduler.NewResource(podResources.MilliCPU, podResources.Memory)
+			if podResources.MilliCPU > ret.LargestPendingCPU.MilliCPU {
+				ret.LargestPendingCPU = scheduler.NewResource(podResources.MilliCPU, podResources.Memory)
 			}
 		}
 	}
@@ -70,7 +71,8 @@ func CalculatePodsRequestedUsage(pods []*v1.Pod) (PodRequestedUsage, error) {
 	return ret, nil
 }
 
-// CalculateNodesCapacity calculates the total Allocatable node capacity for all nodes
+// CalculateNodesCapacity calculates the total Allocatable node capacity for all nodes,
+// as well as the 2 nodes with the largest available CPU and memory
 func CalculateNodesCapacity(nodes []*v1.Node, pods []*v1.Pod) (NodeAvailableCapacity, error) {
 	ret := newNodeAvailableCapacity()
 
