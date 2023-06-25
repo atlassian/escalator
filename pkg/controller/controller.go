@@ -275,6 +275,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupCPUCapacity.WithLabelValues(nodegroup).Set(float64(nodeCapacity.Total.GetCPUQuantity().MilliValue()))
 	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(nodeCapacity.Total.GetMemoryQuantity().MilliValue() / 1000))
 	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(podRequests.Total.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPURequestLargestPendingCPU.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingCPU.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemRequestLargestPendingCPU.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingCPU.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPURequestLargestPendingMem.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingMemory.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemRequestLargestPendingMem.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingMemory.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPUCapacityLargestAvailableCPU.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableCPU.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemCapacityLargestAvailableCPU.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableCPU.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPUCapacityLargestAvailableMem.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableMemory.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemCapacityLargestAvailableMem.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableMemory.GetMemoryQuantity().MilliValue() / 1000))
 
 	// If we ever get into a state where we have less nodes than the minimum
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
