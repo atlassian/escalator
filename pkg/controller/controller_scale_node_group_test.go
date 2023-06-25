@@ -577,15 +577,29 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 		Running:  true,
 		Phase:    v1.PodPending,
 	})
+	scale_up_pods := test.BuildTestPods(50, test.PodOpts{
+		CPU:      []int64{80},
+		Mem:      []int64{80},
+		NodeName: nodes[0].Name,
+		Running:  true,
+		Phase:    v1.PodPending,
+	})
 	for i := 0; i < 5; i++ {
 		for j := 0; j < 10; j++ {
 			pods[i*10+j].Spec.NodeName = nodes[i].Name
+			scale_up_pods[i*10+j].Spec.NodeName = nodes[i].Name
 		}
 		for j := 0; j < 2; j++ {
 			scale_down_pods[i*2+j].Spec.NodeName = nodes[i].Name
 		}
 	}
 	pods = append(pods, test.BuildTestPod(test.PodOpts{
+		CPU:     []int64{550},
+		Mem:     []int64{550},
+		Phase:   v1.PodPending,
+		Running: false,
+	}))
+	scale_up_pods = append(scale_up_pods, test.BuildTestPod(test.PodOpts{
 		CPU:     []int64{550},
 		Mem:     []int64{550},
 		Phase:   v1.PodPending,
@@ -721,6 +735,25 @@ func TestScaleNodeGroupScaleOnStarve(t *testing.T) {
 			},
 			1,
 			false, // second run will scale down instead of neutral
+			nil,
+		},
+		{
+			"Scale up is not limited by ScaleOnStarve",
+			args{
+				nodes,
+				scale_up_pods,
+				NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                2,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					ScaleOnStarve:           true,
+				},
+				ListerOptions{},
+			},
+			2,
+			true,
 			nil,
 		},
 	}
