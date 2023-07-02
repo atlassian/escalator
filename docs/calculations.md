@@ -84,6 +84,13 @@ when cached capacity exists:
 when cached capacity doesn't exist:
 - Amount to increase by: `1` node
 
+## Scale On Starve
+
+The node groups can also contain an optional boolean parameter `scale_on_starve`. When this is true, the system caps
+each escalation size to a minimum of 1 whenever there is a pod that cannot currently be scheduled. This helps alleviate
+situations where a large pod exceeds the available capacity of any 1 node, but its total size does not cause the system
+as a whole to exceed the scale up threshold.
+
 
 ## Daemonsets
 

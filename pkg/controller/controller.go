@@ -7,7 +7,6 @@ import (
 	"github.com/atlassian/escalator/pkg/cloudprovider"
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -259,23 +258,31 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	nodeGroup.NodeInfoMap = k8s.CreateNodeNameToInfoMap(pods, allNodes)
 
 	// Calc capacity for untainted nodes
-	memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(pods)
+	podRequests, err := k8s.CalculatePodsRequestedUsage(pods)
 	if err != nil {
 		log.Errorf("Failed to calculate requests: %v", err)
 		return 0, err
 	}
 
-	memCapacity, cpuCapacity, err := k8s.CalculateNodesCapacityTotal(untaintedNodes)
+	nodeCapacity, err := k8s.CalculateNodesCapacity(untaintedNodes, pods)
 	if err != nil {
 		log.Errorf("Failed to calculate capacity: %v", err)
 		return 0, err
 	}
 
 	// Metrics
-	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(cpuRequest.MilliValue()))
-	metrics.NodeGroupCPUCapacity.WithLabelValues(nodegroup).Set(float64(cpuCapacity.MilliValue()))
-	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(memCapacity.MilliValue() / 1000))
-	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(memRequest.MilliValue() / 1000))
+	metrics.NodeGroupCPURequest.WithLabelValues(nodegroup).Set(float64(podRequests.Total.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupCPUCapacity.WithLabelValues(nodegroup).Set(float64(nodeCapacity.Total.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemCapacity.WithLabelValues(nodegroup).Set(float64(nodeCapacity.Total.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupMemRequest.WithLabelValues(nodegroup).Set(float64(podRequests.Total.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPURequestLargestPendingCPU.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingCPU.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemRequestLargestPendingCPU.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingCPU.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPURequestLargestPendingMem.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingMemory.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemRequestLargestPendingMem.WithLabelValues(nodegroup).Set(float64(podRequests.LargestPendingMemory.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPUCapacityLargestAvailableCPU.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableCPU.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemCapacityLargestAvailableCPU.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableCPU.GetMemoryQuantity().MilliValue() / 1000))
+	metrics.NodeGroupCPUCapacityLargestAvailableMem.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableMemory.GetCPUQuantity().MilliValue()))
+	metrics.NodeGroupMemCapacityLargestAvailableMem.WithLabelValues(nodegroup).Set(float64(nodeCapacity.LargestAvailableMemory.GetMemoryQuantity().MilliValue() / 1000))
 
 	// If we ever get into a state where we have less nodes than the minimum
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
@@ -296,7 +303,12 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// Calc %
 	// both cpu and memory capacity are based on number of untainted nodes
 	// pass number of untainted nodes in to help make decision if it's a scaling-up-from-0
-	cpuPercent, memPercent, err := calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity, int64(len(untaintedNodes)))
+	cpuPercent, memPercent, err := calcPercentUsage(
+		*podRequests.Total.GetCPUQuantity(),
+		*podRequests.Total.GetMemoryQuantity(),
+		*nodeCapacity.Total.GetCPUQuantity(),
+		*nodeCapacity.Total.GetMemoryQuantity(),
+		int64(len(untaintedNodes)))
 	if err != nil {
 		log.Errorf("Failed to calculate percentages: %v", err)
 		return 0, err
@@ -343,11 +355,22 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// if ScaleUpThresholdPercent is our "max target" or "slack capacity"
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThresholdPercent
-		nodesDelta, err = calcScaleUpDelta(untaintedNodes, cpuPercent, memPercent, cpuRequest, memRequest, nodeGroup)
+		nodesDelta, err = calcScaleUpDelta(
+			untaintedNodes,
+			cpuPercent,
+			memPercent,
+			*podRequests.Total.GetCPUQuantity(),
+			*podRequests.Total.GetMemoryQuantity(),
+			nodeGroup)
 		if err != nil {
 			log.Errorf("Failed to calculate node delta: %v", err)
 			return nodesDelta, err
 		}
+	}
+
+	if c.isScaleOnStarve(nodeGroup, podRequests, nodeCapacity, untaintedNodes) {
+		log.WithField("nodegroup", nodegroup).Info("Setting scale to minimum of 1 due to a starved pod")
+		nodesDelta = int(math.Max(float64(nodesDelta), 1))
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
@@ -394,6 +417,18 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugf("DeltaScaled: %v", nodesDeltaResult)
 	return nodesDelta, err
+}
+
+func (c *Controller) isScaleOnStarve(
+	nodeGroup *NodeGroupState,
+	podRequests k8s.PodRequestedUsage,
+	nodeCapacity k8s.NodeAvailableCapacity,
+	untaintedNodes []*v1.Node,
+) bool {
+	return nodeGroup.Opts.ScaleOnStarve &&
+		((!podRequests.LargestPendingCPU.IsEmpty() && podRequests.LargestPendingCPU.MilliCPU > nodeCapacity.LargestAvailableCPU.MilliCPU) ||
+			(!podRequests.LargestPendingMemory.IsEmpty() && podRequests.LargestPendingMemory.Memory > nodeCapacity.LargestAvailableMemory.Memory)) &&
+		len(untaintedNodes) < nodeGroup.Opts.MaxNodes
 }
 
 // RunOnce performs the main autoscaler logic once

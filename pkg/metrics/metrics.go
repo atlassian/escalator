@@ -108,6 +108,42 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupMemRequestLargestPendingCPU byte value of memory of node group's largest pod by request CPU
+	NodeGroupMemRequestLargestPendingCPU = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_mem_request_largest_pending_cpu",
+			Namespace: NAMESPACE,
+			Help:      "byte value of memory for largest pending pod by cpu",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupCPURequestLargestPendingCPU milli value of CPU of node group's largest pod by request cpu
+	NodeGroupCPURequestLargestPendingCPU = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_cpu_request_largest_pending_cpu",
+			Namespace: NAMESPACE,
+			Help:      "milli value of cpu for largest pending pod by cpu",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupMemRequestLargestPendingMem byte value of memory of node group's largest pod by request Mem
+	NodeGroupMemRequestLargestPendingMem = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_mem_request_largest_pending_mem",
+			Namespace: NAMESPACE,
+			Help:      "byte value of memory for largest pending pod by memory",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupCPURequestLargestPendingMem milli value of CPU of node group's largest pod by request Mem
+	NodeGroupCPURequestLargestPendingMem = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_cpu_request_largest_pending_mem",
+			Namespace: NAMESPACE,
+			Help:      "milli value of cpu for largest pending pod by memory",
+		},
+		[]string{"node_group"},
+	)
 	// NodeGroupMemCapacity byte value of node capacity mem
 	NodeGroupMemCapacity = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -123,6 +159,42 @@ var (
 			Name:      "node_group_cpu_capacity",
 			Namespace: NAMESPACE,
 			Help:      "milli value of node capacity cpu",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupMemCapacityLargestAvailableCPU byte value of available memory of node group's largest node by available CPU
+	NodeGroupMemCapacityLargestAvailableCPU = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_mem_capacity_largest_available_cpu",
+			Namespace: NAMESPACE,
+			Help:      "byte value of memory capacity for largest available node by cpu",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupCPUCapacityLargestAvailableCPU milli value of available CPU of node group's largest node by available cpu
+	NodeGroupCPUCapacityLargestAvailableCPU = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_cpu_capacity_largest_available_cpu",
+			Namespace: NAMESPACE,
+			Help:      "milli value of cpu capacity for largest available node by cpu",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupMemCapacityLargestAvailableMem byte value of available memory of node group's largest node by available Mem
+	NodeGroupMemCapacityLargestAvailableMem = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_mem_capacity_largest_available_mem",
+			Namespace: NAMESPACE,
+			Help:      "byte value of memory capacity for largest available node by memory",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupCPUCapacityLargestAvailableMem milli value of available CPU of node group's largest node by available Mem
+	NodeGroupCPUCapacityLargestAvailableMem = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_cpu_capacity_largest_available_mem",
+			Namespace: NAMESPACE,
+			Help:      "milli value of cpu capacity for largest available node by memory",
 		},
 		[]string{"node_group"},
 	)
@@ -241,8 +313,16 @@ func init() {
 	prometheus.MustRegister(NodeGroupsCPUPercent)
 	prometheus.MustRegister(NodeGroupCPURequest)
 	prometheus.MustRegister(NodeGroupMemRequest)
+	prometheus.MustRegister(NodeGroupCPURequestLargestPendingCPU)
+	prometheus.MustRegister(NodeGroupMemRequestLargestPendingCPU)
+	prometheus.MustRegister(NodeGroupCPURequestLargestPendingMem)
+	prometheus.MustRegister(NodeGroupMemRequestLargestPendingMem)
 	prometheus.MustRegister(NodeGroupCPUCapacity)
 	prometheus.MustRegister(NodeGroupMemCapacity)
+	prometheus.MustRegister(NodeGroupCPUCapacityLargestAvailableCPU)
+	prometheus.MustRegister(NodeGroupMemCapacityLargestAvailableCPU)
+	prometheus.MustRegister(NodeGroupCPUCapacityLargestAvailableMem)
+	prometheus.MustRegister(NodeGroupMemCapacityLargestAvailableMem)
 	prometheus.MustRegister(NodeGroupTaintEvent)
 	prometheus.MustRegister(NodeGroupUntaintEvent)
 	prometheus.MustRegister(NodeGroupScaleLock)

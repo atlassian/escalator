@@ -166,10 +166,16 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 			cpuPercent, memPercent, _ := calculatePercentageUsage(tt.args.pods, nodes)
 
 			// get pods requests
-			memRequest, cpuRequest, err := k8s.CalculatePodsRequestsTotal(tt.args.pods)
+			podRequests, err := k8s.CalculatePodsRequestedUsage(tt.args.pods)
 			require.NoError(t, err)
 			// Calculate scale up delta
-			want, _ := calcScaleUpDelta(nodes, cpuPercent, memPercent, cpuRequest, memRequest, tt.args.nodeGroup)
+			want, _ := calcScaleUpDelta(
+				nodes,
+				cpuPercent,
+				memPercent,
+				*resource.NewCPUQuantity(podRequests.Total.MilliCPU),
+				*resource.NewMemoryQuantity(podRequests.Total.Memory),
+				tt.args.nodeGroup)
 
 			if want <= 0 {
 				return
@@ -194,11 +200,16 @@ func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
 // Helper function for calculating percentage usage
 func calculatePercentageUsage(pods []*v1.Pod, nodes []*v1.Node) (float64, float64, error) {
 	// Calculate requests and capacity
-	memRequest, cpuRequest, _ := k8s.CalculatePodsRequestsTotal(pods)
-	memCapacity, cpuCapacity, _ := k8s.CalculateNodesCapacityTotal(nodes)
+	podRequests, _ := k8s.CalculatePodsRequestedUsage(pods)
+	nodeCapacity, _ := k8s.CalculateNodesCapacity(nodes, pods)
 
 	// Calculate percentage usage
-	return calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity, int64(len(nodes)))
+	return calcPercentUsage(
+		*podRequests.Total.GetCPUQuantity(),
+		*podRequests.Total.GetMemoryQuantity(),
+		*nodeCapacity.Total.GetCPUQuantity(),
+		*nodeCapacity.Total.GetMemoryQuantity(),
+		int64(len(nodes)))
 }
 
 func TestCalcPercentUsage(t *testing.T) {

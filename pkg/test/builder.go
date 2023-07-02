@@ -174,6 +174,8 @@ type PodOpts struct {
 	MemOverhead       int64
 	InitContainersCPU []int64
 	InitContainersMem []int64
+	Phase             v1.PodPhase
+	Running           bool
 }
 
 // BuildTestPod builds a pod for testing
@@ -281,6 +283,12 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 			pod.Spec.InitContainers[i].Resources.Requests[apiv1.ResourceMemory] = *resource.NewMemoryQuantity(opts.InitContainersMem[i])
 		}
 	}
+
+	conditions := make([]v1.PodCondition, 0)
+	if opts.Running {
+		conditions = append(conditions, v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionTrue})
+	}
+	pod.Status = v1.PodStatus{Phase: opts.Phase, Conditions: conditions}
 
 	return pod
 }

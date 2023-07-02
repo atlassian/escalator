@@ -16,6 +16,7 @@ node_groups:
     min_nodes: 1
     max_nodes: 30
     dry_mode: false
+    scale_on_starve: false
     taint_upper_capacity_threshold_percent: 40
     taint_lower_capacity_threshold_percent: 10
     slow_node_removal_rate: 2
@@ -97,6 +98,14 @@ the node group, but just logs out the actions it would perform. This is helpful 
 Escalator would do in specific scenarios.
 
 Note: this flag is overridden by the `--drymode` command line flag.
+
+### `scale_on_starve`
+
+This flag adds an additional check to the escalator scaling algorithm to enforce a minimum scaling of 1 new node
+whenever there is a pod that cannot currently be scheduled due to no node having capacity to run it.
+
+Warning: You have to be extra careful around pod request sizes not exceeding node capacity when this option is enabled,
+or you may find the escalator always creates the maximum number of nodes.
 
 ### `taint_upper_capacity_threshold_percent`
 
