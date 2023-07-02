@@ -368,10 +368,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		}
 	}
 
-	if nodeGroup.Opts.ScaleOnStarve &&
-		((!podRequests.LargestPendingCPU.IsEmpty() && podRequests.LargestPendingCPU.MilliCPU > nodeCapacity.LargestAvailableCPU.MilliCPU) ||
-			(!podRequests.LargestPendingMemory.IsEmpty() && podRequests.LargestPendingMemory.Memory > nodeCapacity.LargestAvailableMemory.Memory)) &&
-		len(untaintedNodes) < nodeGroup.Opts.MaxNodes {
+	if c.isScaleOnStarve(nodeGroup, podRequests, nodeCapacity, untaintedNodes) {
 		log.WithField("nodegroup", nodegroup).Info("Setting scale to minimum of 1 due to a starved pod")
 		nodesDelta = int(math.Max(float64(nodesDelta), 1))
 	}
@@ -420,6 +417,18 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugf("DeltaScaled: %v", nodesDeltaResult)
 	return nodesDelta, err
+}
+
+func (c *Controller) isScaleOnStarve(
+	nodeGroup *NodeGroupState,
+	podRequests k8s.PodRequestedUsage,
+	nodeCapacity k8s.NodeAvailableCapacity,
+	untaintedNodes []*v1.Node,
+) bool {
+	return nodeGroup.Opts.ScaleOnStarve &&
+		((!podRequests.LargestPendingCPU.IsEmpty() && podRequests.LargestPendingCPU.MilliCPU > nodeCapacity.LargestAvailableCPU.MilliCPU) ||
+			(!podRequests.LargestPendingMemory.IsEmpty() && podRequests.LargestPendingMemory.Memory > nodeCapacity.LargestAvailableMemory.Memory)) &&
+		len(untaintedNodes) < nodeGroup.Opts.MaxNodes
 }
 
 // RunOnce performs the main autoscaler logic once
