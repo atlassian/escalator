@@ -1,7 +1,7 @@
 # Escalator
 
 [![Godoc](https://godoc.org/github.com/atlassian/escalator?status.svg)](https://godoc.org/github.com/atlassian/escalator)
-[![Build Status](https://travis-ci.org/atlassian/escalator.svg?branch=master)](https://travis-ci.org/atlassian/escalator)
+[![Build Status](https://github.com/atlassian/escalator/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/atlassian/escalator/actions/workflows/build.yml?query=branch%3Amaster)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/escalator)](https://goreportcard.com/report/github.com/atlassian/escalator)
 [![license](https://img.shields.io/github/license/atlassian/escalator.svg)](LICENSE)
 
@@ -29,29 +29,18 @@ The need for this autoscaler is derived from our own experiences with very large
 default autoscaler not scaling up the cluster fast enough. These workloads can't be force-drained by the default 
 autoscaler and must complete before the node can be terminated.
 
-## Planned Features & Development Roadmap
-
-- [#93](https://github.com/atlassian/escalator/issues/93) - Add option to perform a drain before terminating a node
-- [#60](https://github.com/atlassian/escalator/issues/60) - Add additional metrics
-- [#71](https://github.com/atlassian/escalator/issues/71) - Generate unique ID for each scale activity
-
 ## Documentation and Design
 
 See [Docs](docs/README.md)
 
 ## Requirements
 
-- [Kubernetes](https://kubernetes.io/) version 1.8+. Escalator has been tested and deployed on 1.8+ and newer. Older 
+- [Kubernetes](https://kubernetes.io/) version 1.24+. Escalator has been tested and deployed on 1.24+ and newer. Older 
 versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
-- [Go](https://golang.org/) version 1.12+ with `GO111MODULE=on`, but Go 1.13+ is highly recommended as Escalator uses go modules for dependencies.
+- [Go](https://golang.org/) version 1.20+
 - Dependencies and their locked versions can be found in `go.mod` and `go.sum`.
 
 ## Building
-
-```bash
-# If using Go 1.12 make sure to enable Go modules support. For Go 1.13 you can ignore this
-export GO111MODULE=on
-```
 
 ```bash
 # Fetch dependencies and build Escalator
