@@ -1,10 +1,11 @@
 FROM --platform=$BUILDPLATFORM golang:1.20 as builder
 ARG TARGETPLATFORM
+ARG ENVVAR
 WORKDIR /go/src/github.com/atlassian/escalator/
 COPY go.mod go.sum Makefile ./
 COPY cmd cmd
 COPY pkg pkg
-RUN make build
+RUN make build ENVVAR=$ENVVAR
 
 FROM alpine:3.16
 RUN apk --no-cache add ca-certificates
