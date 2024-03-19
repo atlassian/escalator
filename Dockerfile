@@ -1,6 +1,6 @@
 FROM --platform=$BUILDPLATFORM golang:1.20 as builder
 ARG TARGETPLATFORM
-ARG ENVVAR
+ARG ENVVAR=CGO_ENABLED=0
 WORKDIR /go/src/github.com/atlassian/escalator/
 COPY go.mod go.sum Makefile ./
 COPY cmd cmd
