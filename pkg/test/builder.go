@@ -102,6 +102,9 @@ func NameFromChan(c <-chan string, timeout time.Duration) string {
 
 // BuildTestNode creates a node with specified capacity.
 func BuildTestNode(opts NodeOpts) *apiv1.Node {
+	if opts.Name == "" {
+		opts.Name = uuid.New().String()
+	}
 
 	var taints []apiv1.Taint
 	if opts.Tainted {

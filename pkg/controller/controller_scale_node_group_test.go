@@ -2,7 +2,7 @@ package controller
 
 import (
 	"testing"
-	duration "time"
+	stdtime "time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/k8s/resource"
@@ -39,7 +39,7 @@ func buildTestClient(nodes []*v1.Node, pods []*v1.Pod, nodeGroups []NodeGroupOpt
 	opts := Opts{
 		K8SClient:    fakeClient,
 		NodeGroups:   nodeGroups,
-		ScanInterval: 1 * duration.Minute,
+		ScanInterval: 1 * stdtime.Minute,
 		DryMode:      false,
 	}
 	allPodLister, err := test.NewTestPodWatcher(pods, listerOptions.podListerOptions)
@@ -853,7 +853,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 		args                      args
 		scaleUpWithCachedCapacity bool
 		runs                      int
-		runInterval               duration.Duration
+		runInterval               stdtime.Duration
 		want                      int
 		err                       error
 	}{
@@ -879,7 +879,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			},
 			false,
 			1,
-			duration.Minute,
+			stdtime.Minute,
 			-4,
 			nil,
 		},
@@ -905,7 +905,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			},
 			false,
 			5,
-			duration.Minute,
+			stdtime.Minute,
 			-2,
 			nil,
 		},
@@ -931,7 +931,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			},
 			false,
 			1,
-			duration.Minute,
+			stdtime.Minute,
 			-4,
 			nil,
 		},
@@ -958,7 +958,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			},
 			false,
 			1,
-			duration.Minute,
+			stdtime.Minute,
 			1,
 			nil,
 		},
@@ -985,7 +985,7 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			},
 			true,
 			1,
-			duration.Minute,
+			stdtime.Minute,
 			6,
 			nil,
 		},
@@ -1057,6 +1057,214 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			// Ensure the node group on the cloud provider side scales up/down to the correct amount
 			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), cloudProviderNodeGroup.TargetSize())
 			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), cloudProviderNodeGroup.Size())
+		})
+	}
+}
+
+func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
+	buildNode := func(creation stdtime.Time, tainted bool) *v1.Node {
+		return test.BuildTestNode(test.NodeOpts{
+			CPU:      int64(1000),
+			Mem:      int64(1000),
+			Creation: creation,
+			Tainted:  tainted,
+		})
+	}
+
+	type args struct {
+		nodes            []*v1.Node
+		pods             []*v1.Pod
+		nodeGroupOptions NodeGroupOptions
+		listerOptions    ListerOptions
+	}
+
+	tests := []struct {
+		name              string
+		args              args
+		expectedNodeDelta int
+		err               error
+	}{
+		{
+			"max_node_age disabled",
+			args{
+				nodes: []*v1.Node{
+					buildNode(time.Now().Add(-1*stdtime.Hour), false),
+					buildNode(time.Now().Add(-24*stdtime.Hour), false),
+					buildNode(time.Now().Add(-36*stdtime.Hour), false),
+				},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                3,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "0",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
+		{
+			"max_node_age enabled, max node age 12 hours",
+			args{
+				nodes: []*v1.Node{
+					buildNode(time.Now().Add(-1*stdtime.Hour), false),
+					buildNode(time.Now().Add(-24*stdtime.Hour), false),
+					buildNode(time.Now().Add(-36*stdtime.Hour), false),
+				},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                3,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "12h",
+				},
+				listerOptions: ListerOptions{},
+			},
+			1,
+			nil,
+		},
+		{
+			"max_node_age enabled, max node age 48 hours",
+			args{
+				nodes: []*v1.Node{
+					buildNode(time.Now().Add(-1*stdtime.Hour), false),
+					buildNode(time.Now().Add(-24*stdtime.Hour), false),
+					buildNode(time.Now().Add(-36*stdtime.Hour), false),
+				},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                3,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "48h",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
+		{
+			"max_node_age enabled, but not at node minimum",
+			args{
+				nodes: []*v1.Node{
+					buildNode(time.Now().Add(-1*stdtime.Hour), false),
+					buildNode(time.Now().Add(-24*stdtime.Hour), false),
+					buildNode(time.Now().Add(-36*stdtime.Hour), false),
+				},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                1,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "12h",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
+		{
+			"max_node_age enabled, but no nodes",
+			args{
+				nodes: nil,
+				pods:  nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                1,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "12h",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
+		{
+			"max_node_age enabled, some nodes are tainted",
+			args{
+				nodes: []*v1.Node{
+					buildNode(time.Now().Add(-1*stdtime.Hour), false),
+					buildNode(time.Now().Add(-24*stdtime.Hour), false),
+					buildNode(time.Now().Add(-36*stdtime.Hour), true),
+				},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                1,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "12h",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
+			ngName := tt.args.nodeGroupOptions.Name
+			client, opts, err := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
+
+			// For these test cases we only use 1 node group/cloud provider node group
+			nodeGroupSize := 1
+
+			// Create a test (mock) cloud provider
+			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
+			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.CloudProviderGroupName,
+				tt.args.nodeGroupOptions.Name,
+				int64(tt.args.nodeGroupOptions.MinNodes),
+				int64(tt.args.nodeGroupOptions.MaxNodes),
+				int64(len(tt.args.nodes)),
+			)
+			testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+			// Create a node group state with the mapping of node groups to the cloud providers node groups
+			nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+				nodeGroups: nodeGroups,
+				client:     *client,
+			})
+
+			controller := &Controller{
+				Client:        client,
+				Opts:          opts,
+				stopChan:      nil,
+				nodeGroups:    nodeGroupsState,
+				cloudProvider: testCloudProvider,
+			}
+
+			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
+
+			// Ensure there were no errors
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, tt.err, err.Error())
+			}
+
+			assert.Equal(t, tt.expectedNodeDelta, nodesDelta)
+			if nodesDelta <= 0 {
+				return
+			}
+
+			// Ensure the node group on the cloud provider side scales up to the correct amount
+			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), testNodeGroup.TargetSize())
 		})
 	}
 }

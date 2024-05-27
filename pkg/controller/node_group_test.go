@@ -335,6 +335,7 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.Equal(t, time.Minute*10, opts[0].SoftDeleteGracePeriodDuration())
 		assert.Equal(t, time.Duration(0), opts[0].HardDeleteGracePeriodDuration())
 		assert.Equal(t, v1.TaintEffectNoExecute, opts[0].TaintEffect)
+		assert.Equal(t, time.Duration(0), opts[0].MaxNodeAgeDuration())
 
 		assert.NotNil(t, opts[1])
 		assert.Equal(t, "default", opts[1].Name)
@@ -344,6 +345,7 @@ func TestUnmarshalNodeGroupOptions(t *testing.T) {
 		assert.Equal(t, 10, opts[1].MaxNodes)
 		assert.Equal(t, true, opts[1].DryMode)
 		assert.Equal(t, v1.TaintEffectNoSchedule, opts[1].TaintEffect)
+		assert.Equal(t, 12*time.Hour, opts[1].MaxNodeAgeDuration())
 	})
 
 	t.Run("test yaml unmarshal bad", func(t *testing.T) {
@@ -394,6 +396,7 @@ node_groups:
     hard_delete_grace_period: 42
     scale_up_cooldown_period: 1h2m30s
     taint_effect: NoExecute
+    max_node_age: 0
   - name: "default"
     label_key: "customer"
     label_value: "shared"
@@ -406,6 +409,7 @@ node_groups:
     fast_node_removal_rate: 3
     scale_up_cooldown_period: 21h
     taint_effect: NoSchedule
+    max_node_age: 12h
 `
 
 var yamlBE = `node_groups:
@@ -448,6 +452,7 @@ func TestValidateNodeGroup(t *testing.T) {
 					HardDeleteGracePeriod:              "1h10m",
 					ScaleUpCoolDownPeriod:              "55m",
 					TaintEffect:                        "NoExecute",
+					MaxNodeAge:                         "12h",
 				},
 			},
 			nil,
@@ -476,6 +481,53 @@ func TestValidateNodeGroup(t *testing.T) {
 			nil,
 		},
 		{
+			"valid nodegroup with empty maxNodeAge",
+			args{
+				NodeGroupOptions{
+					Name:                               "test",
+					LabelKey:                           "customer",
+					LabelValue:                         "buileng",
+					CloudProviderGroupName:             "somegroup",
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
+					MaxNodeAge:                         "",
+				},
+			},
+			nil,
+		},
+		{
+			"valid nodegroup with zero max_node_age",
+			args{
+				NodeGroupOptions{
+					Name:                               "test",
+					LabelKey:                           "customer",
+					LabelValue:                         "buileng",
+					CloudProviderGroupName:             "somegroup",
+					TaintUpperCapacityThresholdPercent: 70,
+					TaintLowerCapacityThresholdPercent: 60,
+					ScaleUpThresholdPercent:            100,
+					MinNodes:                           1,
+					MaxNodes:                           3,
+					SlowNodeRemovalRate:                1,
+					FastNodeRemovalRate:                2,
+					SoftDeleteGracePeriod:              "10m",
+					HardDeleteGracePeriod:              "1h10m",
+					ScaleUpCoolDownPeriod:              "55m",
+					TaintEffect:                        "",
+					MaxNodeAge:                         "0",
+				},
+			},
+			nil,
+		},
+		{
 			"invalid nodegroup",
 			args{
 				NodeGroupOptions{
@@ -494,6 +546,7 @@ func TestValidateNodeGroup(t *testing.T) {
 					HardDeleteGracePeriod:              "1h10m",
 					ScaleUpCoolDownPeriod:              "21h21m21s",
 					TaintEffect:                        "invalid",
+					MaxNodeAge:                         "bla",
 				},
 			},
 			[]string{
@@ -503,6 +556,7 @@ func TestValidateNodeGroup(t *testing.T) {
 				"max_nodes must be larger than 0",
 				"soft_delete_grace_period failed to parse into a time.Duration. check your formatting.",
 				"taint_effect must be valid kubernetes taint",
+				"max_node_age failed to parse into a time.Duration. Set to '0' or '' to disable, or a positive Go duration to enable.",
 			},
 		},
 	}
