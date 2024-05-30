@@ -1212,6 +1212,45 @@ func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
 			0,
 			nil,
 		},
+		{
+			"max_node_age enabled, scaled down to zero",
+			args{
+				nodes: []*v1.Node{},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                0,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "12h",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
+		{
+			"max_node_age enabled, 1 tainted, 1 untainted",
+			args{
+				nodes: []*v1.Node{
+					buildNode(time.Now().Add(-1*stdtime.Hour), false),
+					buildNode(time.Now().Add(-24*stdtime.Hour), true),
+				},
+				pods: nil,
+				nodeGroupOptions: NodeGroupOptions{
+					Name:                    "default",
+					CloudProviderGroupName:  "default",
+					MinNodes:                1,
+					MaxNodes:                10,
+					ScaleUpThresholdPercent: 70,
+					MaxNodeAge:              "30m",
+				},
+				listerOptions: ListerOptions{},
+			},
+			0,
+			nil,
+		},
 	}
 
 	for _, tt := range tests {

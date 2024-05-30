@@ -373,7 +373,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		nodesDelta = int(math.Max(float64(nodesDelta), 1))
 	}
 
-	if c.scaleOnMaxNodeAge(nodeGroup, untaintedNodes) {
+	if c.scaleOnMaxNodeAge(nodeGroup, untaintedNodes, taintedNodes) {
 		log.WithField("nodegroup", nodegroup).
 			Info("Setting scale to minimum of 1 to rotate out a node older than the max node age")
 		nodesDelta = int(math.Max(float64(nodesDelta), 1))
@@ -441,7 +441,7 @@ func (c *Controller) isScaleOnStarve(
 // than the configured node group's maxNodeAge. The idea here is to constantly rotate out the oldest nodes
 // when the node group is at the minimum. This is to ensure the nodes are receiving the most up-to-date configuration
 // from the cloud provider.
-func (c *Controller) scaleOnMaxNodeAge(nodeGroup *NodeGroupState, untaintedNodes []*v1.Node) bool {
+func (c *Controller) scaleOnMaxNodeAge(nodeGroup *NodeGroupState, untaintedNodes []*v1.Node, taintedNodes []*v1.Node) bool {
 	// Only enable this functionality if the node group has the feature enabled
 	if nodeGroup.Opts.MaxNodeAgeDuration() <= 0 {
 		return false
@@ -449,7 +449,8 @@ func (c *Controller) scaleOnMaxNodeAge(nodeGroup *NodeGroupState, untaintedNodes
 
 	// We don't want to attempt to rotate nodes that have reached the max age if we haven't reached the minimum node
 	// count, as the scaling down of the node group will remove the oldest first anyway.
-	if len(untaintedNodes) != nodeGroup.Opts.MinNodes || len(untaintedNodes) == 0 {
+	// We also don't want to try to rotate out nodes if there are already nodes tainted.
+	if len(untaintedNodes) != nodeGroup.Opts.MinNodes || len(untaintedNodes) == 0 || len(taintedNodes) > 0 {
 		return false
 	}
 
