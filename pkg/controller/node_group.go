@@ -47,10 +47,13 @@ type NodeGroupOptions struct {
 
 	AWS AWSNodeGroupOptions `json:"aws" yaml:"aws"`
 
+	MaxNodeAge string `json:"max_node_age,omitempty" yaml:"max_node_age,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration time.Duration
 	hardDeleteGracePeriodDuration time.Duration
 	scaleUpCoolDownPeriodDuration time.Duration
+	maxNodeAgeDuration            time.Duration
 }
 
 // AWSNodeGroupOptions represents a nodegroup running on a cluster that is
@@ -124,6 +127,9 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(validTaintEffect(nodegroup.TaintEffect), "taint_effect must be valid kubernetes taint")
 
 	checkThat(validAWSLifecycle(nodegroup.AWS.Lifecycle), "aws.lifecycle must be '%v' or '%v' if provided.", aws.LifecycleOnDemand, aws.LifecycleSpot)
+
+	checkThat(validMaxNodeAgeDuration(nodegroup.MaxNodeAge), "max_node_age failed to parse into a time.Duration. Set to '0' or '' to disable, or a positive Go duration to enable.")
+
 	return problems
 }
 
@@ -135,6 +141,15 @@ func validAWSLifecycle(lifecycle string) bool {
 // Empty String is valid value for TaintEffect as AddToBeRemovedTaint method will default to NoSchedule
 func validTaintEffect(taintEffect v1.TaintEffect) bool {
 	return len(taintEffect) == 0 || k8s.TaintEffectTypes[taintEffect]
+}
+
+func validMaxNodeAgeDuration(maxNodeAge string) bool {
+	// Accept a blank maxNodeAge as valid, which will disable the feature
+	if maxNodeAge == "" {
+		return true
+	}
+	_, err := time.ParseDuration(maxNodeAge)
+	return err == nil
 }
 
 // SoftDeleteGracePeriodDuration lazily returns/parses the softDeleteGracePeriod string into a duration
@@ -174,6 +189,18 @@ func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
 	}
 
 	return n.scaleUpCoolDownPeriodDuration
+}
+
+func (n *NodeGroupOptions) MaxNodeAgeDuration() time.Duration {
+	if n.maxNodeAgeDuration == 0 {
+		duration, err := time.ParseDuration(n.MaxNodeAge)
+		if err != nil {
+			return 0
+		}
+		n.maxNodeAgeDuration = duration
+	}
+
+	return n.maxNodeAgeDuration
 }
 
 // autoDiscoverMinMaxNodeOptions returns whether the min_nodes and max_nodes options should be "auto-discovered" from the cloud provider
