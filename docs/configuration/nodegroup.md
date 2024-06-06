@@ -27,6 +27,7 @@ node_groups:
     soft_delete_grace_period: 1m
     hard_delete_grace_period: 10m
     taint_effect: NoExecute
+    max_node_age: 24h
     aws:
         fleet_instance_ready_timeout: 1m
         launch_template_id: lt-1a2b3c4d
@@ -258,3 +259,17 @@ be taken from the launch template.
 Tag ASG and Fleet Request resources used by Escalator with the metatdata key-value pair
 `k8s.io/atlassian-escalator/enabled`:`true`. Tagging doesn't alter the functionality of Escalator. Read more about
 tagging your AWS resources [here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html).
+
+### `max_node_age`
+
+`max_node_age` allows the configuration of a maximum age for nodes in the node group when the node group has scaled down
+to the minimum node group size. When at the minimum node grop size, Escalator will trigger a scale up by a minimum of 1
+if there are any nodes exceeding this max node age in an effort to have the old node rotated out.
+
+This is to ensure that nodes in the node group are kept relatively new to pick up any changes to the launch
+configuration or launch template.
+
+When not at the minimum, the natural scaling up and down of the node group will ensure new nodes are introduced to the
+node group.
+
+This is an optional feature and by default is disabled.
