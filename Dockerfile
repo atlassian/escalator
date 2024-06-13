@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.20 as builder
+FROM --platform=$BUILDPLATFORM golang:1.22 as builder
 ARG TARGETPLATFORM
 ARG ENVVAR=CGO_ENABLED=0
 WORKDIR /go/src/github.com/atlassian/escalator/
