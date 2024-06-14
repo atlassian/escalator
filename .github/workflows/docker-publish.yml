@@ -17,7 +17,11 @@ jobs:
   push:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
-
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v3
 
@@ -34,13 +38,11 @@ jobs:
 
       # Log in to GitHub Container registry
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          # a PAT with `read:packages` and `write:packages` scopes is an Actions secret `CR_PAT`.
-          # Doesn't support Org or Repo level PATs and no bot accounts
-          username: ${{ secrets.CR_PAT_USER }}
-          password: ${{ secrets.CR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push image to GitHub Container Registry
         run: |
