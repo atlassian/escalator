@@ -28,7 +28,9 @@ var TaintEffectTypes = map[apiv1.TaintEffect]bool{
 
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
-	ToBeRemovedByAutoscalerKey      = "atlassian.com/escalator"
+	ToBeRemovedByAutoscalerKey = "atlassian.com/escalator"
+
+	// ToBeForceRemovedByAutoscalerKey specifies the key used to mark a node for force removal
 	ToBeForceRemovedByAutoscalerKey = "atlassian.com/escalator-force"
 )
 
