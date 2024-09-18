@@ -54,11 +54,12 @@ type Opts struct {
 // scaleOpts provides options for a scale function
 // wraps options that would be passed as args
 type scaleOpts struct {
-	nodes          []*v1.Node
-	taintedNodes   []*v1.Node
-	untaintedNodes []*v1.Node
-	nodeGroup      *NodeGroupState
-	nodesDelta     int
+	nodes             []*v1.Node
+	taintedNodes      []*v1.Node
+	forceTaintedNodes []*v1.Node
+	untaintedNodes    []*v1.Node
+	nodeGroup         *NodeGroupState
+	nodesDelta        int
 }
 
 // NewController creates a new controller with the specified options
@@ -116,9 +117,10 @@ func (c *Controller) dryMode(nodeGroup *NodeGroupState) bool {
 }
 
 // filterNodes separates nodes between tainted and untainted nodes
-func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node) (untaintedNodes, taintedNodes, cordonedNodes []*v1.Node) {
+func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node) (untaintedNodes, taintedNodes, forceTaintedNodes, cordonedNodes []*v1.Node) {
 	untaintedNodes = make([]*v1.Node, 0, len(allNodes))
 	taintedNodes = make([]*v1.Node, 0, len(allNodes))
+	forceTaintedNodes = make([]*v1.Node, 0, len(allNodes))
 	cordonedNodes = make([]*v1.Node, 0, len(allNodes))
 
 	for _, node := range allNodes {
@@ -141,10 +143,16 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 				cordonedNodes = append(cordonedNodes, node)
 				continue
 			}
-			if _, tainted := k8s.GetToBeRemovedTaint(node); !tainted {
-				untaintedNodes = append(untaintedNodes, node)
-			} else {
+			var _, tainted = k8s.GetToBeRemovedTaint(node)
+			var _, forceTainted = k8s.GetToBeForceRemovedTaint(node)
+			if tainted {
 				taintedNodes = append(taintedNodes, node)
+			}
+			if forceTainted {
+				forceTaintedNodes = append(forceTaintedNodes, node)
+			}
+			if !tainted && !forceTainted {
+				untaintedNodes = append(untaintedNodes, node)
 			}
 		}
 	}
@@ -210,7 +218,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Filter into untainted and tainted nodes
-	untaintedNodes, taintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
+	untaintedNodes, taintedNodes, forceTaintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
 	// Metrics and Logs
 	log.WithField("nodegroup", nodegroup).Infof("pods total: %v", len(pods))
@@ -218,12 +226,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	log.WithField("nodegroup", nodegroup).Infof("cordoned nodes remaining total: %v", len(cordonedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining untainted: %v", len(untaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining tainted: %v", len(taintedNodes))
+	log.WithField("nodegroup", nodegroup).Infof("nodes remaining force tainted: %v", len(forceTaintedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("Minimum Node: %v", nodeGroup.Opts.MinNodes)
 	log.WithField("nodegroup", nodegroup).Infof("Maximum Node: %v", nodeGroup.Opts.MaxNodes)
 	metrics.NodeGroupNodes.WithLabelValues(nodegroup).Set(float64(len(allNodes)))
 	metrics.NodeGroupNodesCordoned.WithLabelValues(nodegroup).Set(float64(len(cordonedNodes)))
 	metrics.NodeGroupNodesUntainted.WithLabelValues(nodegroup).Set(float64(len(untaintedNodes)))
 	metrics.NodeGroupNodesTainted.WithLabelValues(nodegroup).Set(float64(len(taintedNodes)))
+	metrics.NodeGroupNodesForceTainted.WithLabelValues(nodegroup).Set(float64(len(forceTaintedNodes)))
 	metrics.NodeGroupPods.WithLabelValues(nodegroup).Set(float64(len(pods)))
 
 	// We want to be really simple right now so we don't do anything if we are outside the range of allowed nodes
@@ -288,11 +298,12 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	if len(untaintedNodes) < nodeGroup.Opts.MinNodes {
 		log.WithField("nodegroup", nodegroup).Warn("There are less untainted nodes than the minimum")
 		result, err := c.ScaleUp(scaleOpts{
-			nodes:          allNodes,
-			nodesDelta:     nodeGroup.Opts.MinNodes - len(untaintedNodes),
-			nodeGroup:      nodeGroup,
-			taintedNodes:   taintedNodes,
-			untaintedNodes: untaintedNodes,
+			nodes:             allNodes,
+			nodesDelta:        nodeGroup.Opts.MinNodes - len(untaintedNodes),
+			nodeGroup:         nodeGroup,
+			taintedNodes:      taintedNodes,
+			forceTaintedNodes: forceTaintedNodes,
+			untaintedNodes:    untaintedNodes,
 		})
 		if err != nil {
 			log.WithField("nodegroup", nodegroup).Error(err)
@@ -382,10 +393,21 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
 
 	scaleOptions := scaleOpts{
-		nodes:          allNodes,
-		taintedNodes:   taintedNodes,
-		untaintedNodes: untaintedNodes,
-		nodeGroup:      nodeGroup,
+		nodes:             allNodes,
+		taintedNodes:      taintedNodes,
+		forceTaintedNodes: forceTaintedNodes,
+		untaintedNodes:    untaintedNodes,
+		nodeGroup:         nodeGroup,
+	}
+
+	// Check for nodes tainted for force removal
+	var forceRemoved int
+	var forceActionErr error
+	forceRemoved, forceActionErr = c.TryRemoveForceTaintedNodes(scaleOptions)
+	log.WithField("nodegroup", nodegroup).Infof("Reaper: There were %v empty nodes force deleted this round", forceRemoved)
+
+	if forceActionErr != nil {
+		log.WithField("nodegroup", nodegroup).Error(forceActionErr)
 	}
 
 	// Perform a scale up, do nothing or scale down based on the nodes delta

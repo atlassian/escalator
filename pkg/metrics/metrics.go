@@ -36,6 +36,15 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupNodesForceTainted nodes considered by specific node groups that are force tainted
+	NodeGroupNodesForceTainted = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_force_tainted_nodes",
+			Namespace: NAMESPACE,
+			Help:      "nodes considered by specific node groups that are force tainted",
+		},
+		[]string{"node_group"},
+	)
 	// NodeGroupNodesCordoned nodes considered by specific node groups
 	NodeGroupNodesCordoned = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
