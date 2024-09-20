@@ -105,6 +105,10 @@ func TestControllerFilterNodes(t *testing.T) {
 			Name:    "n6",
 			Tainted: false,
 		}),
+		6: test.BuildTestNode(test.NodeOpts{
+			Name:         "n7",
+			ForceTainted: true,
+		}),
 	}
 
 	type args struct {
@@ -113,11 +117,12 @@ func TestControllerFilterNodes(t *testing.T) {
 		master    bool
 	}
 	tests := []struct {
-		name               string
-		args               args
-		wantUntaintedNodes []*v1.Node
-		wantTaintedNodes   []*v1.Node
-		wantCordonedNodes  []*v1.Node
+		name                  string
+		args                  args
+		wantUntaintedNodes    []*v1.Node
+		wantTaintedNodes      []*v1.Node
+		wantForceTaintedNodes []*v1.Node
+		wantCordonedNodes     []*v1.Node
 	}{
 		{
 			"basic filter not drymode",
@@ -132,6 +137,7 @@ func TestControllerFilterNodes(t *testing.T) {
 			},
 			[]*v1.Node{nodes[1], nodes[3], nodes[5]},
 			[]*v1.Node{nodes[0], nodes[2], nodes[4]},
+			[]*v1.Node{nodes[6]},
 			[]*v1.Node{},
 		},
 		{
@@ -148,6 +154,7 @@ func TestControllerFilterNodes(t *testing.T) {
 			},
 			[]*v1.Node{nodes[1], nodes[3], nodes[5]},
 			[]*v1.Node{nodes[0], nodes[2], nodes[4]},
+			[]*v1.Node{nodes[6]},
 			[]*v1.Node{},
 		},
 	}
@@ -158,9 +165,10 @@ func TestControllerFilterNodes(t *testing.T) {
 					DryMode: tt.args.master,
 				},
 			}
-			gotUntaintedNodes, gotTaintedNodes, gotCordonedNodes := c.filterNodes(tt.args.nodeGroup, tt.args.allNodes)
+			gotUntaintedNodes, gotTaintedNodes, gotForceTaintedNodes, gotCordonedNodes := c.filterNodes(tt.args.nodeGroup, tt.args.allNodes)
 			assert.Equal(t, tt.wantUntaintedNodes, gotUntaintedNodes)
 			assert.Equal(t, tt.wantTaintedNodes, gotTaintedNodes)
+			assert.Equal(t, tt.wantForceTaintedNodes, gotForceTaintedNodes)
 			assert.Equal(t, tt.wantCordonedNodes, gotCordonedNodes)
 		})
 	}
