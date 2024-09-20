@@ -126,7 +126,7 @@ func TestUntaintNodeGroupMinNodes(t *testing.T) {
 		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
 		assert.NoError(t, err)
 
-		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
+		untainted, tainted, _, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
 		// Ensure that the tainted nodes where untainted
 		assert.Equal(t, minNodes, len(untainted))
 		assert.Equal(t, 0, len(tainted))
@@ -193,7 +193,7 @@ func TestUntaintNodeGroupMaxNodes(t *testing.T) {
 		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
 		require.NoError(t, err)
 
-		untainted, tainted, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
+		untainted, tainted, _, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
 		// Ensure that the tainted nodes where untainted
 		assert.Equal(t, maxNodes, len(untainted))
 		assert.Equal(t, 0, len(tainted))
