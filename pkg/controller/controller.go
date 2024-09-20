@@ -143,15 +143,16 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 				cordonedNodes = append(cordonedNodes, node)
 				continue
 			}
-			var _, tainted = k8s.GetToBeRemovedTaint(node)
+
 			var _, forceTainted = k8s.GetToBeForceRemovedTaint(node)
-			if tainted {
-				taintedNodes = append(taintedNodes, node)
-			}
+			var _, tainted = k8s.GetToBeRemovedTaint(node)
+			var untainted = !forceTainted && !tainted
+
 			if forceTainted {
 				forceTaintedNodes = append(forceTaintedNodes, node)
-			}
-			if !tainted && !forceTainted {
+			} else if tainted {
+				taintedNodes = append(taintedNodes, node)
+			} else if untainted {
 				untaintedNodes = append(untaintedNodes, node)
 			}
 		}
