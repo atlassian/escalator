@@ -31,7 +31,8 @@ type NodeGroupState struct {
 	scaleUpLock scaleLock
 
 	// used for tracking which nodes are tainted. testing when in dry mode
-	taintTracker []string
+	taintTracker      []string
+	forceTaintTracker []string
 
 	// used for tracking scale delta across runs, useful for reducing hysteresis
 	scaleDelta   int
@@ -124,19 +125,27 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 	cordonedNodes = make([]*v1.Node, 0, len(allNodes))
 
 	for _, node := range allNodes {
+		var tainted bool
+		var forceTainted bool
+		var untainted bool
+
 		if c.dryMode(nodeGroup) {
-			var contains bool
 			for _, name := range nodeGroup.taintTracker {
 				if node.Name == name {
-					contains = true
+					tainted = true
 					break
 				}
 			}
-			if !contains {
-				untaintedNodes = append(untaintedNodes, node)
-			} else {
-				taintedNodes = append(taintedNodes, node)
+
+			for _, name := range nodeGroup.forceTaintTracker {
+				if node.Name == name {
+					forceTainted = true
+					break
+				}
 			}
+
+			untainted = !forceTainted && !tainted
+
 		} else {
 			// If the node is Unschedulable (cordoned), separate it out from the tainted/untainted
 			if node.Spec.Unschedulable {
@@ -144,17 +153,17 @@ func (c *Controller) filterNodes(nodeGroup *NodeGroupState, allNodes []*v1.Node)
 				continue
 			}
 
-			var _, forceTainted = k8s.GetToBeForceRemovedTaint(node)
-			var _, tainted = k8s.GetToBeRemovedTaint(node)
-			var untainted = !forceTainted && !tainted
+			_, forceTainted = k8s.GetToBeForceRemovedTaint(node)
+			_, tainted = k8s.GetToBeRemovedTaint(node)
+			untainted = !forceTainted && !tainted
+		}
 
-			if forceTainted {
-				forceTaintedNodes = append(forceTaintedNodes, node)
-			} else if tainted {
-				taintedNodes = append(taintedNodes, node)
-			} else if untainted {
-				untaintedNodes = append(untaintedNodes, node)
-			}
+		if forceTainted {
+			forceTaintedNodes = append(forceTaintedNodes, node)
+		} else if tainted {
+			taintedNodes = append(taintedNodes, node)
+		} else if untainted {
+			untaintedNodes = append(untaintedNodes, node)
 		}
 	}
 
