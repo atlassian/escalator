@@ -87,6 +87,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 				scaleOpts{
 					nodes,
 					[]*v1.Node{},
+					[]*v1.Node{},
 					nodes,
 					nodeGroupsState["example"],
 					2,
@@ -101,6 +102,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			args{
 				scaleOpts{
 					nodes,
+					[]*v1.Node{},
 					[]*v1.Node{},
 					nodes,
 					nodeGroupsState["example"],
@@ -117,6 +119,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 				scaleOpts{
 					nodes[:2],
 					[]*v1.Node{},
+					[]*v1.Node{},
 					nodes[:2],
 					nodeGroupsState["example"],
 					4,
@@ -132,6 +135,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 				scaleOpts{
 					nodes[:3],
 					[]*v1.Node{},
+					[]*v1.Node{},
 					nodes[:3],
 					nodeGroupsState["default"],
 					4,
@@ -146,6 +150,7 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			args{
 				scaleOpts{
 					nodes,
+					[]*v1.Node{},
 					[]*v1.Node{},
 					nodes,
 					nodeGroupsState["default"],
@@ -451,6 +456,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			scaleOpts{
 				nodes,
 				taintedNodes,
+				[]*v1.Node{},
 				untaintedNodes,
 				nodeGroupsState[testNodeGroup.ID()],
 				0, // not used in TryRemoveTaintedNodes
@@ -464,6 +470,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			scaleOpts{
 				nodes,
 				taintedNodes,
+				[]*v1.Node{},
 				untaintedNodes,
 				nodeGroupsState[testNodeGroup.ID()],
 				0, // not used in TryRemoveTaintedNodes
@@ -476,6 +483,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			"test none tainted",
 			scaleOpts{
 				nodes,
+				[]*v1.Node{},
 				[]*v1.Node{},
 				nodes,
 				nodeGroupsState[testNodeGroup.ID()],
