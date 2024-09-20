@@ -147,7 +147,8 @@ func TestControllerFilterNodes(t *testing.T) {
 					Opts: NodeGroupOptions{
 						DryMode: true,
 					},
-					taintTracker: []string{"n1", "n3", "n5"},
+					taintTracker:      []string{"n1", "n3", "n5"},
+					forceTaintTracker: []string{"n7"},
 				},
 				nodes,
 				true,
