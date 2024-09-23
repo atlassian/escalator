@@ -511,4 +511,95 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+
+	forceTests := []struct {
+		name                 string
+		opts                 scaleOpts
+		annotateFirstTainted bool
+		want                 int
+		wantErr              bool
+	}{
+		{
+			"test none force tainted",
+			scaleOpts{
+				nodes,
+				[]*v1.Node{},
+				[]*v1.Node{},
+				nodes,
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			0,
+			false,
+		},
+		{
+			"test one tainted",
+			scaleOpts{
+				nodes,
+				[]*v1.Node{nodes[0]},
+				[]*v1.Node{},
+				nodes[1:],
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			0,
+			false,
+		},
+		{
+			"test one force tainted",
+			scaleOpts{
+				nodes,
+				[]*v1.Node{},
+				[]*v1.Node{nodes[0]},
+				nodes[1:],
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			-1,
+			false,
+		},
+		{
+			"test one force tainted remaining tainted",
+			scaleOpts{
+				nodes,
+				nodes[1:],
+				[]*v1.Node{nodes[0]},
+				[]*v1.Node{},
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			-1,
+			false,
+		},
+		{
+			"test all force tainted",
+			scaleOpts{
+				nodes,
+				[]*v1.Node{},
+				nodes,
+				[]*v1.Node{},
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			-len(nodes),
+			false,
+		},
+	}
+
+	for _, tt := range forceTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := c.TryRemoveForceTaintedNodes(tt.opts)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
