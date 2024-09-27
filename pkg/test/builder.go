@@ -16,13 +16,14 @@ import (
 
 // NodeOpts minimal options for configuring a node object in testing
 type NodeOpts struct {
-	Name       string
-	CPU        int64
-	Mem        int64
-	LabelKey   string
-	LabelValue string
-	Creation   time.Time
-	Tainted    bool
+	Name         string
+	CPU          int64
+	Mem          int64
+	LabelKey     string
+	LabelValue   string
+	Creation     time.Time
+	Tainted      bool
+	ForceTainted bool
 }
 
 // BuildFakeClient creates a fake client
@@ -111,6 +112,12 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 		taints = append(taints, apiv1.Taint{
 			Key:    "atlassian.com/escalator",
 			Value:  fmt.Sprint(time.Now().Unix()),
+			Effect: apiv1.TaintEffectNoSchedule,
+		})
+	}
+	if opts.ForceTainted {
+		taints = append(taints, apiv1.Taint{
+			Key:    "atlassian.com/escalator-force",
 			Effect: apiv1.TaintEffectNoSchedule,
 		})
 	}

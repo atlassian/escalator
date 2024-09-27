@@ -52,3 +52,15 @@ metadata:
   annotations:
     atlassian.com/no-delete: "testing some long running bpf tracing"
 ```
+
+## Force Tainting
+
+Force Tainting provides a mechanism for Escalator to promptly remove nodes tainted by an external system, or administrator.
+
+This is implemented by applying a taint to the node, with the following key:
+
+```
+atlassian.com/escalator-force
+```
+
+The node will be removed as soon as all non-daemonset pods are completed. This is useful when nodes must be removed asap, but running pods should not be killed.

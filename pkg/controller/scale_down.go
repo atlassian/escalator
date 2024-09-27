@@ -45,6 +45,26 @@ func safeFromDeletion(node *v1.Node) (string, bool) {
 	return "", false
 }
 
+// TryRemoveForceTaintedNodes attempts to remove nodes that are
+// * Tainted with force remove and empty
+func (c *Controller) TryRemoveForceTaintedNodes(opts scaleOpts) (int, error) {
+	var toBeDeleted []*v1.Node
+	drymode := c.dryMode(opts.nodeGroup)
+
+	for _, candidate := range opts.forceTaintedNodes {
+		if k8s.NodeEmpty(candidate, opts.nodeGroup.NodeInfoMap) {
+			if !drymode {
+				toBeDeleted = append(toBeDeleted, candidate)
+			}
+			log.WithField("drymode", drymode).WithField("nodegroup", opts.nodeGroup.Opts.Name).Infof("Node %v, %v ready to be force deleted", candidate.Name, candidate.Spec.ProviderID)
+		} else {
+			log.WithField("drymode", drymode).WithField("nodegroup", opts.nodeGroup.Opts.Name).Infof("Node %v, %v not ready to be force deleted", candidate.Name, candidate.Spec.ProviderID)
+		}
+	}
+
+	return TryDeleteNodes(c, opts, toBeDeleted)
+}
+
 // TryRemoveTaintedNodes attempts to remove nodes are
 // * tainted and empty
 // * have passed their grace period
@@ -98,6 +118,10 @@ func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
 		}
 	}
 
+	return TryDeleteNodes(c, opts, toBeDeleted)
+}
+
+func TryDeleteNodes(c *Controller, opts scaleOpts, toBeDeleted []*v1.Node) (int, error) {
 	if len(toBeDeleted) > 0 {
 		podsRemaining := 0
 		for _, nodeToBeDeleted := range toBeDeleted {

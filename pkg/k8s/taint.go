@@ -29,6 +29,9 @@ var TaintEffectTypes = map[apiv1.TaintEffect]bool{
 const (
 	// ToBeRemovedByAutoscalerKey specifies the key the autoscaler uses to taint nodes as MARKED
 	ToBeRemovedByAutoscalerKey = "atlassian.com/escalator"
+
+	// ToBeForceRemovedByAutoscalerKey specifies the key used to mark a node for force removal
+	ToBeForceRemovedByAutoscalerKey = "atlassian.com/escalator-force"
 )
 
 // AddToBeRemovedTaint takes a k8s node and adds the ToBeRemovedByAutoscaler taint to the node
@@ -80,6 +83,17 @@ func AddToBeRemovedTaint(node *apiv1.Node, client kubernetes.Interface, taintEff
 func GetToBeRemovedTaint(node *apiv1.Node) (apiv1.Taint, bool) {
 	for _, taint := range node.Spec.Taints {
 		if taint.Key == ToBeRemovedByAutoscalerKey {
+			return taint, true
+		}
+	}
+	return apiv1.Taint{}, false
+}
+
+// GetToBeRemovedTaint returns whether the node is tainted with the ToBeForceRemoved taint
+// and the taint associated
+func GetToBeForceRemovedTaint(node *apiv1.Node) (apiv1.Taint, bool) {
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == ToBeForceRemovedByAutoscalerKey {
 			return taint, true
 		}
 	}
