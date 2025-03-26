@@ -20,14 +20,14 @@ import (
 func buildFakeClientAndUpdateChannel(node *apiv1.Node) (*fake.Clientset, chan string) {
 	fakeClient := &fake.Clientset{}
 	updatedNodes := make(chan string, 10)
-	fakeClient.Fake.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		get := action.(core.GetAction)
 		if get.GetName() == node.Name {
 			return true, node, nil
 		}
 		return true, nil, apiErrors.NewNotFound(apiv1.Resource("node"), get.GetName())
 	})
-	fakeClient.Fake.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		update := action.(core.UpdateAction)
 		obj := update.GetObject().(*apiv1.Node)
 		updatedNodes <- obj.Name

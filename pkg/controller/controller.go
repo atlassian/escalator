@@ -183,7 +183,7 @@ func (c *Controller) calculateNewNodeMetrics(nodegroup string, nodeGroup *NodeGr
 		countNewNodes := 0
 
 		for key, nodeInfo := range nodeGroup.NodeInfoMap {
-			nodeRegTime := nodeInfo.Node().ObjectMeta.CreationTimestamp.Time
+			nodeRegTime := nodeInfo.Node().CreationTimestamp.Time
 			// Check if node registration time newer than last scale out
 			if nodeRegTime.Sub(nodeGroup.lastScaleOut) > 0 {
 				node := nodeInfo.Node()

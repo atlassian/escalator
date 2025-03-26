@@ -22,8 +22,8 @@ func TestPodIsDaemonSet(t *testing.T) {
 
 func TestPodIsStatic(t *testing.T) {
 	staticPod := test.BuildTestPod(test.PodOpts{})
-	staticPod.ObjectMeta.Annotations = make(map[string]string)
-	staticPod.ObjectMeta.Annotations["kubernetes.io/config.source"] = "file"
+	staticPod.Annotations = make(map[string]string)
+	staticPod.Annotations["kubernetes.io/config.source"] = "file"
 	pod := test.BuildTestPod(test.PodOpts{})
 
 	assert.True(t, k8s.PodIsStatic(staticPod))

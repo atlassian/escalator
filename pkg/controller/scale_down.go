@@ -37,7 +37,7 @@ func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 }
 
 func safeFromDeletion(node *v1.Node) (string, bool) {
-	for key, val := range node.ObjectMeta.Annotations {
+	for key, val := range node.Annotations {
 		if key == NodeEscalatorIgnoreAnnotation && val != "" {
 			return val, true
 		}

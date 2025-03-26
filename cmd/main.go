@@ -14,10 +14,10 @@ import (
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/alecthomas/kingpin.v2"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
