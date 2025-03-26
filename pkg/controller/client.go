@@ -28,8 +28,14 @@ func NewClient(k8sClient kubernetes.Interface, nodegroups []NodeGroupOptions, st
 	podStopChan := make(chan struct{})
 	nodeStopChan := make(chan struct{})
 
-	allPodLister, podSync := k8s.NewCachePodWatcher(k8sClient, podStopChan)
-	allNodeLister, nodeSync := k8s.NewCacheNodeWatcher(k8sClient, nodeStopChan)
+	allPodLister, podSync, err := k8s.NewCachePodWatcher(k8sClient, podStopChan)
+	if err != nil {
+		return nil, err
+	}
+	allNodeLister, nodeSync, err := k8s.NewCacheNodeWatcher(k8sClient, nodeStopChan)
+	if err != nil {
+		return nil, err
+	}
 
 	// Spawn a routine to watch for the global stop signal
 	// once it's received, send the stop signal to the cache informers
