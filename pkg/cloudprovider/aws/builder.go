@@ -54,7 +54,7 @@ func (b Builder) Build() (cloudprovider.CloudProvider, error) {
 	}
 
 	// Log the provider we used
-	credValue, err := service.Client.Config.Credentials.Get()
+	credValue, err := service.Config.Credentials.Get()
 	if err != nil {
 		return nil, err
 	}

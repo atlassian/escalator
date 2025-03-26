@@ -417,7 +417,7 @@ InstanceReadyLoop:
 		case <-deadline.C:
 			log.Info("Reached instance ready deadline but not all instances are ready")
 			terminate(n, instances)
-			return errors.New("Not all instances could be started")
+			return errors.New("not all instances could be started")
 		}
 	}
 

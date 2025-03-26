@@ -35,7 +35,7 @@ func newNodeAvailableCapacity() NodeAvailableCapacity {
 
 // PodIsDaemonSet returns if the pod is a daemonset or not
 func PodIsDaemonSet(pod *v1.Pod) bool {
-	for _, ownerReference := range pod.ObjectMeta.OwnerReferences {
+	for _, ownerReference := range pod.OwnerReferences {
 		if ownerReference.Kind == "DaemonSet" {
 			return true
 		}
@@ -45,7 +45,7 @@ func PodIsDaemonSet(pod *v1.Pod) bool {
 
 // PodIsStatic returns if the pod is static or not
 func PodIsStatic(pod *v1.Pod) bool {
-	configSource, ok := pod.ObjectMeta.Annotations["kubernetes.io/config.source"]
+	configSource, ok := pod.Annotations["kubernetes.io/config.source"]
 	return ok && configSource == "file"
 }
 

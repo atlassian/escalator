@@ -7,7 +7,6 @@ import (
 	"github.com/atlassian/escalator/pkg/k8s/resource"
 	"github.com/google/uuid"
 	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -31,16 +30,16 @@ func BuildFakeClient(nodes []*apiv1.Node, pods []*apiv1.Pod) (*fake.Clientset, <
 	fakeClient := &fake.Clientset{}
 	updateChan := make(chan string, 2*(len(nodes)+len(pods)))
 	// nodes
-	fakeClient.Fake.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		getAction := action.(core.GetAction)
 		for _, node := range nodes {
 			if node.Name == getAction.GetName() {
 				return true, node, nil
 			}
 		}
-		return true, nil, fmt.Errorf("No node named: %v", getAction.GetName())
+		return true, nil, fmt.Errorf("no node named: %v", getAction.GetName())
 	})
-	fakeClient.Fake.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
 		node := updateAction.GetObject().(*apiv1.Node)
 		for _, n := range nodes {
@@ -49,9 +48,9 @@ func BuildFakeClient(nodes []*apiv1.Node, pods []*apiv1.Pod) (*fake.Clientset, <
 				return true, node, nil
 			}
 		}
-		return false, nil, fmt.Errorf("No node named: %v", node.Name)
+		return false, nil, fmt.Errorf("no node named: %v", node.Name)
 	})
-	fakeClient.Fake.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		nodesCopy := make([]apiv1.Node, 0, len(nodes))
 		for _, n := range nodes {
 			nodesCopy = append(nodesCopy, *n)
@@ -60,16 +59,16 @@ func BuildFakeClient(nodes []*apiv1.Node, pods []*apiv1.Pod) (*fake.Clientset, <
 	})
 
 	// pods
-	fakeClient.Fake.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		getAction := action.(core.GetAction)
 		for _, pod := range pods {
 			if pod.Name == getAction.GetName() && pod.Namespace == getAction.GetNamespace() {
 				return true, pod, nil
 			}
 		}
-		return true, nil, fmt.Errorf("No pod named: %v", getAction.GetName())
+		return true, nil, fmt.Errorf("no pod named: %v", getAction.GetName())
 	})
-	fakeClient.Fake.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
 		pod := updateAction.GetObject().(*apiv1.Pod)
 		for _, p := range pods {
@@ -78,9 +77,9 @@ func BuildFakeClient(nodes []*apiv1.Node, pods []*apiv1.Pod) (*fake.Clientset, <
 				return true, pod, nil
 			}
 		}
-		return false, nil, fmt.Errorf("No pod named: %v", pod.Name)
+		return false, nil, fmt.Errorf("no pod named: %v", pod.Name)
 	})
-	fakeClient.Fake.AddReactor("list", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		podsCopy := make([]apiv1.Pod, 0, len(pods))
 		for _, p := range pods {
 			podsCopy = append(podsCopy, *p)
@@ -178,13 +177,13 @@ type PodOpts struct {
 	Owner             string
 	NodeAffinityKey   string
 	NodeAffinityValue string
-	NodeAffinityOp    v1.NodeSelectorOperator
+	NodeAffinityOp    apiv1.NodeSelectorOperator
 	NodeName          string
 	CPUOverhead       int64
 	MemOverhead       int64
 	InitContainersCPU []int64
 	InitContainersMem []int64
-	Phase             v1.PodPhase
+	Phase             apiv1.PodPhase
 	Running           bool
 }
 
@@ -225,7 +224,7 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 	var affinity *apiv1.Affinity
 	if len(opts.NodeAffinityKey) > 0 || len(opts.NodeAffinityValue) > 0 {
 		if opts.NodeAffinityOp == "" {
-			opts.NodeAffinityOp = v1.NodeSelectorOpIn
+			opts.NodeAffinityOp = apiv1.NodeSelectorOpIn
 		}
 		affinity = &apiv1.Affinity{
 			NodeAffinity: &apiv1.NodeAffinity{
@@ -248,12 +247,12 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		}
 	}
 
-	overhead := v1.ResourceList{}
+	overhead := apiv1.ResourceList{}
 	if opts.CPUOverhead > 0 {
-		overhead[v1.ResourceCPU] = *resource.NewCPUQuantity(opts.CPUOverhead)
+		overhead[apiv1.ResourceCPU] = *resource.NewCPUQuantity(opts.CPUOverhead)
 	}
 	if opts.MemOverhead > 0 {
-		overhead[v1.ResourceMemory] = *resource.NewMemoryQuantity(opts.MemOverhead)
+		overhead[apiv1.ResourceMemory] = *resource.NewMemoryQuantity(opts.MemOverhead)
 	}
 
 	pod := &apiv1.Pod{
@@ -294,11 +293,11 @@ func BuildTestPod(opts PodOpts) *apiv1.Pod {
 		}
 	}
 
-	conditions := make([]v1.PodCondition, 0)
+	conditions := make([]apiv1.PodCondition, 0)
 	if opts.Running {
-		conditions = append(conditions, v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionTrue})
+		conditions = append(conditions, apiv1.PodCondition{Type: apiv1.PodScheduled, Status: apiv1.ConditionTrue})
 	}
-	pod.Status = v1.PodStatus{Phase: opts.Phase, Conditions: conditions}
+	pod.Status = apiv1.PodStatus{Phase: opts.Phase, Conditions: conditions}
 
 	return pod
 }
