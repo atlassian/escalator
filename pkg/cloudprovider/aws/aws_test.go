@@ -209,10 +209,9 @@ func TestCreateTemplateOverrides_NoASG(t *testing.T) {
 	)
 	mockNodeGroup.provider = awsCloudProvider
 
-	_, error := createTemplateOverrides(mockNodeGroup)
+	_, err := createTemplateOverrides(mockNodeGroup)
 	errorMessage := "failed to get an ASG from DescribeAutoscalingGroups response"
-	e := errors.New(errorMessage)
-	assert.Equalf(t, e, error, "Expected error with message '%v'", errorMessage)
+	assert.EqualError(t, err, errorMessage)
 }
 
 func TestCreateTemplateOverrides_NoSubnetIDs(t *testing.T) {
@@ -233,10 +232,9 @@ func TestCreateTemplateOverrides_NoSubnetIDs(t *testing.T) {
 	)
 	mockNodeGroup.provider = awsCloudProvider
 
-	_, error := createTemplateOverrides(mockNodeGroup)
+	_, err := createTemplateOverrides(mockNodeGroup)
 	errorMessage := "failed to get any subnetIDs from DescribeAutoscalingGroups response"
-	e := errors.New(errorMessage)
-	assert.Equalf(t, e, error, "Expected error with message '%v'", errorMessage)
+	assert.EqualError(t, err, errorMessage)
 }
 
 func TestCreateTemplateOverrides_Success(t *testing.T) {
