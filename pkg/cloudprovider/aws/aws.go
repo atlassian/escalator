@@ -48,7 +48,7 @@ func providerIDToInstanceID(providerID string) (string, error) {
 	if len(parts) < 5 {
 		return "", fmt.Errorf("malformed providerID %s: expected at least 4 slashes", providerID)
 	}
-	return strings.Split(providerID, "/")[4], nil
+	return parts[4], nil
 }
 
 // CloudProvider providers an aws cloud provider implementation
