@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	er "github.com/pkg/errors"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -146,7 +145,7 @@ func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, erro
 
 	id, err := providerIDToInstanceID(node.Spec.ProviderID)
 	if err != nil {
-		return instance, er.Wrap(err, "failed to get cloud provider ID")
+		return instance, errors.Wrap(err, "failed to get instance ID from provider ID")
 	}
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{&id},
