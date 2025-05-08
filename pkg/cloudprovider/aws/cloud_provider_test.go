@@ -308,3 +308,15 @@ func TestCloudProvider_GetInstance(t *testing.T) {
 		})
 	}
 }
+
+func TestCloudProvider_GetInstance_No_Provider_ID(t *testing.T) {
+	nodeGroups := []string{"1"}
+	node := &v1.Node{
+		Spec: v1.NodeSpec{},
+	}
+	ec2Service := &test.MockEc2Service{}
+	awsCloudProvider, err := newMockCloudProvider(nodeGroups, nil, ec2Service)
+	assert.Nil(t, err)
+	_, err = awsCloudProvider.GetInstance(node)
+	assert.NotNil(t, err)
+}

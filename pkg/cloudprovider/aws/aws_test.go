@@ -70,7 +70,21 @@ func TestInstanceToProviderId(t *testing.T) {
 }
 
 func TestProviderIdToInstanceId(t *testing.T) {
-	assert.Equal(t, "abc123", providerIDToInstanceID("aws:///us-east-1b/abc123"))
+	id, err := providerIDToInstanceID("aws:///us-east-1b/abc123")
+	assert.Nil(t, err)
+	assert.Equal(t, "abc123", id)
+}
+
+func TestProviderIdToInstanceIdEmpty(t *testing.T) {
+	_, err := providerIDToInstanceID("")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "empty providerID, it may be set later by cloud controller")
+}
+
+func TestProviderIdToInstanceIdMalformed(t *testing.T) {
+	_, err := providerIDToInstanceID("fake://provider/id")
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "malformed providerID fake://provider/id: expected at least 4 slashes")
 }
 
 func newMockCloudProvider(nodeGroups []string, service *test.MockAutoscalingService, ec2Service *test.MockEc2Service) (*CloudProvider, error) {
@@ -195,10 +209,9 @@ func TestCreateTemplateOverrides_NoASG(t *testing.T) {
 	)
 	mockNodeGroup.provider = awsCloudProvider
 
-	_, error := createTemplateOverrides(mockNodeGroup)
+	_, err := createTemplateOverrides(mockNodeGroup)
 	errorMessage := "failed to get an ASG from DescribeAutoscalingGroups response"
-	e := errors.New(errorMessage)
-	assert.Equalf(t, e, error, "Expected error with message '%v'", errorMessage)
+	assert.EqualError(t, err, errorMessage)
 }
 
 func TestCreateTemplateOverrides_NoSubnetIDs(t *testing.T) {
@@ -219,10 +232,9 @@ func TestCreateTemplateOverrides_NoSubnetIDs(t *testing.T) {
 	)
 	mockNodeGroup.provider = awsCloudProvider
 
-	_, error := createTemplateOverrides(mockNodeGroup)
+	_, err := createTemplateOverrides(mockNodeGroup)
 	errorMessage := "failed to get any subnetIDs from DescribeAutoscalingGroups response"
-	e := errors.New(errorMessage)
-	assert.Equalf(t, e, error, "Expected error with message '%v'", errorMessage)
+	assert.EqualError(t, err, errorMessage)
 }
 
 func TestCreateTemplateOverrides_Success(t *testing.T) {

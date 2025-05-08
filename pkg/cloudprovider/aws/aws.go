@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -40,8 +40,15 @@ func instanceToProviderID(instance *autoscaling.Instance) string {
 	return fmt.Sprintf("aws:///%s/%s", *instance.AvailabilityZone, *instance.InstanceId)
 }
 
-func providerIDToInstanceID(providerID string) string {
-	return strings.Split(providerID, "/")[4]
+func providerIDToInstanceID(providerID string) (string, error) {
+	if providerID == "" {
+		return "", fmt.Errorf("empty providerID, it may be set later by cloud controller")
+	}
+	parts := strings.Split(providerID, "/")
+	if len(parts) < 5 {
+		return "", fmt.Errorf("malformed providerID %s: expected at least 4 slashes", providerID)
+	}
+	return parts[4], nil
 }
 
 // CloudProvider providers an aws cloud provider implementation
@@ -136,8 +143,10 @@ type Instance struct {
 func (c *CloudProvider) GetInstance(node *v1.Node) (cloudprovider.Instance, error) {
 	var instance *Instance
 
-	id := providerIDToInstanceID(node.Spec.ProviderID)
-
+	id, err := providerIDToInstanceID(node.Spec.ProviderID)
+	if err != nil {
+		return instance, errors.Wrap(err, "failed to get instance ID from provider ID")
+	}
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{&id},
 	}
