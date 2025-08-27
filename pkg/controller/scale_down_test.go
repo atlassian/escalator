@@ -442,7 +442,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 		}
 
 		// Make odd nodes unhealthy
-		var ready v1.NodeConditionType = v1.NodeReady
+		var ready = v1.NodeReady
 
 		if i%2 == 0 {
 			// This is used arbitrarily to mean "not ready"
