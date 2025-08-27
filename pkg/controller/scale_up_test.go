@@ -2,9 +2,10 @@ package controller
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
@@ -21,6 +22,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 		0: test.BuildTestNode(test.NodeOpts{
 			Name:     "n1",
 			Creation: time.Date(2011, 3, 3, 13, 0, 0, 0, time.UTC),
+			NotReady: true,
 		}),
 		1: test.BuildTestNode(test.NodeOpts{
 			Name:     "n2",
@@ -29,6 +31,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 		2: test.BuildTestNode(test.NodeOpts{
 			Name:     "n3",
 			Creation: time.Date(2010, 3, 3, 13, 0, 0, 0, time.UTC),
+			NotReady: true,
 		}),
 		3: test.BuildTestNode(test.NodeOpts{
 			Name:     "n4",
@@ -37,6 +40,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 		4: test.BuildTestNode(test.NodeOpts{
 			Name:     "n5",
 			Creation: time.Date(2005, 3, 3, 13, 0, 0, 0, time.UTC),
+			NotReady: true,
 		}),
 		5: test.BuildTestNode(test.NodeOpts{
 			Name:     "n6",
@@ -69,9 +73,9 @@ func TestControllerUntaintNewestN(t *testing.T) {
 	}
 
 	type args struct {
-		nodes     []*v1.Node
-		nodeGroup *NodeGroupState
-		n         int
+		nodes                    []*v1.Node
+		n                        int
+		unhealthyNodeGracePeriod string
 	}
 	tests := []struct {
 		name string
@@ -82,8 +86,8 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			"first 3 nodes. untaint 3",
 			args{
 				nodes[:3],
-				nodeGroupsState["example"],
 				3,
+				"",
 			},
 			[]int{0, 2, 1},
 		},
@@ -91,17 +95,35 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			"first 3 nodes. untaint 2",
 			args{
 				nodes[:3],
-				nodeGroupsState["example"],
 				2,
+				"",
 			},
 			[]int{0, 2},
+		},
+		{
+			"first 3 nodes. untaint 1 (with grace period)",
+			args{
+				nodes[:3],
+				1,
+				"1m",
+			},
+			[]int{1},
+		},
+		{
+			"first 3 nodes. untaint 2 (with grace period)",
+			args{
+				nodes[:3],
+				2,
+				"1m",
+			},
+			[]int{1},
 		},
 		{
 			"6 nodes. untaint 0",
 			args{
 				nodes,
-				nodeGroupsState["example"],
 				0,
+				"",
 			},
 			[]int{},
 		},
@@ -109,8 +131,8 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			"6 nodes. untaint 2",
 			args{
 				nodes,
-				nodeGroupsState["example"],
 				2,
+				"",
 			},
 			[]int{3, 0},
 		},
@@ -118,17 +140,26 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			"6 nodes. untaint 6",
 			args{
 				nodes,
-				nodeGroupsState["example"],
 				6,
+				"",
 			},
 			[]int{3, 0, 2, 1, 5, 4},
+		},
+		{
+			"6 nodes. untaint 6 (with grace period)",
+			args{
+				nodes,
+				6,
+				"1m",
+			},
+			[]int{3, 1, 5},
 		},
 		{
 			"6 nodes. untaint 5",
 			args{
 				nodes,
-				nodeGroupsState["example"],
 				5,
+				"",
 			},
 			[]int{3, 0, 2, 1, 5},
 		},
@@ -136,8 +167,8 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			"6 nodes. untaint 7",
 			args{
 				nodes,
-				nodeGroupsState["example"],
 				7,
+				"",
 			},
 			[]int{3, 0, 2, 1, 5, 4},
 		},
@@ -145,8 +176,8 @@ func TestControllerUntaintNewestN(t *testing.T) {
 			"4 nodes. untaint 1",
 			args{
 				nodes[:4],
-				nodeGroupsState["example"],
 				1,
+				"",
 			},
 			[]int{3},
 		},
@@ -159,6 +190,10 @@ func TestControllerUntaintNewestN(t *testing.T) {
 				stopChan:   nil,
 				nodeGroups: nodeGroupsState,
 			}
+
+			// Reset the node grace period for each test case
+			nodeGroupsState["example"].Opts.unhealthyNodeGracePeriodDuration = 0
+			nodeGroupsState["example"].Opts.UnhealthyNodeGracePeriod = tt.args.unhealthyNodeGracePeriod
 
 			// taint all
 			var tc int
@@ -174,7 +209,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 
 			// test wet mode
 			c.Opts.DryMode = false
-			got := c.untaintNewestN(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
+			got := c.untaintNewestN(tt.args.nodes, nodeGroupsState["example"], tt.args.n)
 			eq := assert.Equal(t, tt.want, got)
 			if eq {
 				for _, i := range got {
@@ -192,7 +227,7 @@ func TestControllerUntaintNewestN(t *testing.T) {
 
 			// test dry mode
 			c.Opts.DryMode = true
-			got = c.untaintNewestN(tt.args.nodes, tt.args.nodeGroup, tt.args.n)
+			got = c.untaintNewestN(tt.args.nodes, nodeGroupsState["example"], tt.args.n)
 			assert.Equal(t, tt.want, got)
 		})
 	}

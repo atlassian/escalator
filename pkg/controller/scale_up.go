@@ -12,7 +12,6 @@ import (
 
 // ScaleUp performs the untaint and increase cloud provider node group logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
-
 	untainted, err := c.scaleUpUntaint(opts)
 	// No nodes were untainted, so we need to scale up cloud provider node group
 	if err != nil {
@@ -20,28 +19,35 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 		return untainted, err
 	}
 
-	// remove the number of nodes that were just untainted and the remaining is how much to increase the cloud provider node group by
+	// remove the number of nodes that were just untainted and the remaining is
+	// how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
 
-	if opts.nodesDelta > 0 {
-		// check that untainting the nodes doesn't do bring us over max nodes
-		if opts.nodesDelta <= 0 {
-			log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
-			return 0, nil
-		}
+	// check that untainting the nodes doesn't do bring us over max nodes
+	if opts.nodesDelta <= 0 {
+		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
+		return 0, nil
+	}
 
-		if opts.nodesDelta > 0 {
-			added, err := c.scaleUpCloudProviderNodeGroup(opts)
-			if err != nil {
-				log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
-				return 0, err
-			}
-			opts.nodeGroup.scaleUpLock.lock(added)
-			return untainted + added, nil
+	// If the nodegroup is not considered healthy then prevent cloud provider
+	// scale up because new instances may have a bad configuration.
+	if opts.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+		if !c.isNodegroupHealthy(opts.nodeGroup, opts.nodes) {
+			return untainted, nil
 		}
 	}
 
-	return untainted, nil
+	// The nodegroup is deemed healthy enough to support scaling activity and
+	// more instances are needed, scale up new instances from the cloud
+	// provider.
+	added, err := c.scaleUpCloudProviderNodeGroup(opts)
+	if err != nil {
+		log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
+		return 0, err
+	}
+
+	opts.nodeGroup.scaleUpLock.lock(added)
+	return untainted + added, nil
 }
 
 // Calulates how many new nodes need to be created
@@ -124,6 +130,17 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 
 	untaintedIndices := make([]int, 0, n)
 	for _, bundle := range sorted {
+		// Check if the node is ready before untainting. Not ready nodes should
+		// be left to be removed instead. If a previously unhealthy node has
+		// become healthy, it will pass this test and as such be untainted and
+		// able to receive pods.
+		if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+			if k8s.IsNodeUnhealthy(bundle.node, nodeGroup.Opts.UnhealthyNodeGracePeriodDuration()) {
+				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Skipping untaint of unhealthy node %v", bundle.node.Name)
+				continue
+			}
+		}
+
 		// stop at N (or when array is fully iterated)
 		if len(untaintedIndices) >= n {
 			break

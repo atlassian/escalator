@@ -15,14 +15,19 @@ import (
 
 // NodeOpts minimal options for configuring a node object in testing
 type NodeOpts struct {
-	Name         string
-	CPU          int64
-	Mem          int64
-	LabelKey     string
-	LabelValue   string
-	Creation     time.Time
-	Tainted      bool
-	ForceTainted bool
+	Name          string
+	CPU           int64
+	Mem           int64
+	LabelKey      string
+	LabelValue    string
+	Creation      time.Time
+	Tainted       bool
+	ForceTainted  bool
+	Unschedulable bool
+
+	// Not using Ready because bool defaults to false and the default should
+	// be that the node is ready
+	NotReady bool
 }
 
 // BuildFakeClient creates a fake client
@@ -131,14 +136,29 @@ func BuildTestNode(opts NodeOpts) *apiv1.Node {
 			CreationTimestamp: metav1.NewTime(opts.Creation),
 		},
 		Spec: apiv1.NodeSpec{
-			ProviderID: opts.Name,
-			Taints:     taints,
+			ProviderID:    opts.Name,
+			Taints:        taints,
+			Unschedulable: opts.Unschedulable,
 		},
 		Status: apiv1.NodeStatus{
 			Capacity: apiv1.ResourceList{
 				apiv1.ResourcePods: *resource.NewPodQuantity(100),
 			},
+			Conditions: []apiv1.NodeCondition{
+				{
+					Type:   apiv1.NodeReady,
+					Status: apiv1.ConditionTrue,
+				},
+			},
 		},
+	}
+
+	if opts.NotReady {
+		for i, c := range node.Status.Conditions {
+			if c.Type == apiv1.NodeReady {
+				node.Status.Conditions[i].Status = apiv1.ConditionFalse
+			}
+		}
 	}
 
 	if opts.CPU >= 0 {

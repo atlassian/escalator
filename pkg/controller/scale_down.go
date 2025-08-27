@@ -194,36 +194,11 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 // indices are from the parameter nodes indexes, not the sorted index
 func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
+
 	for i, node := range nodes {
 		sorted = append(sorted, nodeIndexBundle{node, i})
 	}
+
 	sort.Sort(sorted)
-
-	taintedIndices := make([]int, 0, n)
-	for _, bundle := range sorted {
-		// stop at N (or when array is fully iterated)
-		if len(taintedIndices) >= n {
-			break
-		}
-
-		// only actually taint in dry mode
-		if !c.dryMode(nodeGroup) {
-			log.WithField("drymode", "off").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
-
-			// Taint the node
-			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client, nodeGroup.Opts.TaintEffect)
-			if err != nil {
-				log.Errorf("While tainting %v: %v", bundle.node.Name, err)
-			} else {
-				bundle.node = updatedNode
-				taintedIndices = append(taintedIndices, bundle.index)
-			}
-		} else {
-			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
-			taintedIndices = append(taintedIndices, bundle.index)
-			log.WithField("drymode", "on").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
-		}
-	}
-
-	return taintedIndices
+	return c.taintInstances(sorted, nodeGroup, n)
 }

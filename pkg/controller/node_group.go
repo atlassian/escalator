@@ -49,11 +49,26 @@ type NodeGroupOptions struct {
 
 	MaxNodeAge string `json:"max_node_age,omitempty" yaml:"max_node_age,omitempty"`
 
+	// UnhealthyNodeGracePeriod is the duration to wait before testing if a node
+	// can be considered unhealthy.
+	UnhealthyNodeGracePeriod string `json:"unhealthy_node_grace_period,omitempty" yaml:"unhealthy_node_grace_period,omitempty"`
+
+	// HealthCheckNewestNodesPercent is the percentage of newest nodes to check
+	// for an unhealthy state. The number of instances checked is rounded up
+	// from the strict percentage supplied. E.g. if 50 is given and there is
+	// only one instance found, 1 will be used rather than 0.
+	HealthCheckNewestNodesPercent int `json:"health_check_newest_nodes_percent,omitempty" yaml:"health_check_newest_nodes_percent,omitempty"`
+
+	// MaxUnhealthyNodesPercentage is the maximum percentage of unhealthy nodes
+	// allowed in the nodegroup at any given time.
+	MaxUnhealthyNodesPercent int `json:"max_unhealthy_nodes_percent,omitempty" yaml:"max_unhealthy_nodes_percent,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
-	softDeleteGracePeriodDuration time.Duration
-	hardDeleteGracePeriodDuration time.Duration
-	scaleUpCoolDownPeriodDuration time.Duration
-	maxNodeAgeDuration            time.Duration
+	softDeleteGracePeriodDuration    time.Duration
+	hardDeleteGracePeriodDuration    time.Duration
+	scaleUpCoolDownPeriodDuration    time.Duration
+	maxNodeAgeDuration               time.Duration
+	unhealthyNodeGracePeriodDuration time.Duration
 }
 
 // AWSNodeGroupOptions represents a nodegroup running on a cluster that is
@@ -130,6 +145,15 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 
 	checkThat(validMaxNodeAgeDuration(nodegroup.MaxNodeAge), "max_node_age failed to parse into a time.Duration. Set to '0' or '' to disable, or a positive Go duration to enable.")
 
+	// UnhealthyNodeGracePeriod is an optional parameter.
+	if len(nodegroup.UnhealthyNodeGracePeriod) > 0 {
+		checkThat(nodegroup.UnhealthyNodeGracePeriodDuration() > 0, "unhealthy_node_grace_period failed to parse into a time.Duration. check your formatting.")
+		checkThat(nodegroup.MaxUnhealthyNodesPercent >= 0, "max_unhealthy_nodes_percentage must be greater than or equal to 0")
+		checkThat(nodegroup.MaxUnhealthyNodesPercent <= 100, "max_unhealthy_nodes_percentage must be less than or equal to 100")
+		checkThat(nodegroup.HealthCheckNewestNodesPercent >= 0, "health_check_newest_nodes_percent must be greater than or equal to 0")
+		checkThat(nodegroup.HealthCheckNewestNodesPercent <= 100, "health_check_newest_nodes_percent must be less than or equal to 100")
+	}
+
 	return problems
 }
 
@@ -201,6 +225,21 @@ func (n *NodeGroupOptions) MaxNodeAgeDuration() time.Duration {
 	}
 
 	return n.maxNodeAgeDuration
+}
+
+// UnhealthyNodeGracePeriodDuration lazily returns/parses the unhealthyNodeGracePeriod string into a duration
+func (n *NodeGroupOptions) UnhealthyNodeGracePeriodDuration() time.Duration {
+	if n.unhealthyNodeGracePeriodDuration != 0 {
+		return n.unhealthyNodeGracePeriodDuration
+	}
+
+	duration, err := time.ParseDuration(n.UnhealthyNodeGracePeriod)
+	if err != nil {
+		return 0
+	}
+
+	n.unhealthyNodeGracePeriodDuration = duration
+	return n.unhealthyNodeGracePeriodDuration
 }
 
 // autoDiscoverMinMaxNodeOptions returns whether the min_nodes and max_nodes options should be "auto-discovered" from the cloud provider

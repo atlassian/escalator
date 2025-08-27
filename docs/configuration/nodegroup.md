@@ -29,12 +29,12 @@ node_groups:
     taint_effect: NoExecute
     max_node_age: 24h
     aws:
-        fleet_instance_ready_timeout: 1m
-        launch_template_id: lt-1a2b3c4d
-        launch_template_version: "1"
-        lifecycle: on-demand
-        instance_type_overrides: ["t2.large", "t3.large"]
-        resource_tagging: false
+      fleet_instance_ready_timeout: 1m
+      launch_template_id: lt-1a2b3c4d
+      launch_template_version: "1"
+      lifecycle: on-demand
+      instance_type_overrides: ["t2.large", "t3.large"]
+      resource_tagging: false
 ```
 
 ## Options
@@ -273,3 +273,21 @@ When not at the minimum, the natural scaling up and down of the node group will 
 node group.
 
 This is an optional feature and by default is disabled.
+
+### `unhealthy_node_grace_period`
+
+This is an optional field. The default value is empty, which disables the feature.
+
+When configured, this is the duration to wait before node can be considered node unhealthy.
+
+### `health_check_newest_nodes_percent`
+
+This is an optional field.
+
+This is the percentage of newer nodes in the nodegroup can can be considered when checking for the maximum allowed unhealthy nodes in the nodegroup. Any older nodes will not be considered.
+
+### `max_unhealthy_nodes_percentage`
+
+This is an optional field.
+
+This is the maximum percentage of unhealthy nodes in the test set from `health_check_newest_nodes_percent` which are at least older than the grace period duration.

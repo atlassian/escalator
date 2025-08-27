@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/atlassian/escalator/pkg/cloudprovider"
@@ -227,6 +229,29 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		nodeGroup.memCapacity = *allNodes[0].Status.Allocatable.Memory()
 	}
 
+	// Taint all instances considered to be unhealthy before filtering the nodes
+	// into groups.
+	if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+		c.taintUnhealthyInstances(allNodes, nodeGroup)
+
+		// Determine if the nodegroup is healthy for the metric
+		isHealthy := 1
+
+		if !c.isNodegroupHealthy(nodeGroup, allNodes) {
+			isHealthy = 0
+		}
+
+		metrics.NodeGroupUnhealthy.WithLabelValues(nodegroup).Set(float64(isHealthy))
+	} else {
+		// This metric should can only return non-1 if the feature is being used,
+		// otherwise the nodegroup is considered healthy.
+		metrics.NodeGroupUnhealthy.WithLabelValues(nodegroup).Set(1)
+	}
+
+	if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+
+	}
+
 	// Filter into untainted and tainted nodes
 	untaintedNodes, taintedNodes, forceTaintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
@@ -420,6 +445,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).Error(forceActionErr)
 	}
 
+	for _, node := range allNodes {
+		fmt.Println(node.Name, "unhealthy", k8s.IsNodeUnhealthy(
+			node, scaleOptions.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration()),
+		)
+	}
+
+	return 0, nil
+
 	// Perform a scale up, do nothing or scale down based on the nodes delta
 	var nodesDeltaResult int
 	// actionErr keeps the error of any action below and checked after action
@@ -427,7 +460,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	var actionErr error
 	switch {
 	case nodesDelta < 0:
-		// Try to scale down
+		// Try to scale down. The nodegroup can be considered unhealthy when
+		// this happens because unhealthy nodes are tainted and marked for
+		// deletion.
 		scaleOptions.nodesDelta = -nodesDelta
 		nodesDeltaResult, actionErr = c.ScaleDown(scaleOptions)
 	case nodesDelta > 0:
@@ -455,6 +490,124 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	log.WithField("nodegroup", nodegroup).Debugf("DeltaScaled: %v", nodesDeltaResult)
 	return nodesDelta, err
+}
+
+// Finds all unhealthy instances in the nodegroup and adds the taint to mark
+// them for deletion.
+func (c *Controller) taintUnhealthyInstances(nodes []*v1.Node, state *NodeGroupState) []int {
+	bundles := make(nodesByOldestCreationTime, 0, len(nodes))
+
+	for i, node := range nodes {
+		// If the node is deemed heathly then there is nothing to do
+		if !k8s.IsNodeUnhealthy(node, state.Opts.unhealthyNodeGracePeriodDuration) {
+			continue
+		}
+
+		bundles = append(bundles, nodeIndexBundle{node, i})
+	}
+
+	return c.taintInstances(bundles, state, len(bundles))
+}
+
+// isNodegroupHealthy checks if the nodegroup is healthy.
+// It does this by checking the health of the newest X% of nodes in the nodegroup that are older than the grace period.
+// If the percentage of unhealthy nodes in this newest set of nodes is greater than the configured threshold, the nodegroup is considered unhealthy.
+func (c *Controller) isNodegroupHealthy(state *NodeGroupState, nodes []*v1.Node) bool {
+	// Sort the nodes is reverse order based on age
+	reversedOrderedNodes := c.getReverseOrderedNodes(nodes)
+
+	// Filter out any nodes which are node old enough for the test group
+	oldEnoughNodes := c.filterOutNodesTooNew(state, reversedOrderedNodes)
+
+	// Out of the nodes that are left, find the most recent configured
+	// percentage of nodes to do the test.
+	nodesForTest := c.getMostRecentNodes(state, oldEnoughNodes)
+
+	// If there are no nodes to test, then the nodegroup is considered healthy.
+	if len(nodesForTest) == 0 {
+		return true
+	}
+
+	// Get the total number of unhealthy nodes in the test set.
+	unhealthyNodesCount := c.countUnhealthyNodes(state, nodesForTest)
+
+	// If the number of unhealthy nodes in the test group exceeds the percentage
+	// allowed then the test has failed.
+	return (unhealthyNodesCount*100)/len(nodesForTest) <= state.Opts.MaxUnhealthyNodesPercent
+}
+
+func (c *Controller) getReverseOrderedNodes(nodes []*v1.Node) []*v1.Node {
+	sortedNodes := make(nodesByOldestCreationTime, 0, len(nodes))
+
+	for i, node := range nodes {
+		sortedNodes = append(sortedNodes, nodeIndexBundle{node, i})
+	}
+
+	// Sort in reverse to get the newest instances at the front to make it
+	// easier to loop through.
+	sort.Sort(sort.Reverse(sortedNodes))
+
+	// The number of recent nodes may collected may not reach "numberOfNodes"
+	// because
+	reverseOrderedNodes := make([]*v1.Node, 0, len(nodes))
+
+	for _, sortedNode := range sortedNodes {
+		reverseOrderedNodes = append(reverseOrderedNodes, sortedNode.node)
+	}
+
+	return reverseOrderedNodes
+}
+
+func (c *Controller) filterOutNodesTooNew(state *NodeGroupState, nodes []*v1.Node) []*v1.Node {
+	now := time.Now()
+	newNodes := make([]*v1.Node, 0)
+
+	for _, node := range nodes {
+		// Check if the node is old enough to be included in the new list
+		if node.CreationTimestamp.Add(state.Opts.unhealthyNodeGracePeriodDuration).Before(now) {
+			newNodes = append(newNodes, node)
+		}
+	}
+
+	return newNodes
+}
+
+// Returns the most recent X% of instances from the nodegroup which are older
+// than the grace period defined. If no grace period is defined then all
+// instances in the nodegroup are included in the check.
+func (c *Controller) getMostRecentNodes(state *NodeGroupState, nodes []*v1.Node) []*v1.Node {
+	// Round up rather than down from HealthCheckNewestNodesPercent so that if
+	// there is a single instance then a non-100% percentage will still result
+	// in testing the instance. We want to test more rather than less.
+	numberOfNodes := int(math.Ceil((float64(state.Opts.HealthCheckNewestNodesPercent) / 100) * float64(len(nodes))))
+
+	// The number of recent nodes may collected may not reach "numberOfNodes"
+	// because
+	recentNodes := make([]*v1.Node, 0)
+
+	for i, node := range nodes {
+		if i == numberOfNodes {
+			break
+		}
+
+		recentNodes = append(recentNodes, node)
+	}
+
+	return recentNodes
+}
+
+func (c *Controller) countUnhealthyNodes(state *NodeGroupState, nodes []*v1.Node) int {
+	unhealthyNodesCount := 0
+
+	for _, node := range nodes {
+		// Include the unhealthyNodeDuration in the call to be 100% sure that we
+		// are not counting nodes which are too young are unhealthy.
+		if k8s.IsNodeUnhealthy(node, state.Opts.unhealthyNodeGracePeriodDuration) {
+			unhealthyNodesCount++
+		}
+	}
+
+	return unhealthyNodesCount
 }
 
 func (c *Controller) isScaleOnStarve(
@@ -561,6 +714,8 @@ func (c *Controller) RunForever(runImmediately bool) error {
 			return err
 		}
 	}
+
+	return nil
 
 	// Start the main loop
 	ticker := time.NewTicker(c.Opts.ScanInterval)
