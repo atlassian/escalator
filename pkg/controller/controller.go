@@ -452,9 +452,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	var actionErr error
 	switch {
 	case nodesDelta < 0:
-		// Try to scale down. The nodegroup can be considered unhealthy when
-		// this happens because unhealthy nodes are tainted and marked for
-		// deletion.
+		// Try to scale down.
 		scaleOptions.nodesDelta = -nodesDelta
 		nodesDeltaResult, actionErr = c.ScaleDown(scaleOptions)
 	case nodesDelta > 0:
