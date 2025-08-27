@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -445,14 +444,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).Error(forceActionErr)
 	}
 
-	for _, node := range allNodes {
-		fmt.Println(node.Name, "unhealthy", k8s.IsNodeUnhealthy(
-			node, scaleOptions.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration()),
-		)
-	}
-
-	return 0, nil
-
 	// Perform a scale up, do nothing or scale down based on the nodes delta
 	var nodesDeltaResult int
 	// actionErr keeps the error of any action below and checked after action
@@ -714,8 +705,6 @@ func (c *Controller) RunForever(runImmediately bool) error {
 			return err
 		}
 	}
-
-	return nil
 
 	// Start the main loop
 	ticker := time.NewTicker(c.Opts.ScanInterval)
