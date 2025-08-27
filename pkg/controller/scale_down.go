@@ -21,7 +21,9 @@ const (
 
 // ScaleDown performs the taint and remove node logic
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
-	removed, err := c.TryRemoveTaintedNodes(opts)
+	// Scaling down cannot trigger when a nodegroup is unhealthy so the function
+	// can be called and it is fine to assume that healthy nodes can be removed.
+	removed, err := c.TryRemoveTaintedNodes(opts, true)
 	if err != nil {
 		switch err.(type) {
 		// early return when node not in expected autoscaling group is found
@@ -68,9 +70,17 @@ func (c *Controller) TryRemoveForceTaintedNodes(opts scaleOpts) (int, error) {
 // TryRemoveTaintedNodes attempts to remove nodes are
 // * tainted and empty
 // * have passed their grace period
-func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
+func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts, healthyNodesAllowedToBeRemoved bool) (int, error) {
 	var toBeDeleted []*v1.Node
 	for _, candidate := range opts.taintedNodes {
+		if opts.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+			// If healthy nodes should not be removed and the node is healthy
+			// then the node is no longer considered a candidate for deletion.
+			if !healthyNodesAllowedToBeRemoved && !k8s.IsNodeUnhealthy(candidate, opts.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration()) {
+				log.Infof("skip node %s because it is healthy and healthy nodes cannot be deleted right now", candidate.Name)
+				continue
+			}
+		}
 
 		// skip any nodes marked with the NodeEscalatorIgnore condition which is true
 		// filter these nodes out as late as possible to ensure rest of escalator scaling calculations remain unaffected

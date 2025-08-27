@@ -26,7 +26,7 @@ func DeleteNodes(nodes []*v1.Node, client kubernetes.Interface) error {
 	return nil
 }
 
-// IsNodeUnheathly returns true if the node not ready by the amount of time
+// IsNodeUnhealthy returns true if the node is not ready by the amount of time
 // allowed.
 func IsNodeUnhealthy(node *v1.Node, gracePeriod time.Duration) bool {
 	// If a node is cordoned then do not consider it unhealthy

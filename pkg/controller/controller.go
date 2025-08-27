@@ -232,23 +232,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// into groups.
 	if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
 		c.taintUnhealthyInstances(allNodes, nodeGroup)
-
-		// Determine if the nodegroup is healthy for the metric
-		isHealthy := 1
-
-		if !c.isNodegroupHealthy(nodeGroup, allNodes) {
-			isHealthy = 0
-		}
-
-		metrics.NodeGroupUnhealthy.WithLabelValues(nodegroup).Set(float64(isHealthy))
-	} else {
-		// This metric should can only return non-1 if the feature is being used,
-		// otherwise the nodegroup is considered healthy.
-		metrics.NodeGroupUnhealthy.WithLabelValues(nodegroup).Set(1)
-	}
-
-	if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
-
 	}
 
 	// Filter into untainted and tainted nodes
@@ -444,6 +427,24 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).Error(forceActionErr)
 	}
 
+	// If the nodegroup is considered to be unhealthy, then prevent any scaling
+	// for the time being and instead try removing tainted nodes to get the
+	// nodegroup into a healthy state again. No healthy nodes should be removed
+	// and no new cloud provider nodes should be added.
+	nodeGroupIsHealthy := true
+
+	if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+		if !c.isNodegroupHealthy(nodeGroup, allNodes) {
+			nodeGroupIsHealthy = false
+			nodesDelta = 0
+			log.WithField("nodegroup", nodegroup).Infof("NodegroupUnhealthy: nodesDelta overridden to 0 from %d because the nodegroup is unhealthy", nodesDelta)
+		}
+	}
+
+	// This metric should only return non-1 if the feature grace period is being
+	// used, otherwise the nodegroup is always considered healthy.
+	c.reportNodeGroupHealthMetric(nodegroup, nodeGroupIsHealthy)
+
 	// Perform a scale up, do nothing or scale down based on the nodes delta
 	var nodesDeltaResult int
 	// actionErr keeps the error of any action below and checked after action
@@ -465,7 +466,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).Info("No need to scale")
 		// reap any expired nodes
 		var removed int
-		removed, actionErr = c.TryRemoveTaintedNodes(scaleOptions)
+		removed, actionErr = c.TryRemoveTaintedNodes(scaleOptions, nodeGroupIsHealthy)
 		log.WithField("nodegroup", nodegroup).Infof("Reaper: There were %v empty nodes deleted this round", removed)
 	}
 
@@ -498,6 +499,16 @@ func (c *Controller) taintUnhealthyInstances(nodes []*v1.Node, state *NodeGroupS
 	}
 
 	return c.taintInstances(bundles, state, len(bundles))
+}
+
+func (c *Controller) reportNodeGroupHealthMetric(nodegroup string, nodeGroupHealthy bool) {
+	healthy := 1
+
+	if !nodeGroupHealthy {
+		healthy = 0
+	}
+
+	metrics.NodeGroupUnhealthy.WithLabelValues(nodegroup).Set(float64(healthy))
 }
 
 // isNodegroupHealthy checks if the nodegroup is healthy.

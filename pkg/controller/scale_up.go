@@ -29,14 +29,6 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 		return 0, nil
 	}
 
-	// If the nodegroup is not considered healthy then prevent cloud provider
-	// scale up because new instances may have a bad configuration.
-	if opts.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
-		if !c.isNodegroupHealthy(opts.nodeGroup, opts.nodes) {
-			return untainted, nil
-		}
-	}
-
 	// The nodegroup is deemed healthy enough to support scaling activity and
 	// more instances are needed, scale up new instances from the cloud
 	// provider.
