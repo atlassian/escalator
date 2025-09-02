@@ -276,18 +276,26 @@ This is an optional feature and by default is disabled.
 
 ### `unhealthy_node_grace_period`
 
-This is an optional field. The default value is empty, which disables the feature.
+Defines the minimum age of a node before it can be tested to check if it is unhealthy.
 
-When configured, this is the duration to wait before node can be considered node unhealthy.
+When enabled, instances can be tested periodically to determine if they are healthy. Escalator will pause all scaling activity and flush out unhealthy instances if they go above a configured threshold for the nodegroup. It will continuously do this until enough instances in the nodegroup are healthy and normal scaling activity can resume.
+
+Cordoned nodes are skipped and can never be considered unhealthy.
+
+This is an optional field. The default value is empty, which disables the feature.
 
 ### `health_check_newest_nodes_percent`
 
-This field is required if `unhealthy_node_grace_period` is enabled.
+**[Only used if `unhealthy_node_grace_period` is set.]**
 
-This is the percentage of newer nodes in the nodegroup that can be considered when checking for the maximum allowed unhealthy nodes in the nodegroup. Any older nodes will not be considered.
+The percentage of nodes (ordered by age from newer to older) in the nodegroup that are considered when checking for the maximum allowed unhealthy nodes in the nodegroup. The nodes captured by this percentage form the "test set" to be checked. Only nodes which are older than `unhealthy_node_grace_period` will be included in the test set.
 
-### `max_unhealthy_nodes_percentage`
+This field is required.
+
+### `max_unhealthy_nodes_percent`
+
+**[Only used if `unhealthy_node_grace_period` is set.]**
+
+The maximum percentage of unhealthy nodes in the test set from `health_check_newest_nodes_percent`. Beyond this threshold all scaling activity is paused and unhealthy nodes are flushed out.
 
 This is an optional field. If not set, it will default to `0%`.
-
-This is the maximum percentage of unhealthy nodes in the test set from `health_check_newest_nodes_percent` which are at least older than the grace period duration.

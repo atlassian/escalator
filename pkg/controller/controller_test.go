@@ -270,7 +270,7 @@ func TestGetMostRecentNodes(t *testing.T) {
 		want []string
 	}{
 		{
-			"get most recent 50% (even)",
+			"get most recent 50% (even starting nodes)",
 			args{
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
@@ -282,7 +282,7 @@ func TestGetMostRecentNodes(t *testing.T) {
 			[]string{"n1", "n2"},
 		},
 		{
-			"get most recent 49% (even)",
+			"get most recent 49% (even starting nodes)",
 			args{
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
@@ -294,7 +294,7 @@ func TestGetMostRecentNodes(t *testing.T) {
 			[]string{"n1", "n2"},
 		},
 		{
-			"get most recent 75% (even)",
+			"get most recent 75% (even starting nodes)",
 			args{
 				&NodeGroupState{
 					Opts: NodeGroupOptions{
@@ -306,7 +306,7 @@ func TestGetMostRecentNodes(t *testing.T) {
 			[]string{"n1", "n2", "n3"},
 		},
 		{
-			"get most recent 50% (odd)",
+			"get most recent 50% (odd starting nodes)",
 			args{
 				&NodeGroupState{
 					Opts: NodeGroupOptions{

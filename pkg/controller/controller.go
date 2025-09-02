@@ -450,9 +450,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	var actionErr error
 	switch {
 	case nodesDelta < 0:
-		// Try to scale down. This cannot trigger when a nodegroup is unhealthy
-		// so the function can be called and it is fine to assume that healthy
-		// nodes can be removed.
+		// Try to scale down
 		scaleOptions.nodesDelta = -nodesDelta
 		nodesDeltaResult, actionErr = c.ScaleDown(scaleOptions)
 	case nodesDelta > 0:
@@ -488,7 +486,7 @@ func (c *Controller) taintUnhealthyInstances(nodes []*v1.Node, state *NodeGroupS
 	bundles := make(nodesByOldestCreationTime, 0, len(nodes))
 
 	for i, node := range nodes {
-		// If the node is deemed heathly then there is nothing to do
+		// If the node is deemed healthy then there is nothing to do
 		if !k8s.IsNodeUnhealthy(node, state.Opts.unhealthyNodeGracePeriodDuration) {
 			continue
 		}
