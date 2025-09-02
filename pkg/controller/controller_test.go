@@ -179,7 +179,7 @@ func TestControllerFilterNodes(t *testing.T) {
 	}
 }
 
-func TestGetReverseOrderedNodes(t *testing.T) {
+func TestGetNodesOrderedNewestFirst(t *testing.T) {
 	c := &Controller{}
 	now := time.Now()
 
@@ -189,7 +189,7 @@ func TestGetReverseOrderedNodes(t *testing.T) {
 		test.BuildTestNode(test.NodeOpts{Name: "n3", Creation: now.Add(-15 * time.Minute)}),
 	}
 
-	reversedNodes := c.getReverseOrderedNodes(nodes)
+	reversedNodes := c.getNodesOrderedNewestFirst(nodes)
 
 	assert.Equal(t, "n2", reversedNodes[0].Name)
 	assert.Equal(t, "n3", reversedNodes[1].Name)

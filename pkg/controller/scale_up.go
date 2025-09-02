@@ -23,12 +23,6 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	// how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
 
-	// check that untainting the nodes doesn't do bring us over max nodes
-	if opts.nodesDelta <= 0 {
-		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
-		return 0, nil
-	}
-
 	// The nodegroup is deemed healthy enough to support scaling activity and
 	// more instances are needed, scale up new instances from the cloud
 	// provider.
@@ -140,7 +134,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 		// only actually taint in dry mode
 		if !c.dryMode(nodeGroup) {
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
-				log.WithField("drymode", "off").Infof("Untainting node %v", bundle.node.Name)
+				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Untainting node %v", bundle.node.Name)
 
 				// Remove the taint from the node
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
@@ -163,7 +157,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 				// Delete from tracker
 				nodeGroup.taintTracker = append(nodeGroup.taintTracker[:deleteIndex], nodeGroup.taintTracker[deleteIndex+1:]...)
 				untaintedIndices = append(untaintedIndices, bundle.index)
-				log.WithField("drymode", "on").Infof("Untainting node %v", bundle.node.Name)
+				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Untainting node %v", bundle.node.Name)
 			}
 		}
 	}

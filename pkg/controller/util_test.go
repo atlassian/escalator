@@ -373,6 +373,25 @@ func TestTaintInstances(t *testing.T) {
 			},
 			[]int{3, 2},
 		},
+		{
+			"taint 4 oldest nodes in dry mode even with max > len(nodes)",
+			args{
+				nodesByOldestCreationTime{
+					{nodes[3], 3},
+					{nodes[2], 2},
+					{nodes[1], 1},
+					{nodes[0], 0},
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						Name: "default",
+					},
+				},
+				5,
+				true,
+			},
+			[]int{3, 2, 1, 0},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

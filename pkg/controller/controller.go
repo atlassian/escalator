@@ -441,8 +441,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		}
 	}
 
-	// This metric should only return non-1 if the feature grace period is being
-	// used, otherwise the nodegroup is always considered healthy.
 	c.reportNodeGroupHealthMetric(nodegroup, nodeGroupIsHealthy)
 
 	// Perform a scale up, do nothing or scale down based on the nodes delta
@@ -452,7 +450,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	var actionErr error
 	switch {
 	case nodesDelta < 0:
-		// Try to scale down.
+		// Try to scale down. This cannot trigger when a nodegroup is unhealthy
+		// so the function can be called and it is fine to assume that healthy
+		// nodes can be removed.
 		scaleOptions.nodesDelta = -nodesDelta
 		nodesDeltaResult, actionErr = c.ScaleDown(scaleOptions)
 	case nodesDelta > 0:
@@ -514,9 +514,9 @@ func (c *Controller) reportNodeGroupHealthMetric(nodegroup string, nodeGroupHeal
 // If the percentage of unhealthy nodes in this newest set of nodes is greater than the configured threshold, the nodegroup is considered unhealthy.
 func (c *Controller) isNodegroupHealthy(state *NodeGroupState, nodes []*v1.Node) bool {
 	// Sort the nodes is reverse order based on age
-	reversedOrderedNodes := c.getReverseOrderedNodes(nodes)
+	reversedOrderedNodes := c.getNodesOrderedNewestFirst(nodes)
 
-	// Filter out any nodes which are node old enough for the test group
+	// Filter out any nodes which are not old enough for the test group
 	oldEnoughNodes := c.filterOutNodesTooNew(state, reversedOrderedNodes)
 
 	// Out of the nodes that are left, find the most recent configured
@@ -536,7 +536,7 @@ func (c *Controller) isNodegroupHealthy(state *NodeGroupState, nodes []*v1.Node)
 	return (unhealthyNodesCount*100)/len(nodesForTest) <= state.Opts.MaxUnhealthyNodesPercent
 }
 
-func (c *Controller) getReverseOrderedNodes(nodes []*v1.Node) []*v1.Node {
+func (c *Controller) getNodesOrderedNewestFirst(nodes []*v1.Node) []*v1.Node {
 	sortedNodes := make(nodesByOldestCreationTime, 0, len(nodes))
 
 	for i, node := range nodes {
@@ -547,8 +547,6 @@ func (c *Controller) getReverseOrderedNodes(nodes []*v1.Node) []*v1.Node {
 	// easier to loop through.
 	sort.Sort(sort.Reverse(sortedNodes))
 
-	// The number of recent nodes may collected may not reach "numberOfNodes"
-	// because
 	reverseOrderedNodes := make([]*v1.Node, 0, len(nodes))
 
 	for _, sortedNode := range sortedNodes {
@@ -558,6 +556,10 @@ func (c *Controller) getReverseOrderedNodes(nodes []*v1.Node) []*v1.Node {
 	return reverseOrderedNodes
 }
 
+// Returns the list of nodes which are at least as old at the health check grace
+// period duration configured for the nodegroup. These nodes are considered to
+// be too new and still have a chance to be not Ready for legitimate reasons so
+// they should not be considered.
 func (c *Controller) filterOutNodesTooNew(state *NodeGroupState, nodes []*v1.Node) []*v1.Node {
 	now := time.Now()
 	newNodes := make([]*v1.Node, 0)
@@ -572,17 +574,12 @@ func (c *Controller) filterOutNodesTooNew(state *NodeGroupState, nodes []*v1.Nod
 	return newNodes
 }
 
-// Returns the most recent X% of instances from the nodegroup which are older
-// than the grace period defined. If no grace period is defined then all
-// instances in the nodegroup are included in the check.
+// Returns the most recent X% of instances from the given list of nodes.
 func (c *Controller) getMostRecentNodes(state *NodeGroupState, nodes []*v1.Node) []*v1.Node {
 	// Round up rather than down from HealthCheckNewestNodesPercent so that if
 	// there is a single instance then a non-100% percentage will still result
 	// in testing the instance. We want to test more rather than less.
 	numberOfNodes := int(math.Ceil((float64(state.Opts.HealthCheckNewestNodesPercent) / 100) * float64(len(nodes))))
-
-	// The number of recent nodes may collected may not reach "numberOfNodes"
-	// because
 	recentNodes := make([]*v1.Node, 0)
 
 	for i, node := range nodes {

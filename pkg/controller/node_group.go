@@ -148,10 +148,10 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	// UnhealthyNodeGracePeriod is an optional parameter.
 	if len(nodegroup.UnhealthyNodeGracePeriod) > 0 {
 		checkThat(nodegroup.UnhealthyNodeGracePeriodDuration() > 0, "unhealthy_node_grace_period failed to parse into a time.Duration. check your formatting.")
+		checkThat(nodegroup.HealthCheckNewestNodesPercent > 0, "health_check_newest_nodes_percent must be greater than 0")
+		checkThat(nodegroup.HealthCheckNewestNodesPercent <= 100, "health_check_newest_nodes_percent must be less than or equal to 100")
 		checkThat(nodegroup.MaxUnhealthyNodesPercent >= 0, "max_unhealthy_nodes_percentage must be greater than or equal to 0")
 		checkThat(nodegroup.MaxUnhealthyNodesPercent <= 100, "max_unhealthy_nodes_percentage must be less than or equal to 100")
-		checkThat(nodegroup.HealthCheckNewestNodesPercent >= 0, "health_check_newest_nodes_percent must be greater than or equal to 0")
-		checkThat(nodegroup.HealthCheckNewestNodesPercent <= 100, "health_check_newest_nodes_percent must be less than or equal to 100")
 	}
 
 	return problems

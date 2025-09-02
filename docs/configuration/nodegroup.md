@@ -282,12 +282,12 @@ When configured, this is the duration to wait before node can be considered node
 
 ### `health_check_newest_nodes_percent`
 
-This is an optional field.
+This field is required if `unhealthy_node_grace_period` is enabled.
 
-This is the percentage of newer nodes in the nodegroup can can be considered when checking for the maximum allowed unhealthy nodes in the nodegroup. Any older nodes will not be considered.
+This is the percentage of newer nodes in the nodegroup that can be considered when checking for the maximum allowed unhealthy nodes in the nodegroup. Any older nodes will not be considered.
 
 ### `max_unhealthy_nodes_percentage`
 
-This is an optional field.
+This is an optional field. If not set, it will default to `0%`.
 
 This is the maximum percentage of unhealthy nodes in the test set from `health_check_newest_nodes_percent` which are at least older than the grace period duration.

@@ -21,8 +21,6 @@ const (
 
 // ScaleDown performs the taint and remove node logic
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
-	// Scaling down cannot trigger when a nodegroup is unhealthy so the function
-	// can be called and it is fine to assume that healthy nodes can be removed.
 	removed, err := c.TryRemoveTaintedNodes(opts, true)
 	if err != nil {
 		switch err.(type) {

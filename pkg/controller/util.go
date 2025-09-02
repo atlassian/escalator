@@ -84,7 +84,7 @@ func calcPercentUsage(cpuRequest, memRequest, cpuCapacity, memCapacity resource.
 // taintInstances taints the nodes in the node group. It will taint a maximum of `max` nodes.
 // It returns the indexes of the nodes that were tainted.
 func (c *Controller) taintInstances(sortedNodes nodesByOldestCreationTime, nodeGroup *NodeGroupState, max int) []int {
-	taintedIndices := make([]int, 0, len(sortedNodes))
+	taintedIndices := make([]int, 0)
 
 	for _, bundle := range sortedNodes {
 		// stop at max (or when array is fully iterated)
@@ -97,11 +97,11 @@ func (c *Controller) taintInstances(sortedNodes nodesByOldestCreationTime, nodeG
 			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
 			taintedIndices = append(taintedIndices, bundle.index)
 
-			log.WithField("drymode", "on").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
+			log.WithField("drymode", c.dryMode(nodeGroup)).WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
 			continue
 		}
 
-		log.WithField("drymode", "off").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
+		log.WithField("drymode", c.dryMode(nodeGroup)).WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
 
 		// Taint the node
 		updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client, nodeGroup.Opts.TaintEffect)
