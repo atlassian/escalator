@@ -22,25 +22,20 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	// remove the number of nodes that were just untainted and the remaining is how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
 
-	if opts.nodesDelta > 0 {
-		// check that untainting the nodes doesn't do bring us over max nodes
-		if opts.nodesDelta <= 0 {
-			log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
-			return 0, nil
-		}
-
-		if opts.nodesDelta > 0 {
-			added, err := c.scaleUpCloudProviderNodeGroup(opts)
-			if err != nil {
-				log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
-				return 0, err
-			}
-			opts.nodeGroup.scaleUpLock.lock(added)
-			return untainted + added, nil
-		}
+	// check that untainting the nodes doesn't do bring us over max nodes
+	if opts.nodesDelta <= 0 {
+		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
+		return untainted, nil
 	}
 
-	return untainted, nil
+	added, err := c.scaleUpCloudProviderNodeGroup(opts)
+	if err != nil {
+		log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
+		return 0, err
+	}
+
+	opts.nodeGroup.scaleUpLock.lock(added)
+	return untainted + added, nil
 }
 
 // Calulates how many new nodes need to be created
