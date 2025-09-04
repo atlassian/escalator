@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,4 +24,29 @@ func DeleteNodes(nodes []*v1.Node, client kubernetes.Interface) error {
 		}
 	}
 	return nil
+}
+
+// IsNodeUnhealthy returns true if the node is not ready by the amount of time
+// allowed.
+func IsNodeUnhealthy(node *v1.Node, gracePeriod time.Duration) bool {
+	// If a node is cordoned then do not consider it unhealthy
+	if node.Spec.Unschedulable {
+		return false
+	}
+
+	// If the grace period expiry time is in the future then the instance is not
+	// deemed to be unhealthy even if it is not ready.
+	if node.CreationTimestamp.Add(gracePeriod).After(time.Now()) {
+		return false
+	}
+
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady {
+			// ConditionTrue shows whether the node is ready, anything else
+			// and we can assume the node is not.
+			return condition.Status != v1.ConditionTrue
+		}
+	}
+
+	return true
 }

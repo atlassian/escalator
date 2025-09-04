@@ -72,6 +72,15 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupUnhealthy nodes considered by specific node groups that are unhealthy
+	NodeGroupUnhealthy = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_unhealthy_nodes",
+			Namespace: NAMESPACE,
+			Help:      "node group considered to be unhealthy",
+		},
+		[]string{"node_group"},
+	)
 	// NodeGroupPodsEvicted pods evicted during a scale down
 	NodeGroupPodsEvicted = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -316,6 +325,7 @@ func init() {
 	prometheus.MustRegister(NodeGroupNodesCordoned)
 	prometheus.MustRegister(NodeGroupNodesUntainted)
 	prometheus.MustRegister(NodeGroupNodesTainted)
+	prometheus.MustRegister(NodeGroupUnhealthy)
 	prometheus.MustRegister(NodeGroupPods)
 	prometheus.MustRegister(NodeGroupPodsEvicted)
 	prometheus.MustRegister(NodeGroupsMemPercent)

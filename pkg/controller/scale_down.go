@@ -21,7 +21,7 @@ const (
 
 // ScaleDown performs the taint and remove node logic
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
-	removed, err := c.TryRemoveTaintedNodes(opts)
+	removed, err := c.TryRemoveTaintedNodes(opts, true)
 	if err != nil {
 		switch err.(type) {
 		// early return when node not in expected autoscaling group is found
@@ -68,9 +68,17 @@ func (c *Controller) TryRemoveForceTaintedNodes(opts scaleOpts) (int, error) {
 // TryRemoveTaintedNodes attempts to remove nodes are
 // * tainted and empty
 // * have passed their grace period
-func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts) (int, error) {
+func (c *Controller) TryRemoveTaintedNodes(opts scaleOpts, healthyNodesAllowedToBeRemoved bool) (int, error) {
 	var toBeDeleted []*v1.Node
 	for _, candidate := range opts.taintedNodes {
+		if opts.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+			// If healthy nodes should not be removed and the node is healthy
+			// then the node is no longer considered a candidate for deletion.
+			if !healthyNodesAllowedToBeRemoved && !k8s.IsNodeUnhealthy(candidate, opts.nodeGroup.Opts.UnhealthyNodeGracePeriodDuration()) {
+				log.Infof("skip node %s because it is healthy and healthy nodes cannot be deleted right now", candidate.Name)
+				continue
+			}
+		}
 
 		// skip any nodes marked with the NodeEscalatorIgnore condition which is true
 		// filter these nodes out as late as possible to ensure rest of escalator scaling calculations remain unaffected
@@ -194,36 +202,11 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 // indices are from the parameter nodes indexes, not the sorted index
 func (c *Controller) taintOldestN(nodes []*v1.Node, nodeGroup *NodeGroupState, n int) []int {
 	sorted := make(nodesByOldestCreationTime, 0, len(nodes))
+
 	for i, node := range nodes {
 		sorted = append(sorted, nodeIndexBundle{node, i})
 	}
+
 	sort.Sort(sorted)
-
-	taintedIndices := make([]int, 0, n)
-	for _, bundle := range sorted {
-		// stop at N (or when array is fully iterated)
-		if len(taintedIndices) >= n {
-			break
-		}
-
-		// only actually taint in dry mode
-		if !c.dryMode(nodeGroup) {
-			log.WithField("drymode", "off").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
-
-			// Taint the node
-			updatedNode, err := k8s.AddToBeRemovedTaint(bundle.node, c.Client, nodeGroup.Opts.TaintEffect)
-			if err != nil {
-				log.Errorf("While tainting %v: %v", bundle.node.Name, err)
-			} else {
-				bundle.node = updatedNode
-				taintedIndices = append(taintedIndices, bundle.index)
-			}
-		} else {
-			nodeGroup.taintTracker = append(nodeGroup.taintTracker, bundle.node.Name)
-			taintedIndices = append(taintedIndices, bundle.index)
-			log.WithField("drymode", "on").WithField("nodegroup", nodeGroup.Opts.Name).Infof("Tainting node %v", bundle.node.Name)
-		}
-	}
-
-	return taintedIndices
+	return c.taintInstances(sorted, nodeGroup, n)
 }

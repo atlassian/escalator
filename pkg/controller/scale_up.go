@@ -12,7 +12,6 @@ import (
 
 // ScaleUp performs the untaint and increase cloud provider node group logic
 func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
-
 	untainted, err := c.scaleUpUntaint(opts)
 	// No nodes were untainted, so we need to scale up cloud provider node group
 	if err != nil {
@@ -23,25 +22,20 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 	// remove the number of nodes that were just untainted and the remaining is how much to increase the cloud provider node group by
 	opts.nodesDelta -= untainted
 
-	if opts.nodesDelta > 0 {
-		// check that untainting the nodes doesn't do bring us over max nodes
-		if opts.nodesDelta <= 0 {
-			log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
-			return 0, nil
-		}
-
-		if opts.nodesDelta > 0 {
-			added, err := c.scaleUpCloudProviderNodeGroup(opts)
-			if err != nil {
-				log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
-				return 0, err
-			}
-			opts.nodeGroup.scaleUpLock.lock(added)
-			return untainted + added, nil
-		}
+	// check that untainting the nodes doesn't do bring us over max nodes
+	if opts.nodesDelta <= 0 {
+		log.Warnf("Scale up delta is less than or equal to 0 after clamping: %v. Will not scale up cloud provider.", opts.nodesDelta)
+		return untainted, nil
 	}
 
-	return untainted, nil
+	added, err := c.scaleUpCloudProviderNodeGroup(opts)
+	if err != nil {
+		log.Errorf("Failed to add nodes because of an error. Skipping cloud provider node group scaleup: %v", err)
+		return 0, err
+	}
+
+	opts.nodeGroup.scaleUpLock.lock(added)
+	return untainted + added, nil
 }
 
 // Calulates how many new nodes need to be created
@@ -124,6 +118,17 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 
 	untaintedIndices := make([]int, 0, n)
 	for _, bundle := range sorted {
+		// Check if the node is ready before untainting. Not ready nodes should
+		// be left to be removed instead. If a previously unhealthy node has
+		// become healthy, it will pass this test and as such be untainted and
+		// able to receive pods.
+		if nodeGroup.Opts.UnhealthyNodeGracePeriodDuration() > 0 {
+			if k8s.IsNodeUnhealthy(bundle.node, nodeGroup.Opts.UnhealthyNodeGracePeriodDuration()) {
+				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Skipping untaint of unhealthy node %v", bundle.node.Name)
+				continue
+			}
+		}
+
 		// stop at N (or when array is fully iterated)
 		if len(untaintedIndices) >= n {
 			break
@@ -131,7 +136,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 		// only actually taint in dry mode
 		if !c.dryMode(nodeGroup) {
 			if _, tainted := k8s.GetToBeRemovedTaint(bundle.node); tainted {
-				log.WithField("drymode", "off").Infof("Untainting node %v", bundle.node.Name)
+				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Untainting node %v", bundle.node.Name)
 
 				// Remove the taint from the node
 				updatedNode, err := k8s.DeleteToBeRemovedTaint(bundle.node, c.Client)
@@ -154,7 +159,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 				// Delete from tracker
 				nodeGroup.taintTracker = append(nodeGroup.taintTracker[:deleteIndex], nodeGroup.taintTracker[deleteIndex+1:]...)
 				untaintedIndices = append(untaintedIndices, bundle.index)
-				log.WithField("drymode", "on").Infof("Untainting node %v", bundle.node.Name)
+				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Untainting node %v", bundle.node.Name)
 			}
 		}
 	}

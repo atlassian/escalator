@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/k8s/resource"
@@ -10,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCalcScaleUpDeltaBelowThreshold(t *testing.T) {
@@ -308,6 +311,119 @@ func TestCalcPercentUsage(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectedCPU, cpu)
 			assert.Equal(t, tt.expectedMem, mem)
+		})
+	}
+}
+
+func TestTaintInstances(t *testing.T) {
+	now := time.Now()
+	nodes := []*v1.Node{
+		test.BuildTestNode(test.NodeOpts{Name: "n1", Creation: now.Add(-5 * time.Minute)}),
+		test.BuildTestNode(test.NodeOpts{Name: "n2", Creation: now.Add(-15 * time.Minute)}),
+		test.BuildTestNode(test.NodeOpts{Name: "n3", Creation: now.Add(-20 * time.Minute)}),
+		test.BuildTestNode(test.NodeOpts{Name: "n4", Creation: now.Add(-30 * time.Minute)}),
+	}
+
+	type args struct {
+		sortedNodes nodesByOldestCreationTime
+		nodeGroup   *NodeGroupState
+		max         int
+		dryMode     bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{
+			"taint 2 oldest nodes",
+			args{
+				nodesByOldestCreationTime{
+					{nodes[3], 3},
+					{nodes[2], 2},
+					{nodes[1], 1},
+					{nodes[0], 0},
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						Name: "default",
+					},
+				},
+				2,
+				false,
+			},
+			[]int{3, 2},
+		},
+		{
+			"taint 2 oldest nodes in dry mode",
+			args{
+				nodesByOldestCreationTime{
+					{nodes[3], 3},
+					{nodes[2], 2},
+					{nodes[1], 1},
+					{nodes[0], 0},
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						Name: "default",
+					},
+				},
+				2,
+				true,
+			},
+			[]int{3, 2},
+		},
+		{
+			"taint 4 oldest nodes in dry mode even with max > len(nodes)",
+			args{
+				nodesByOldestCreationTime{
+					{nodes[3], 3},
+					{nodes[2], 2},
+					{nodes[1], 1},
+					{nodes[0], 0},
+				},
+				&NodeGroupState{
+					Opts: NodeGroupOptions{
+						Name: "default",
+					},
+				},
+				5,
+				true,
+			},
+			[]int{3, 2, 1, 0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeClient, _ := test.BuildFakeClient(nodes, nil)
+			c := &Controller{
+				Client: &Client{
+					Interface: fakeClient,
+				},
+				Opts: Opts{
+					DryMode: tt.args.dryMode,
+				},
+			}
+
+			tt.args.nodeGroup.taintTracker = []string{}
+
+			got := c.taintInstances(tt.args.sortedNodes, tt.args.nodeGroup, tt.args.max)
+			assert.Equal(t, tt.want, got)
+
+			// Check that the nodes were actually tainted if not in dry mode
+			if !tt.args.dryMode {
+				for _, index := range got {
+					node := nodes[index]
+					updatedNode, err := c.Client.CoreV1().Nodes().Get(context.Background(), node.Name, metav1.GetOptions{})
+					assert.NoError(t, err)
+
+					_, tainted := k8s.GetToBeRemovedTaint(updatedNode)
+					assert.True(t, tainted)
+				}
+			} else {
+				// In dry mode, the taint tracker should be updated
+				assert.Len(t, tt.args.nodeGroup.taintTracker, len(tt.want))
+			}
 		})
 	}
 }

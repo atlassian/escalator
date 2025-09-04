@@ -29,12 +29,12 @@ node_groups:
     taint_effect: NoExecute
     max_node_age: 24h
     aws:
-        fleet_instance_ready_timeout: 1m
-        launch_template_id: lt-1a2b3c4d
-        launch_template_version: "1"
-        lifecycle: on-demand
-        instance_type_overrides: ["t2.large", "t3.large"]
-        resource_tagging: false
+      fleet_instance_ready_timeout: 1m
+      launch_template_id: lt-1a2b3c4d
+      launch_template_version: "1"
+      lifecycle: on-demand
+      instance_type_overrides: ["t2.large", "t3.large"]
+      resource_tagging: false
 ```
 
 ## Options
@@ -273,3 +273,31 @@ When not at the minimum, the natural scaling up and down of the node group will 
 node group.
 
 This is an optional feature and by default is disabled.
+
+### `unhealthy_node_grace_period`
+
+Defines the minimum age of a node before it can be tested to check if it is unhealthy.
+
+When enabled, instances can be tested periodically to determine if they are healthy. Escalator will pause all scaling activity and flush out unhealthy instances if they go above a configured threshold for the nodegroup. It will continuously do this until enough instances in the nodegroup are healthy and normal scaling activity can resume.
+
+Cordoned nodes are skipped and can never be considered unhealthy.
+
+This is an optional field. The default value is empty, which disables the feature.
+
+### `health_check_newest_nodes_percent`
+
+**[Only used if `unhealthy_node_grace_period` is set.]**
+
+The percentage of nodes (ordered by age from newer to older) in the nodegroup that are considered when checking for the maximum allowed unhealthy nodes in the nodegroup. The nodes captured by this percentage form the "test set" to be checked. Only nodes which are older than `unhealthy_node_grace_period` will be included in the test set.
+
+This field is required.
+
+### `max_unhealthy_nodes_percent`
+
+**[Only used if `unhealthy_node_grace_period` is set.]**
+
+The maximum percentage of unhealthy nodes in the test set from `health_check_newest_nodes_percent`. Beyond this threshold all scaling activity is paused and unhealthy nodes are flushed out.
+
+> **Note:** The valid range for `max_unhealthy_nodes_percent` is `0%` to `99%`.
+
+This is an optional field. If not set, it will default to `0%`.

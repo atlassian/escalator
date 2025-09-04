@@ -2,9 +2,10 @@ package controller
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/test"
@@ -440,16 +441,31 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			continue
 		}
 
+		// Make odd nodes unhealthy
+		var ready = v1.NodeReady
+
+		if i%2 == 0 {
+			// This is used arbitrarily to mean "not ready"
+			ready = v1.NodeNetworkUnavailable
+		}
+
+		for i, condition := range n.Status.Conditions {
+			if condition.Type == v1.NodeReady {
+				n.Status.Conditions[i].Type = ready
+			}
+		}
+
 		untaintedNodes = append(untaintedNodes, nodes[i])
 	}
 	assert.Equal(t, len(nodes)-2, len(untaintedNodes))
 
 	tests := []struct {
-		name                 string
-		opts                 scaleOpts
-		annotateFirstTainted bool
-		want                 int
-		wantErr              bool
+		name                           string
+		opts                           scaleOpts
+		annotateFirstTainted           bool
+		healthyNodesAllowedToBeRemoved bool
+		want                           int
+		wantErr                        bool
 	}{
 		{
 			"test normal delete all tainted",
@@ -462,6 +478,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 				0, // not used in TryRemoveTaintedNodes
 			},
 			false,
+			true,
 			-2,
 			false,
 		},
@@ -475,6 +492,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 				nodeGroupsState[testNodeGroup.ID()],
 				0, // not used in TryRemoveTaintedNodes
 			},
+			true,
 			true,
 			-1,
 			false,
@@ -490,7 +508,23 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 				0, // not used in TryRemoveTaintedNodes
 			},
 			false,
+			true,
 			0,
+			false,
+		},
+		{
+			"test normal delete without unhealthy nodes",
+			scaleOpts{
+				nodes,
+				taintedNodes,
+				[]*v1.Node{},
+				untaintedNodes,
+				nodeGroupsState[testNodeGroup.ID()],
+				0, // not used in TryRemoveTaintedNodes
+			},
+			false,
+			false,
+			-1,
 			false,
 		},
 	}
@@ -502,7 +536,7 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 					NodeEscalatorIgnoreAnnotation: "skip for testing",
 				}
 			}
-			got, err := c.TryRemoveTaintedNodes(tt.opts)
+			got, err := c.TryRemoveTaintedNodes(tt.opts, tt.healthyNodesAllowedToBeRemoved)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
