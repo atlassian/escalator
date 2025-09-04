@@ -532,7 +532,7 @@ func TestIsNodegroupHealthy(t *testing.T) {
 			healthy: true,
 		},
 		{
-			name: "4 nodes, all unhealthy, max unhealthy 100%, healthy",
+			name: "4 nodes, all unhealthy, max unhealthy 99%, healthy",
 			state: &NodeGroupState{
 				Opts: NodeGroupOptions{
 					unhealthyNodeGracePeriodDuration: gracePeriod,
