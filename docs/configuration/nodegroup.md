@@ -298,4 +298,6 @@ This field is required.
 
 The maximum percentage of unhealthy nodes in the test set from `health_check_newest_nodes_percent`. Beyond this threshold all scaling activity is paused and unhealthy nodes are flushed out.
 
+> **Note:** The valid range for `max_unhealthy_nodes_percent` is `0%` to `99%`.
+
 This is an optional field. If not set, it will default to `0%`.

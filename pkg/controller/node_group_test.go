@@ -506,7 +506,7 @@ func TestValidateNodeGroup(t *testing.T) {
 					ScaleUpCoolDownPeriod:              "55m",
 					UnhealthyNodeGracePeriod:           "500h",
 					HealthCheckNewestNodesPercent:      1,
-					MaxUnhealthyNodesPercent:           100,
+					MaxUnhealthyNodesPercent:           99,
 				},
 			},
 			nil,
@@ -560,7 +560,7 @@ func TestValidateNodeGroup(t *testing.T) {
 					MaxNodeAge:                         "bla",
 					UnhealthyNodeGracePeriod:           "bla",
 					HealthCheckNewestNodesPercent:      101,
-					MaxUnhealthyNodesPercent:           101,
+					MaxUnhealthyNodesPercent:           100,
 				},
 			},
 			[]string{
@@ -573,7 +573,7 @@ func TestValidateNodeGroup(t *testing.T) {
 				"max_node_age failed to parse into a time.Duration. Set to '0' or '' to disable, or a positive Go duration to enable.",
 				"unhealthy_node_grace_period failed to parse into a time.Duration. check your formatting.",
 				"health_check_newest_nodes_percent must be less than or equal to 100",
-				"max_unhealthy_nodes_percent must be less than or equal to 100",
+				"max_unhealthy_nodes_percent must be less than 100",
 			},
 		},
 		{

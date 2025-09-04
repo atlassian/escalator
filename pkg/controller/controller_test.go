@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -439,6 +440,115 @@ func TestTaintUnhealthyInstances(t *testing.T) {
 				_, tainted := k8s.GetToBeRemovedTaint(updatedNode)
 				assert.True(t, tainted)
 			}
+		})
+	}
+}
+
+func TestIsNodegroupHealthy(t *testing.T) {
+	c := &Controller{}
+	now := time.Now()
+	gracePeriod := 10 * time.Minute
+
+	buildNodes := func(total int, unhealthy int, creationTime time.Time) []*v1.Node {
+		nodes := make([]*v1.Node, total)
+		for i := 0; i < total; i++ {
+			notReady := i < unhealthy
+			nodes[i] = test.BuildTestNode(test.NodeOpts{
+				Name:     fmt.Sprintf("n%d", i+1),
+				NotReady: notReady,
+				Creation: creationTime,
+			})
+		}
+		return nodes
+	}
+
+	oldCreationTime := now.Add(-2 * gracePeriod)
+	newCreationTime := now.Add(-gracePeriod / 2)
+
+	tests := []struct {
+		name    string
+		state   *NodeGroupState
+		nodes   []*v1.Node
+		healthy bool
+	}{
+		{
+			name: "0 nodes, healthy",
+			state: &NodeGroupState{
+				Opts: NodeGroupOptions{
+					unhealthyNodeGracePeriodDuration: gracePeriod,
+					HealthCheckNewestNodesPercent:    100,
+					MaxUnhealthyNodesPercent:         50,
+				},
+			},
+			nodes:   buildNodes(0, 0, oldCreationTime),
+			healthy: true,
+		},
+		{
+			name: "0 nodes, max unhealthy 0%, healthy",
+			state: &NodeGroupState{
+				Opts: NodeGroupOptions{
+					unhealthyNodeGracePeriodDuration: gracePeriod,
+					HealthCheckNewestNodesPercent:    100,
+					MaxUnhealthyNodesPercent:         0,
+				},
+			},
+			nodes:   buildNodes(0, 0, oldCreationTime),
+			healthy: true,
+		},
+		{
+			name: "4 nodes, all nodes too new, healthy",
+			state: &NodeGroupState{
+				Opts: NodeGroupOptions{
+					unhealthyNodeGracePeriodDuration: gracePeriod,
+					HealthCheckNewestNodesPercent:    100,
+					MaxUnhealthyNodesPercent:         50,
+				},
+			},
+			nodes:   buildNodes(4, 4, newCreationTime),
+			healthy: true,
+		},
+		{
+			name: "4 nodes, all nodes old, unhealthy",
+			state: &NodeGroupState{
+				Opts: NodeGroupOptions{
+					unhealthyNodeGracePeriodDuration: gracePeriod,
+					HealthCheckNewestNodesPercent:    100,
+					MaxUnhealthyNodesPercent:         50,
+				},
+			},
+			nodes:   buildNodes(4, 4, oldCreationTime),
+			healthy: false,
+		},
+		{
+			name: "4 nodes, all healthy, max unhealthy 0%, healthy",
+			state: &NodeGroupState{
+				Opts: NodeGroupOptions{
+					unhealthyNodeGracePeriodDuration: gracePeriod,
+					HealthCheckNewestNodesPercent:    100,
+					MaxUnhealthyNodesPercent:         0,
+				},
+			},
+			nodes:   buildNodes(4, 0, oldCreationTime),
+			healthy: true,
+		},
+		{
+			name: "4 nodes, all unhealthy, max unhealthy 100%, healthy",
+			state: &NodeGroupState{
+				Opts: NodeGroupOptions{
+					unhealthyNodeGracePeriodDuration: gracePeriod,
+					HealthCheckNewestNodesPercent:    100,
+					MaxUnhealthyNodesPercent:         99,
+				},
+			},
+			nodes:   buildNodes(4, 4, oldCreationTime),
+			healthy: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := c.isNodegroupHealthy(tt.state, tt.nodes)
+			assert.Equal(t, tt.healthy, got)
 		})
 	}
 }
