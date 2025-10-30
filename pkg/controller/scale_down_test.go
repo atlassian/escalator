@@ -44,22 +44,75 @@ func TestControllerScaleDownTaint(t *testing.T) {
 
 	nodeGroups := []NodeGroupOptions{
 		{
-			Name:     "example",
-			MinNodes: 3,
-			MaxNodes: 6,
-			DryMode:  false,
+			Name:                   "example",
+			CloudProviderGroupName: "example-asg",
+			MinNodes:               3,
+			MaxNodes:               6,
+			DryMode:                false,
 		},
 		{
-			Name:     "default",
-			MinNodes: 0,
-			MaxNodes: 6,
-			DryMode:  false,
+			Name:                   "default",
+			CloudProviderGroupName: "default-asg",
+			MinNodes:               0,
+			MaxNodes:               6,
+			DryMode:                false,
+		},
+		{
+			Name:                   "asg-constrained",
+			CloudProviderGroupName: "asg-constrained-asg",
+			MinNodes:               1, // Very permissive - ASG constraint should be more restrictive
+			MaxNodes:               10,
+			DryMode:                false,
+		},
+		{
+			Name:                   "asg-atmin",
+			CloudProviderGroupName: "asg-atmin-asg",
+			MinNodes:               0, // No Escalator restriction - ASG constraint should kick in
+			MaxNodes:               6,
+			DryMode:                false,
 		},
 	}
 
 	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
 		nodeGroups: nodeGroups,
 	})
+
+	testCloudProvider := test.NewCloudProvider(len(nodeGroups))
+
+	exampleNodeGroup := test.NewNodeGroup(
+		"example-asg",
+		"example",
+		3, // minSize
+		6, // maxSize
+		6, // targetSize (current desired capacity)
+	)
+	defaultNodeGroup := test.NewNodeGroup(
+		"default-asg",
+		"default",
+		0, // minSize
+		6, // maxSize
+		6, // targetSize (current desired capacity)
+	)
+
+	asgConstrainedNodeGroup := test.NewNodeGroup(
+		"asg-constrained-asg",
+		"asg-constrained",
+		4,  // minSize - this will be more restrictive than Escalator MinNodes
+		10, // maxSize
+		7,  // targetSize (allows some deletions: 7-4=3 max)
+	)
+	asgAtMinNodeGroup := test.NewNodeGroup(
+		"asg-atmin-asg",
+		"asg-atmin",
+		3, // minSize
+		6, // maxSize
+		3, // targetSize = minSize (no deletions allowed)
+	)
+
+	testCloudProvider.RegisterNodeGroup(exampleNodeGroup)
+	testCloudProvider.RegisterNodeGroup(defaultNodeGroup)
+	testCloudProvider.RegisterNodeGroup(asgConstrainedNodeGroup)
+	testCloudProvider.RegisterNodeGroup(asgAtMinNodeGroup)
 
 	fakeClient, updateChan := test.BuildFakeClient(nodes, []*v1.Pod{})
 	opts := Opts{
@@ -162,14 +215,47 @@ func TestControllerScaleDownTaint(t *testing.T) {
 			false,
 			"",
 		},
+		{
+			"test ASG constraint: try taint 4 but ASG only allows 3 (Escalator MinNodes=1, ASG MinSize=4, TargetSize=7)",
+			args{
+				scaleOpts{
+					nodes,
+					[]*v1.Node{},
+					[]*v1.Node{},
+					nodes,
+					nodeGroupsState["asg-constrained"], // Escalator MinNodes=1, ASG MinSize=4, TargetSize=7
+					4,                                  // want to taint 4, but ASG constraint: maxDeletable = 7-4 = 3
+				},
+			},
+			3, // should only taint 3 due to ASG constraint
+			false,
+			"",
+		},
+		{
+			"test ASG constraint: ASG at minimum prevents tainting (Escalator MinNodes=0, ASG MinSize=3, TargetSize=3)",
+			args{
+				scaleOpts{
+					nodes[:3], // use 3 nodes to match ASG current size
+					[]*v1.Node{},
+					[]*v1.Node{},
+					nodes[:3],
+					nodeGroupsState["asg-atmin"], // Escalator MinNodes=0, ASG MinSize=3, TargetSize=3
+					2,                            // want to taint 2, but ASG constraint: maxDeletable = 3-3 = 0
+				},
+			},
+			0, // should taint 0 due to ASG constraint (at minimum)
+			false,
+			"",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Controller{
-				Client:     client,
-				Opts:       opts,
-				stopChan:   nil,
-				nodeGroups: nodeGroupsState,
+				Client:        client,
+				Opts:          opts,
+				stopChan:      nil,
+				nodeGroups:    nodeGroupsState,
+				cloudProvider: testCloudProvider,
 			}
 			tainted, err := c.scaleDownTaint(tt.args.opts)
 			assert.Equal(t, tt.want, tainted)
