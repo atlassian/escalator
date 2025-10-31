@@ -189,6 +189,21 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 		}
 	}
 
+	// Check ASG constraint early before tainting to avoid hitting the downstream
+	// constraint check in aws.DeleteNodes that prevents breaching MinSize.
+	cloudProviderNodeGroup, ok := c.cloudProvider.GetNodeGroup(opts.nodeGroup.Opts.CloudProviderGroupName)
+	if ok {
+		// Adjust nodesToRemove to respect ASG minimum
+		if cloudProviderNodeGroup.TargetSize()-int64(nodesToRemove) < cloudProviderNodeGroup.MinSize() {
+			maxDeletable := cloudProviderNodeGroup.TargetSize() - cloudProviderNodeGroup.MinSize()
+			if maxDeletable >= 0 {
+				log.Infof("ASG constraints limit taint amount from %v to %v (TargetSize: %v, MinSize: %v)",
+					nodesToRemove, maxDeletable, cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.MinSize())
+				nodesToRemove = int(maxDeletable)
+			}
+		}
+	}
+
 	log.WithField("nodegroup", nodegroupName).Infof("Scaling Down: tainting %v nodes", nodesToRemove)
 	metrics.NodeGroupTaintEvent.WithLabelValues(nodegroupName).Add(float64(nodesToRemove))
 	// Perform the tainting loop with the fail safe around it
