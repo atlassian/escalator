@@ -324,7 +324,7 @@ func TestScaleNodeGroup(t *testing.T) {
 			nil,
 		},
 		{
-			"node count less than the minimum",
+			"node count less than the minimum, should return error",
 			args{
 				nodeArgs{1, 0, 0},
 				buildTestPods(0, 0, 0),
@@ -337,21 +337,6 @@ func TestScaleNodeGroup(t *testing.T) {
 			},
 			0,
 			errors.New("node count less than the minimum"),
-		},
-		{
-			"node count larger than the maximum",
-			args{
-				nodeArgs{10, 0, 0},
-				buildTestPods(0, 0, 0),
-				NodeGroupOptions{
-					Name:                   "default",
-					CloudProviderGroupName: "default",
-					MaxNodes:               5,
-				},
-				ListerOptions{},
-			},
-			0,
-			errors.New("node count larger than the maximum"),
 		},
 		{
 			"node and pod usage/requests",
@@ -1057,6 +1042,211 @@ func TestScaleNodeGroup_MultipleRuns(t *testing.T) {
 			// Ensure the node group on the cloud provider side scales up/down to the correct amount
 			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), cloudProviderNodeGroup.TargetSize())
 			assert.Equal(t, int64(len(tt.args.nodes)+nodesDelta), cloudProviderNodeGroup.Size())
+		})
+	}
+}
+
+// TestScaleDesiredNodesExceedsMaxNodes tests the scenario where ASG desired is set higher than MaxNodes.
+// The controller should trigger a scale-down to bring nodes back within the MaxNodes limit.
+func TestScaleDesiredNodesExceedsMaxNodes(t *testing.T) {
+	type args struct {
+		nodes            []*v1.Node
+		pods             []*v1.Pod
+		nodeGroupOptions NodeGroupOptions
+		listerOptions    ListerOptions
+	}
+
+	tests := []struct {
+		name              string
+		args              args
+		expectedNodeDelta int
+		err               error
+	}{
+		{
+			"12 nodes exceeds max of 10, should scale down by 2",
+			args{
+				buildTestNodes(12, 2000, 8000),
+				buildTestPods(30, 500, 1000), // 62% CPU utilization, normally no scaling
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           5,
+					MaxNodes:                           10,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 50,
+					ScaleUpThresholdPercent:            80,
+				},
+				ListerOptions{},
+			},
+			-2,
+			nil,
+		},
+		{
+			"15 nodes exceeds max of 10, should scale down by 5",
+			args{
+				buildTestNodes(15, 2000, 8000),
+				buildTestPods(30, 500, 1000), // 62% CPU utilization, normally no scaling
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           5,
+					MaxNodes:                           10,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 50,
+					ScaleUpThresholdPercent:            80,
+				},
+				ListerOptions{},
+			},
+			-5,
+			nil,
+		},
+		{
+			"11 nodes exceeds max of 10, should scale down by 1",
+			args{
+				buildTestNodes(11, 2000, 8000),
+				buildTestPods(40, 500, 1000), // 90% CPU utilization, would normally scale up
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           5,
+					MaxNodes:                           10,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 50,
+					ScaleUpThresholdPercent:            80,
+				},
+				ListerOptions{},
+			},
+			-1, // Even with high utilization, should force scale down 1 node
+			nil,
+		},
+		{
+			"10 nodes equals max, no scale down",
+			args{
+				buildTestNodes(10, 2000, 8000),
+				buildTestPods(26, 500, 1000), // 65% CPU utilization, normally no scaling
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           5,
+					MaxNodes:                           10,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 50,
+					ScaleUpThresholdPercent:            80,
+				},
+				ListerOptions{},
+			},
+			0,
+			nil,
+		},
+		{
+			"14 nodes, 12 untainted exceed max of 10, scale down by FastNodeRemovalRate below MaxNodes",
+			args{
+				func() []*v1.Node {
+					// 10 untainted + 2 tainted = 12 total nodes
+					untainted := test.BuildTestNodes(12, test.NodeOpts{
+						CPU: 2000,
+						Mem: 8000,
+					})
+					tainted := test.BuildTestNodes(2, test.NodeOpts{
+						CPU:     2000,
+						Mem:     8000,
+						Tainted: true,
+					})
+					return append(untainted, tainted...)  
+				}(),
+				buildTestPods(10, 500, 1000), // 20% CPU utilization, should scale down by FastNodeRemovalRate
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           5,
+					MaxNodes:                           10,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 50,
+					FastNodeRemovalRate:                4,
+				},
+				ListerOptions{},
+			},
+			-4,
+			nil,
+		},
+		{
+			"12 nodes, 8 untainted dont exceed max of 10, no scale down",
+			args{
+				func() []*v1.Node {
+					// 8 untainted + 4 tainted = 12 total nodes
+					untainted := test.BuildTestNodes(8, test.NodeOpts{
+						CPU: 2000,
+						Mem: 8000,
+					})
+					tainted := test.BuildTestNodes(4, test.NodeOpts{
+						CPU:     2000,
+						Mem:     8000,
+						Tainted: true,
+					})
+					return append(untainted, tainted...)
+				}(),
+				buildTestPods(20, 500, 1000),   // 62% CPU utilization, normally no scaling
+				NodeGroupOptions{
+					Name:                               "default",
+					CloudProviderGroupName:             "default",
+					MinNodes:                           5,
+					MaxNodes:                           10,
+					ScaleUpThresholdPercent:            70,
+					TaintLowerCapacityThresholdPercent: 40,
+					TaintUpperCapacityThresholdPercent: 50,
+				},
+				ListerOptions{},
+			},
+			0,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeGroups := []NodeGroupOptions{tt.args.nodeGroupOptions}
+			ngName := tt.args.nodeGroupOptions.Name
+			client, opts, err := buildTestClient(tt.args.nodes, tt.args.pods, nodeGroups, tt.args.listerOptions)
+			require.NoError(t, err)
+
+			// For these test cases we only use 1 node group/cloud provider node group
+			nodeGroupSize := 1
+
+			// Create a test (mock) cloud provider
+			testCloudProvider := test.NewCloudProvider(nodeGroupSize)
+			testNodeGroup := test.NewNodeGroup(
+				tt.args.nodeGroupOptions.CloudProviderGroupName,
+				tt.args.nodeGroupOptions.Name,
+				int64(tt.args.nodeGroupOptions.MinNodes),
+				int64(tt.args.nodeGroupOptions.MaxNodes),
+				int64(len(tt.args.nodes)),
+			)
+			testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+			// Create a node group state with the mapping of node groups to the cloud providers node groups
+			nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+				nodeGroups: nodeGroups,
+				client:     *client,
+			})
+
+			controller := &Controller{
+				Client:        client,
+				Opts:          opts,
+				stopChan:      nil,
+				nodeGroups:    nodeGroupsState,
+				cloudProvider: testCloudProvider,
+			}
+
+			nodesDelta, err := controller.scaleNodeGroup(ngName, nodeGroupsState[ngName])
+
+			// Ensure there were no errors
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, tt.err, err.Error())
+			}
+
+			assert.Equal(t, tt.expectedNodeDelta, nodesDelta)
 		})
 	}
 }
