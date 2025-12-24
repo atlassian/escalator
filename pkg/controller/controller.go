@@ -468,9 +468,9 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 
 	if actionErr != nil {
 		switch actionErr.(type) {
-		// early return when node is NOT in expected node group
+		// log error when node is NOT in expected node group and continue
 		case *cloudprovider.NodeNotInNodeGroup:
-			return 0, actionErr
+			log.WithField("nodegroup", nodegroup).Errorf("Node not in node group, skipping: %v", actionErr)
 		default:
 			log.WithField("nodegroup", nodegroup).Error(actionErr)
 		}
@@ -683,13 +683,12 @@ func (c *Controller) RunOnce() error {
 		state.scaleDelta = delta
 		if err != nil {
 			switch err.(type) {
-			// return error which will cause app erroring out
+			// log error when node is NOT in expected node group and continue
 			case *cloudprovider.NodeNotInNodeGroup:
-				return err
+				log.WithField("nodegroup", nodeGroupOpts.Name).Errorf("Node not in node group, continuing: %v", err)
 			default:
 				log.Warn(err)
 			}
-
 		}
 	}
 

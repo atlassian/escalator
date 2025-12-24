@@ -23,13 +23,15 @@ const (
 func (c *Controller) ScaleDown(opts scaleOpts) (int, error) {
 	removed, err := c.TryRemoveTaintedNodes(opts, true)
 	if err != nil {
-		switch err.(type) {
-		// early return when node not in expected autoscaling group is found
+		switch e := err.(type) {
+		// log error when node not in expected autoscaling group is found and continue
 		case *cloudprovider.NodeNotInNodeGroup:
-			return 0, err
+			log.WithError(err).Warning("Node not in node group during scale down, continuing")
+			metrics.NodeDeleteErrors.WithLabelValues(opts.nodeGroup.Opts.Name, e.NodeName).Inc()
 		default:
 			// continue instead of exiting, because reaping nodes is separate than tainting
 			log.WithError(err).Warning("Reaping nodes failed")
+			metrics.NodeDeleteErrors.WithLabelValues(opts.nodeGroup.Opts.Name, "").Inc()
 		}
 	}
 	log.Infof("Reaper: There were %v empty nodes deleted this round", removed)
