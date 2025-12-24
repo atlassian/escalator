@@ -253,8 +253,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	metrics.NodeGroupNodesForceTainted.WithLabelValues(nodegroup).Set(float64(len(forceTaintedNodes)))
 	metrics.NodeGroupPods.WithLabelValues(nodegroup).Set(float64(len(pods)))
 
-	// We want to be really simple right now so we don't do anything if we are outside the range of allowed nodes
-	// We assume it is a config error or something bad has gone wrong in the cluster
+	// We dont need to handle the case where node count <  minimum, but we do handle the case where node count > maximum
 
 	if len(allNodes) == 0 && len(pods) == 0 {
 		log.WithField("nodegroup", nodegroup).Info("no pods requests and remain 0 node for node group")
@@ -267,15 +266,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 			"Node count of %v less than minimum of %v",
 			len(allNodes),
 			nodeGroup.Opts.MinNodes,
-		)
-		return 0, err
-	}
-	if len(allNodes) > nodeGroup.Opts.MaxNodes {
-		err = errors.New("node count larger than the maximum")
-		log.WithField("nodegroup", nodegroup).Warningf(
-			"Node count of %v larger than maximum of %v",
-			len(allNodes),
-			nodeGroup.Opts.MaxNodes,
 		)
 		return 0, err
 	}
@@ -343,7 +333,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Metrics
-	log.WithField("nodegroup", nodegroup).Infof("cpu: %v, memory: %v", cpuPercent, memPercent)
+	log.WithField("nodegroup", nodegroup).Infof("cpu: %.2f%%, memory: %.2f%%", cpuPercent, memPercent)
 
 	// on the case that we're scaling up from 0, emit 0 as the metrics to keep metrics sane
 	if cpuPercent == math.MaxFloat64 || memPercent == math.MaxFloat64 {
@@ -405,6 +395,16 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		log.WithField("nodegroup", nodegroup).
 			Info("Setting scale to minimum of 1 to rotate out a node older than the max node age")
 		nodesDelta = int(math.Max(float64(nodesDelta), 1))
+	}
+
+	// Check if desired was set to higher than max
+	if len(untaintedNodes) > nodeGroup.Opts.MaxNodes {
+		excessNodes := len(untaintedNodes) - nodeGroup.Opts.MaxNodes
+		log.WithField("nodegroup", nodegroup).
+			Infof("Node count %v exceeds maximum %v. Forcing scale down of %v nodes",
+				len(untaintedNodes), nodeGroup.Opts.MaxNodes, excessNodes)
+		// Scale down at least the excess amount
+		nodesDelta = int(math.Min(float64(nodesDelta), float64(-excessNodes)))
 	}
 
 	log.WithField("nodegroup", nodegroup).Debugf("Delta: %v", nodesDelta)
