@@ -317,6 +317,15 @@ var (
 		},
 		[]string{"cloud_provider", "id", "node_group"},
 	)
+	// NodeDeleteErrors counts the number of node deletion errors
+	NodeDeleteErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      "node_delete_errors",
+			Namespace: NAMESPACE,
+			Help:      "number of node deletion errors due to node not being in the expected node group",
+		},
+		[]string{"node_group", "node"},
+	)
 )
 
 func init() {
@@ -353,6 +362,7 @@ func init() {
 	prometheus.MustRegister(CloudProviderMaxSize)
 	prometheus.MustRegister(CloudProviderTargetSize)
 	prometheus.MustRegister(CloudProviderSize)
+	prometheus.MustRegister(NodeDeleteErrors)
 }
 
 // Start starts the metrics endpoint on a new routine
