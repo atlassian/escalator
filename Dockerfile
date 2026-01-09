@@ -7,7 +7,7 @@ COPY cmd cmd
 COPY pkg pkg
 RUN make build ENVVAR=$ENVVAR
 
-FROM alpine:3.16
+FROM alpine:20251224
 RUN apk --no-cache add ca-certificates
 COPY --from=builder /go/src/github.com/atlassian/escalator/escalator ./main
 CMD [ "./main" ]
