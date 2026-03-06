@@ -1497,3 +1497,304 @@ func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
 		})
 	}
 }
+
+func TestScaleDownCoolDown(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+
+	buildTestNodesForScaleDown := func(count int) []*v1.Node {
+		return test.BuildTestNodes(count, test.NodeOpts{
+			CPU: 2000,
+			Mem: 8000,
+		})
+	}
+
+	t.Run("scale-down cooldown blocks further taint actions while locked", func(t *testing.T) {
+		nodeGroupOpts := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                4,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			ScaleDownCoolDownPeriod:            "5m",
+			TaintEffect:                        "NoSchedule",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+		nodes := buildTestNodesForScaleDown(10)
+		pods := buildTestPods(0, 0, 0) // No pods = low utilization = scale down
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupOpts.CloudProviderGroupName,
+			nodeGroupOpts.Name,
+			int64(nodeGroupOpts.MinNodes),
+			int64(nodeGroupOpts.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		// First run should scale down (taint nodes)
+		nodesDelta1, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta1) // FastNodeRemovalRate = 4
+
+		// Second run should be blocked by cooldown
+		nodesDelta2, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, 0, nodesDelta2) // Blocked by cooldown
+	})
+
+	t.Run("scale-down cooldown does NOT block scale-up lock", func(t *testing.T) {
+		nodeGroupOpts := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                4,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			ScaleDownCoolDownPeriod:            "5m",
+			TaintEffect:                        "NoSchedule",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+		nodes := buildTestNodesForScaleDown(10)
+		pods := buildTestPods(0, 0, 0) // No pods = low utilization = scale down
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupOpts.CloudProviderGroupName,
+			nodeGroupOpts.Name,
+			int64(nodeGroupOpts.MinNodes),
+			int64(nodeGroupOpts.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		// First run should scale down and engage the scale-down lock
+		nodesDelta1, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta1)
+
+		// Verify scale-down lock is engaged but scale-up lock is not
+		assert.True(t, nodeGroupsState[nodeGroupOpts.Name].scaleDownLock.locked(), "scale-down lock should be engaged")
+		assert.False(t, nodeGroupsState[nodeGroupOpts.Name].scaleUpLock.locked(), "scale-up lock should NOT be engaged")
+	})
+
+	t.Run("scale-down cooldown with empty string has no effect (backwards compatibility)", func(t *testing.T) {
+		nodeGroupOpts := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                4,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			ScaleDownCoolDownPeriod:            "", // Empty = no cooldown
+			TaintEffect:                        "NoSchedule",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+		nodes := buildTestNodesForScaleDown(10)
+		pods := buildTestPods(0, 0, 0) // No pods = low utilization = scale down
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupOpts.CloudProviderGroupName,
+			nodeGroupOpts.Name,
+			int64(nodeGroupOpts.MinNodes),
+			int64(nodeGroupOpts.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		// First run should scale down
+		nodesDelta1, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta1)
+
+		// Second run should also scale down (no cooldown blocking)
+		nodesDelta2, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta2) // Not blocked, continues scaling down
+	})
+
+	t.Run("scale-down cooldown with 0s has no effect (backwards compatibility)", func(t *testing.T) {
+		nodeGroupOpts := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                4,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			ScaleDownCoolDownPeriod:            "0s", // Zero = no cooldown
+			TaintEffect:                        "NoSchedule",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+		nodes := buildTestNodesForScaleDown(10)
+		pods := buildTestPods(0, 0, 0) // No pods = low utilization = scale down
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupOpts.CloudProviderGroupName,
+			nodeGroupOpts.Name,
+			int64(nodeGroupOpts.MinNodes),
+			int64(nodeGroupOpts.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		// First run should scale down
+		nodesDelta1, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta1)
+
+		// Second run should also scale down (no cooldown blocking with 0s)
+		nodesDelta2, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta2) // Not blocked, continues scaling down
+	})
+
+	t.Run("scale-down cooldown unlocks after configured duration", func(t *testing.T) {
+		nodeGroupOpts := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                4,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			ScaleDownCoolDownPeriod:            "1ns", // Very short for immediate unlock
+			TaintEffect:                        "NoSchedule",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+		nodes := buildTestNodesForScaleDown(10)
+		pods := buildTestPods(0, 0, 0) // No pods = low utilization = scale down
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroupOpts.CloudProviderGroupName,
+			nodeGroupOpts.Name,
+			int64(nodeGroupOpts.MinNodes),
+			int64(nodeGroupOpts.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		// First run should scale down
+		nodesDelta1, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta1)
+
+		// With 1ns cooldown, it should have expired by the next call
+		// Second run should also scale down (cooldown expired almost immediately)
+		nodesDelta2, err := controller.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+		require.NoError(t, err)
+		assert.Equal(t, -4, nodesDelta2) // Cooldown expired, can scale down again
+	})
+}

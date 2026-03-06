@@ -212,6 +212,11 @@ func (c *Controller) scaleDownTaint(opts scaleOpts) (int, error) {
 	tainted := c.taintOldestN(opts.untaintedNodes, opts.nodeGroup, nodesToRemove)
 
 	log.WithField("nodegroup", nodegroupName).Infof("Tainted a total of %v nodes", len(tainted))
+
+	if len(tainted) > 0 {
+		opts.nodeGroup.scaleDownLock.lock(len(tainted))
+	}
+
 	return len(tainted), nil
 }
 
