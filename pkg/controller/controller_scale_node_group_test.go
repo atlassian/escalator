@@ -1497,3 +1497,221 @@ func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
 		})
 	}
 }
+
+func TestIncludeTaintedInCapacity(t *testing.T) {
+	t.Run("tainted nodes included in denominator prevents artificial utilisation spike", func(t *testing.T) {
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			ScaleUpThresholdPercent:            80,
+			FastNodeRemovalRate:                3,
+			SlowNodeRemovalRate:                1,
+			SoftDeleteGracePeriod:              "5m",
+			HardDeleteGracePeriod:              "10m",
+			ScaleUpCoolDownPeriod:              "1m",
+			TaintEffect:                        "NoSchedule",
+			IncludeTaintedInCapacity:           true,
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		// 5 untainted nodes + 5 tainted nodes = 10 total
+		untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{
+			CPU: 1000,
+			Mem: 1000,
+		})
+		taintedNodes := test.BuildTestNodes(5, test.NodeOpts{
+			CPU:     1000,
+			Mem:     1000,
+			Tainted: true,
+		})
+		allNodes := append(untaintedNodes, taintedNodes...)
+
+		pods := test.BuildTestPods(9, test.PodOpts{
+			CPU: []int64{500},
+			Mem: []int64{500},
+		})
+
+		client, opts, err := buildTestClient(allNodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(allNodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		nodesDelta, err := controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		// With flag enabled, utilisation = 45% (not 90%), so no scale up
+		assert.LessOrEqual(t, nodesDelta, 0)
+	})
+
+	t.Run("flag disabled preserves existing behavior", func(t *testing.T) {
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			ScaleUpThresholdPercent:            80,
+			FastNodeRemovalRate:                3,
+			SlowNodeRemovalRate:                1,
+			SoftDeleteGracePeriod:              "5m",
+			HardDeleteGracePeriod:              "10m",
+			ScaleUpCoolDownPeriod:              "1m",
+			TaintEffect:                        "NoSchedule",
+			IncludeTaintedInCapacity:           false, // Default behavior
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		// 5 untainted nodes + 5 tainted nodes = 10 total
+		untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{
+			CPU: 1000,
+			Mem: 1000,
+		})
+		taintedNodes := test.BuildTestNodes(5, test.NodeOpts{
+			CPU:     1000,
+			Mem:     1000,
+			Tainted: true,
+		})
+		allNodes := append(untaintedNodes, taintedNodes...)
+
+		pods := test.BuildTestPods(9, test.PodOpts{
+			CPU: []int64{500},
+			Mem: []int64{500},
+		})
+
+		client, opts, err := buildTestClient(allNodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(allNodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		nodesDelta, err := controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		// With flag disabled, utilisation = 90% > 80%, triggers scale up
+		assert.Greater(t, nodesDelta, 0)
+	})
+
+	t.Run("force-tainted and cordoned nodes are never included", func(t *testing.T) {
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			ScaleUpThresholdPercent:            80,
+			FastNodeRemovalRate:                3,
+			SlowNodeRemovalRate:                1,
+			SoftDeleteGracePeriod:              "5m",
+			HardDeleteGracePeriod:              "10m",
+			ScaleUpCoolDownPeriod:              "1m",
+			TaintEffect:                        "NoSchedule",
+			IncludeTaintedInCapacity:           true,
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		untaintedNodes := test.BuildTestNodes(3, test.NodeOpts{
+			CPU: 1000,
+			Mem: 1000,
+		})
+		taintedNodes := test.BuildTestNodes(2, test.NodeOpts{
+			CPU:     1000,
+			Mem:     1000,
+			Tainted: true,
+		})
+		forceTaintedNodes := test.BuildTestNodes(2, test.NodeOpts{
+			CPU:          1000,
+			Mem:          1000,
+			ForceTainted: true,
+		})
+		cordonedNodes := test.BuildTestNodes(2, test.NodeOpts{
+			CPU:           1000,
+			Mem:           1000,
+			Unschedulable: true,
+		})
+		allNodes := append(append(append(untaintedNodes, taintedNodes...), forceTaintedNodes...), cordonedNodes...)
+
+		pods := test.BuildTestPods(5, test.PodOpts{
+			CPU: []int64{500},
+			Mem: []int64{500},
+		})
+
+		client, opts, err := buildTestClient(allNodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(allNodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		nodesDelta, err := controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		// Capacity = 5 nodes (3 untainted + 2 tainted), utilisation = 50%
+		assert.Equal(t, -nodeGroup.SlowNodeRemovalRate, nodesDelta)
+	})
+}
