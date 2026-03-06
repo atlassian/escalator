@@ -2,6 +2,7 @@ package controller
 
 import (
 	"math"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/pkg/errors"
@@ -90,6 +91,21 @@ func (c *Controller) taintInstances(sortedNodes nodesByOldestCreationTime, nodeG
 		// stop at max (or when array is fully iterated)
 		if len(taintedIndices) >= max {
 			break
+		}
+
+		// Skip nodes within the untaint grace period
+		if nodeGroup.Opts.UntaintGracePeriodDuration() > 0 {
+			if untaintTime, exists := nodeGroup.untaintTracker[bundle.node.Name]; exists {
+				if time.Since(untaintTime) < nodeGroup.Opts.UntaintGracePeriodDuration() {
+					log.WithField("nodegroup", nodeGroup.Opts.Name).Infof(
+						"Skipping taint of node %v: untainted %v ago, grace period %v",
+						bundle.node.Name,
+						time.Since(untaintTime).Round(time.Second),
+						nodeGroup.Opts.UntaintGracePeriodDuration(),
+					)
+					continue
+				}
+			}
 		}
 
 		// only actually taint in non-dry mode

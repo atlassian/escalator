@@ -49,6 +49,11 @@ type NodeGroupOptions struct {
 
 	MaxNodeAge string `json:"max_node_age,omitempty" yaml:"max_node_age,omitempty"`
 
+	// UntaintGracePeriod is the duration to wait after untainting a node before
+	// it can be re-tainted. This gives the scheduler time to fill the node and
+	// gives Escalator a stable signal before deciding whether to remove it again.
+	UntaintGracePeriod string `json:"untaint_grace_period,omitempty" yaml:"untaint_grace_period,omitempty"`
+
 	// UnhealthyNodeGracePeriod is the duration to wait before testing if a node
 	// can be considered unhealthy.
 	UnhealthyNodeGracePeriod string `json:"unhealthy_node_grace_period,omitempty" yaml:"unhealthy_node_grace_period,omitempty"`
@@ -68,6 +73,7 @@ type NodeGroupOptions struct {
 	hardDeleteGracePeriodDuration    time.Duration
 	scaleUpCoolDownPeriodDuration    time.Duration
 	maxNodeAgeDuration               time.Duration
+	untaintGracePeriodDuration       time.Duration
 	unhealthyNodeGracePeriodDuration time.Duration
 }
 
@@ -144,6 +150,11 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(validAWSLifecycle(nodegroup.AWS.Lifecycle), "aws.lifecycle must be '%v' or '%v' if provided.", aws.LifecycleOnDemand, aws.LifecycleSpot)
 
 	checkThat(validMaxNodeAgeDuration(nodegroup.MaxNodeAge), "max_node_age failed to parse into a time.Duration. Set to '0' or '' to disable, or a positive Go duration to enable.")
+
+	// UntaintGracePeriod is an optional parameter.
+	if len(nodegroup.UntaintGracePeriod) > 0 {
+		checkThat(nodegroup.UntaintGracePeriodDuration() >= 0, "untaint_grace_period failed to parse into a time.Duration. check your formatting.")
+	}
 
 	// UnhealthyNodeGracePeriod is an optional parameter.
 	if len(nodegroup.UnhealthyNodeGracePeriod) > 0 {
@@ -225,6 +236,19 @@ func (n *NodeGroupOptions) MaxNodeAgeDuration() time.Duration {
 	}
 
 	return n.maxNodeAgeDuration
+}
+
+// UntaintGracePeriodDuration lazily returns/parses the untaintGracePeriod string into a duration
+func (n *NodeGroupOptions) UntaintGracePeriodDuration() time.Duration {
+	if n.untaintGracePeriodDuration == 0 {
+		duration, err := time.ParseDuration(n.UntaintGracePeriod)
+		if err != nil {
+			return 0
+		}
+		n.untaintGracePeriodDuration = duration
+	}
+
+	return n.untaintGracePeriodDuration
 }
 
 // UnhealthyNodeGracePeriodDuration lazily returns/parses the unhealthyNodeGracePeriod string into a duration
@@ -387,6 +411,7 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
 				nodegroup:           ng.Name,
 			},
+			untaintTracker: make(map[string]time.Time),
 		}
 	}
 	return nodeGroupsState
