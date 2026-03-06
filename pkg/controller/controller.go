@@ -237,6 +237,13 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// Filter into untainted and tainted nodes
 	untaintedNodes, taintedNodes, forceTaintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
+	// Determine which nodes count toward capacity for utilisation calculation
+	capacityNodes := untaintedNodes
+	if nodeGroup.Opts.IncludeTaintedInCapacity {
+		capacityNodes = append(append([]*v1.Node{}, untaintedNodes...), taintedNodes...)
+		log.WithField("nodegroup", nodegroup).Infof("Including %v tainted nodes in capacity calculation (total capacity nodes: %v)", len(taintedNodes), len(capacityNodes))
+	}
+
 	// Metrics and Logs
 	log.WithField("nodegroup", nodegroup).Infof("pods total: %v", len(pods))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining total: %v", len(allNodes))
@@ -274,14 +281,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// for working out which pods are on which nodes
 	nodeGroup.NodeInfoMap = k8s.CreateNodeNameToInfoMap(pods, allNodes)
 
-	// Calc capacity for untainted nodes
+	// Calc capacity for nodes included in utilisation calculation
 	podRequests, err := k8s.CalculatePodsRequestedUsage(pods)
 	if err != nil {
 		log.Errorf("Failed to calculate requests: %v", err)
 		return 0, err
 	}
 
-	nodeCapacity, err := k8s.CalculateNodesCapacity(untaintedNodes, pods)
+	nodeCapacity, err := k8s.CalculateNodesCapacity(capacityNodes, pods)
 	if err != nil {
 		log.Errorf("Failed to calculate capacity: %v", err)
 		return 0, err
@@ -319,14 +326,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	}
 
 	// Calc %
-	// both cpu and memory capacity are based on number of untainted nodes
-	// pass number of untainted nodes in to help make decision if it's a scaling-up-from-0
+	// both cpu and memory capacity are based on number of capacity nodes
+	// pass number of capacity nodes in to help make decision if it's a scaling-up-from-0
 	cpuPercent, memPercent, err := calcPercentUsage(
 		*podRequests.Total.GetCPUQuantity(),
 		*podRequests.Total.GetMemoryQuantity(),
 		*nodeCapacity.Total.GetCPUQuantity(),
 		*nodeCapacity.Total.GetMemoryQuantity(),
-		int64(len(untaintedNodes)))
+		int64(len(capacityNodes)))
 	if err != nil {
 		log.Errorf("Failed to calculate percentages: %v", err)
 		return 0, err
@@ -374,7 +381,7 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		// we want to add enough nodes such that the maxPercentage cluster util
 		// drops back below ScaleUpThresholdPercent
 		nodesDelta, err = calcScaleUpDelta(
-			untaintedNodes,
+			capacityNodes,
 			cpuPercent,
 			memPercent,
 			*podRequests.Total.GetCPUQuantity(),
