@@ -41,7 +41,8 @@ type NodeGroupOptions struct {
 	SoftDeleteGracePeriod string `json:"soft_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 	HardDeleteGracePeriod string `json:"hard_delete_grace_period,omitempty" yaml:"soft_delete_grace_period,omitempty"`
 
-	ScaleUpCoolDownPeriod string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
+	ScaleUpCoolDownPeriod   string `json:"scale_up_cool_down_period,omitempty" yaml:"scale_up_cool_down_period,omitempty"`
+	ScaleDownCoolDownPeriod string `json:"scale_down_cool_down_period,omitempty" yaml:"scale_down_cool_down_period,omitempty"`
 
 	TaintEffect v1.TaintEffect `json:"taint_effect,omitempty" yaml:"taint_effect,omitempty"`
 
@@ -67,6 +68,7 @@ type NodeGroupOptions struct {
 	softDeleteGracePeriodDuration    time.Duration
 	hardDeleteGracePeriodDuration    time.Duration
 	scaleUpCoolDownPeriodDuration    time.Duration
+	scaleDownCoolDownPeriodDuration  time.Duration
 	maxNodeAgeDuration               time.Duration
 	unhealthyNodeGracePeriodDuration time.Duration
 }
@@ -137,7 +139,12 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(nodegroup.SoftDeleteGracePeriodDuration() < nodegroup.HardDeleteGracePeriodDuration(), "soft_delete_grace_period must be less than hard_delete_grace_period")
 
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
-	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
+	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "scale_up_cool_down_period failed to parse into a time.Duration. check your formatting.")
+
+	// ScaleDownCoolDownPeriod is optional for backwards compatibility
+	if len(nodegroup.ScaleDownCoolDownPeriod) > 0 {
+		checkThat(nodegroup.ScaleDownCoolDownPeriodDuration() >= 0, "scale_down_cool_down_period failed to parse into a time.Duration. check your formatting.")
+	}
 
 	checkThat(validTaintEffect(nodegroup.TaintEffect), "taint_effect must be valid kubernetes taint")
 
@@ -213,6 +220,19 @@ func (n *NodeGroupOptions) ScaleUpCoolDownPeriodDuration() time.Duration {
 	}
 
 	return n.scaleUpCoolDownPeriodDuration
+}
+
+// ScaleDownCoolDownPeriodDuration lazily returns/parses the scaleDownCoolDownPeriod string into a duration
+func (n *NodeGroupOptions) ScaleDownCoolDownPeriodDuration() time.Duration {
+	if n.scaleDownCoolDownPeriodDuration == 0 {
+		duration, err := time.ParseDuration(n.ScaleDownCoolDownPeriod)
+		if err != nil {
+			return 0
+		}
+		n.scaleDownCoolDownPeriodDuration = duration
+	}
+
+	return n.scaleDownCoolDownPeriodDuration
 }
 
 func (n *NodeGroupOptions) MaxNodeAgeDuration() time.Duration {
@@ -385,6 +405,10 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 			// Setup the scaleLock timeouts for this nodegroup
 			scaleUpLock: scaleLock{
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
+				nodegroup:           ng.Name,
+			},
+			scaleDownLock: scaleLock{
+				minimumLockDuration: ng.ScaleDownCoolDownPeriodDuration(),
 				nodegroup:           ng.Name,
 			},
 		}
