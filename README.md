@@ -122,3 +122,4 @@ those contributing as an individual.
 
 Copyright (c) 2018 Atlassian and others.
 Apache 2.0 licensed, see [LICENSE](./LICENSE) file.
+
