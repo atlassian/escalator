@@ -1497,3 +1497,405 @@ func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
 		})
 	}
 }
+
+func TestUntaintGracePeriod(t *testing.T) {
+	t.Run("recently untainted node is not re-tainted", func(t *testing.T) {
+		// Set up 10 nodes with low utilisation (triggers taint)
+		nodes := buildTestNodes(10, 1000, 1000)
+		pods := buildTestPods(5, 100, 100) // ~5% utilization, should trigger fast scale down
+
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                5,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			UntaintGracePeriod:                 "10m",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		// Manually record an untaint timestamp for 2 nodes (recently untainted)
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[0].Name] = stdtime.Now()
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[1].Name] = stdtime.Now()
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		_, tainted, _, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
+
+		for _, taintedNode := range tainted {
+			assert.NotEqual(t, nodes[0].Name, taintedNode.Name, "Node %s should not be tainted (within grace period)", nodes[0].Name)
+			assert.NotEqual(t, nodes[1].Name, taintedNode.Name, "Node %s should not be tainted (within grace period)", nodes[1].Name)
+		}
+
+		assert.LessOrEqual(t, len(tainted), 5, "Should not taint more than FastNodeRemovalRate nodes")
+		assert.Greater(t, len(tainted), 0, "Should have tainted some nodes")
+	})
+
+	t.Run("expired grace period allows re-tainting", func(t *testing.T) {
+		nodes := buildTestNodes(10, 1000, 1000)
+		pods := buildTestPods(5, 100, 100) // ~5% utilization, triggers fast scale down
+
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                5,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			UntaintGracePeriod:                 "10m",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		// Record untaint timestamp as 15 minutes ago (past the 10-minute grace period)
+		expiredTime := stdtime.Now().Add(-15 * stdtime.Minute)
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[0].Name] = expiredTime
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[1].Name] = expiredTime
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		_, tainted, _, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
+
+		assert.Equal(t, 5, len(tainted), "Should taint FastNodeRemovalRate nodes when grace period expired")
+	})
+
+	t.Run("grace period of 0s has no effect (backwards compatibility)", func(t *testing.T) {
+		nodes := buildTestNodes(10, 1000, 1000)
+		pods := buildTestPods(5, 100, 100) // ~5% utilization
+
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                5,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			UntaintGracePeriod:                 "", // Empty = disabled
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		// Record untaint timestamps - should be ignored when grace period is 0
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[0].Name] = stdtime.Now()
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[1].Name] = stdtime.Now()
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		_, tainted, _, _ := controller.filterNodes(nodeGroupsState[nodeGroup.Name], nodes)
+
+		assert.Equal(t, 5, len(tainted), "Should taint FastNodeRemovalRate nodes when grace period is disabled")
+	})
+
+	t.Run("stale tracker entries are cleaned up", func(t *testing.T) {
+		nodes := buildTestNodes(5, 1000, 1000)
+		pods := buildTestPods(10, 100, 100) // normal utilization
+
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           2,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                5,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			UntaintGracePeriod:                 "10m",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		// Add entries for existing nodes
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[0].Name] = stdtime.Now()
+		nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[1].Name] = stdtime.Now()
+
+		// Add stale entries for nodes that don't exist
+		nodeGroupsState[nodeGroup.Name].untaintTracker["non-existent-node-1"] = stdtime.Now()
+		nodeGroupsState[nodeGroup.Name].untaintTracker["non-existent-node-2"] = stdtime.Now()
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		assert.Equal(t, 4, len(nodeGroupsState[nodeGroup.Name].untaintTracker), "Should have 4 tracker entries before cleanup")
+
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, len(nodeGroupsState[nodeGroup.Name].untaintTracker), "Should have 2 tracker entries after cleanup")
+		_, exists1 := nodeGroupsState[nodeGroup.Name].untaintTracker["non-existent-node-1"]
+		_, exists2 := nodeGroupsState[nodeGroup.Name].untaintTracker["non-existent-node-2"]
+		assert.False(t, exists1, "Stale entry 'non-existent-node-1' should be removed")
+		assert.False(t, exists2, "Stale entry 'non-existent-node-2' should be removed")
+
+		_, exists := nodeGroupsState[nodeGroup.Name].untaintTracker[nodes[0].Name]
+		assert.True(t, exists, "Valid entry for existing node should remain")
+	})
+
+	t.Run("untaint records timestamp in wet mode", func(t *testing.T) {
+		// Set up nodes where some are tainted
+		taintedNodes := test.BuildTestNodes(3, test.NodeOpts{
+			CPU:     1000,
+			Mem:     1000,
+			Tainted: true,
+		})
+		untaintedNodes := test.BuildTestNodes(2, test.NodeOpts{
+			CPU: 1000,
+			Mem: 1000,
+		})
+		nodes := append(taintedNodes, untaintedNodes...)
+
+		// High utilization to trigger scale up (untaint)
+		pods := buildTestPods(10, 500, 500) // High utilization
+
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           5,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                5,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			UntaintGracePeriod:                 "10m",
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		assert.Equal(t, 0, len(nodeGroupsState[nodeGroup.Name].untaintTracker), "Tracker should be empty before untaint")
+
+		beforeTime := stdtime.Now()
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+		afterTime := stdtime.Now()
+
+		for nodeName, untaintTime := range nodeGroupsState[nodeGroup.Name].untaintTracker {
+			assert.True(t, untaintTime.After(beforeTime) || untaintTime.Equal(beforeTime),
+				"Untaint time for %s should be after or equal to beforeTime", nodeName)
+			assert.True(t, untaintTime.Before(afterTime) || untaintTime.Equal(afterTime),
+				"Untaint time for %s should be before or equal to afterTime", nodeName)
+		}
+	})
+
+	t.Run("dry mode also records untaint timestamps", func(t *testing.T) {
+		// Set up nodes
+		nodes := buildTestNodes(5, 1000, 1000)
+
+		// High utilization to trigger scale up (untaint)
+		pods := buildTestPods(10, 500, 500)
+
+		nodeGroup := NodeGroupOptions{
+			Name:                               "default",
+			CloudProviderGroupName:             "default",
+			MinNodes:                           5,
+			MaxNodes:                           20,
+			ScaleUpThresholdPercent:            70,
+			TaintLowerCapacityThresholdPercent: 40,
+			TaintUpperCapacityThresholdPercent: 60,
+			FastNodeRemovalRate:                5,
+			SlowNodeRemovalRate:                2,
+			SoftDeleteGracePeriod:              "1m",
+			HardDeleteGracePeriod:              "2m",
+			ScaleUpCoolDownPeriod:              "1m",
+			UntaintGracePeriod:                 "10m",
+			DryMode:                            true, // Enable dry mode
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroup}
+
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testNodeGroup := test.NewNodeGroup(
+			nodeGroup.CloudProviderGroupName,
+			nodeGroup.Name,
+			int64(nodeGroup.MinNodes),
+			int64(nodeGroup.MaxNodes),
+			int64(len(nodes)),
+		)
+		testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+			nodeGroups: nodeGroups,
+			client:     *client,
+		})
+
+		// Simulate some nodes being tainted in dry mode
+		nodeGroupsState[nodeGroup.Name].taintTracker = []string{nodes[0].Name, nodes[1].Name, nodes[2].Name}
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			stopChan:      nil,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+
+		assert.Equal(t, 0, len(nodeGroupsState[nodeGroup.Name].untaintTracker), "Tracker should be empty before untaint")
+
+		beforeTime := stdtime.Now()
+		_, err = controller.scaleNodeGroup(nodeGroup.Name, nodeGroupsState[nodeGroup.Name])
+		require.NoError(t, err)
+		afterTime := stdtime.Now()
+
+		assert.Greater(t, len(nodeGroupsState[nodeGroup.Name].untaintTracker), 0, "Should have recorded untaint timestamps in dry mode")
+
+		for nodeName, untaintTime := range nodeGroupsState[nodeGroup.Name].untaintTracker {
+			assert.True(t, untaintTime.After(beforeTime) || untaintTime.Equal(beforeTime),
+				"Untaint time for %s should be after or equal to beforeTime", nodeName)
+			assert.True(t, untaintTime.Before(afterTime) || untaintTime.Equal(afterTime),
+				"Untaint time for %s should be before or equal to afterTime", nodeName)
+		}
+	})
+}

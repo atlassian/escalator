@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/atlassian/escalator/pkg/k8s"
 	"github.com/atlassian/escalator/pkg/metrics"
@@ -145,6 +146,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 				} else {
 					bundle.node = updatedNode
 					untaintedIndices = append(untaintedIndices, bundle.index)
+					nodeGroup.untaintTracker[bundle.node.Name] = time.Now()
 				}
 			}
 		} else {
@@ -159,6 +161,7 @@ func (c *Controller) untaintNewestN(nodes []*v1.Node, nodeGroup *NodeGroupState,
 				// Delete from tracker
 				nodeGroup.taintTracker = append(nodeGroup.taintTracker[:deleteIndex], nodeGroup.taintTracker[deleteIndex+1:]...)
 				untaintedIndices = append(untaintedIndices, bundle.index)
+				nodeGroup.untaintTracker[bundle.node.Name] = time.Now()
 				log.WithField("drymode", c.dryMode(nodeGroup)).Infof("Untainting node %v", bundle.node.Name)
 			}
 		}
