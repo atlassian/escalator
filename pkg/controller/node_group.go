@@ -63,6 +63,10 @@ type NodeGroupOptions struct {
 	// allowed in the nodegroup at any given time.
 	MaxUnhealthyNodesPercent int `json:"max_unhealthy_nodes_percent,omitempty" yaml:"max_unhealthy_nodes_percent,omitempty"`
 
+	// IncludeTaintedInCapacity includes tainted nodes in the capacity denominator
+	// for utilisation calculations, preventing artificial spikes when nodes are tainted.
+	IncludeTaintedInCapacity bool `json:"include_tainted_in_capacity,omitempty" yaml:"include_tainted_in_capacity,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration    time.Duration
 	hardDeleteGracePeriodDuration    time.Duration
