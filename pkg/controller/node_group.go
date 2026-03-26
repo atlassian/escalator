@@ -30,6 +30,8 @@ type NodeGroupOptions struct {
 
 	ScaleOnStarve bool `json:"scale_on_starve,omitempty" yaml:"scale_on_starve,omitempty"`
 
+	ExcludeUnavailableNodePods bool `json:"exclude_unavailable_node_pods,omitempty" yaml:"exclude_unavailable_node_pods,omitempty"`
+
 	TaintUpperCapacityThresholdPercent int `json:"taint_upper_capacity_threshold_percent,omitempty" yaml:"taint_upper_capacity_threshold_percent,omitempty"`
 	TaintLowerCapacityThresholdPercent int `json:"taint_lower_capacity_threshold_percent,omitempty" yaml:"taint_lower_capacity_threshold_percent,omitempty"`
 

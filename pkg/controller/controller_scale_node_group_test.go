@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"testing"
 	stdtime "time"
 
@@ -1152,7 +1153,7 @@ func TestScaleDesiredNodesExceedsMaxNodes(t *testing.T) {
 						Mem:     8000,
 						Tainted: true,
 					})
-					return append(untainted, tainted...)  
+					return append(untainted, tainted...)
 				}(),
 				buildTestPods(10, 500, 1000), // 20% CPU utilization, should scale down by FastNodeRemovalRate
 				NodeGroupOptions{
@@ -1185,7 +1186,7 @@ func TestScaleDesiredNodesExceedsMaxNodes(t *testing.T) {
 					})
 					return append(untainted, tainted...)
 				}(),
-				buildTestPods(20, 500, 1000),   // 62% CPU utilization, normally no scaling
+				buildTestPods(20, 500, 1000), // 62% CPU utilization, normally no scaling
 				NodeGroupOptions{
 					Name:                               "default",
 					CloudProviderGroupName:             "default",
@@ -1249,6 +1250,185 @@ func TestScaleDesiredNodesExceedsMaxNodes(t *testing.T) {
 			assert.Equal(t, tt.expectedNodeDelta, nodesDelta)
 		})
 	}
+}
+
+func TestScaleNodeGroupExcludeUnavailableNodePods(t *testing.T) {
+	buildController := func(t *testing.T, nodes []*v1.Node, pods []*v1.Pod, excludeUnavailableNodePods bool) (*Controller, map[string]*NodeGroupState) {
+		t.Helper()
+		nodeGroupOpts := NodeGroupOptions{
+			Name:                       "default",
+			CloudProviderGroupName:     "default",
+			MinNodes:                   5,
+			MaxNodes:                   100,
+			ScaleUpThresholdPercent:    70,
+			ExcludeUnavailableNodePods: excludeUnavailableNodePods,
+		}
+		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})
+		require.NoError(t, err)
+
+		testCloudProvider := test.NewCloudProvider(1)
+		testCloudProvider.RegisterNodeGroup(test.NewNodeGroup(
+			nodeGroupOpts.CloudProviderGroupName,
+			nodeGroupOpts.Name,
+			int64(nodeGroupOpts.MinNodes),
+			int64(nodeGroupOpts.MaxNodes),
+			int64(len(nodes)),
+		))
+		nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{nodeGroups: nodeGroups, client: *client})
+
+		controller := &Controller{
+			Client:        client,
+			Opts:          opts,
+			nodeGroups:    nodeGroupsState,
+			cloudProvider: testCloudProvider,
+		}
+		return controller, nodeGroupsState
+	}
+
+	t.Run("flag disabled - tainted node pods inflate utilisation, triggers scale up", func(t *testing.T) {
+		untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000})
+		taintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000, Tainted: true})
+		nodes := append(untaintedNodes, taintedNodes...)
+
+		// 25 pods on untainted nodes (50% utilisation of untainted capacity)
+		var pods []*v1.Pod
+		for i, node := range untaintedNodes {
+			for j := 0; j < 5; j++ {
+				pods = append(pods, test.BuildTestPod(test.PodOpts{
+					CPU:      []int64{200},
+					Mem:      []int64{800},
+					NodeName: node.Name,
+					Running:  true,
+					Phase:    v1.PodRunning,
+					Name:     fmt.Sprintf("untainted-pod-%d-%d", i, j),
+				}))
+			}
+		}
+		// 25 pods on tainted nodes
+		for i, node := range taintedNodes {
+			for j := 0; j < 5; j++ {
+				pods = append(pods, test.BuildTestPod(test.PodOpts{
+					CPU:      []int64{200},
+					Mem:      []int64{800},
+					NodeName: node.Name,
+					Running:  true,
+					Phase:    v1.PodRunning,
+					Name:     fmt.Sprintf("tainted-pod-%d-%d", i, j),
+				}))
+			}
+		}
+		controller, nodeGroupsState := buildController(t, nodes, pods, false)
+
+		// All 50 pods counted: 10000 CPU / 10000 untainted capacity = 100% > 70% threshold
+		nodesDelta, err := controller.scaleNodeGroup("default", nodeGroupsState["default"])
+		require.NoError(t, err)
+		assert.True(t, nodesDelta > 0, "expected scale up due to inflated utilisation but got delta %v", nodesDelta)
+	})
+
+	t.Run("flag enabled - accurate utilisation, no scale up", func(t *testing.T) {
+		untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000})
+		taintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000, Tainted: true})
+		nodes := append(untaintedNodes, taintedNodes...)
+
+		// 25 pods on untainted nodes (50% utilisation of untainted capacity)
+		var pods []*v1.Pod
+		for i, node := range untaintedNodes {
+			for j := 0; j < 5; j++ {
+				pods = append(pods, test.BuildTestPod(test.PodOpts{
+					CPU:      []int64{200},
+					Mem:      []int64{800},
+					NodeName: node.Name,
+					Running:  true,
+					Phase:    v1.PodRunning,
+					Name:     fmt.Sprintf("untainted-pod-%d-%d", i, j),
+				}))
+			}
+		}
+		// 25 pods on tainted nodes
+		for i, node := range taintedNodes {
+			for j := 0; j < 5; j++ {
+				pods = append(pods, test.BuildTestPod(test.PodOpts{
+					CPU:      []int64{200},
+					Mem:      []int64{800},
+					NodeName: node.Name,
+					Running:  true,
+					Phase:    v1.PodRunning,
+					Name:     fmt.Sprintf("tainted-pod-%d-%d", i, j),
+				}))
+			}
+		}
+		controller, nodeGroupsState := buildController(t, nodes, pods, false)
+
+		// Only untainted pods counted: 5000 CPU / 10000 untainted capacity = 50% < 70% threshold
+		nodesDelta, err := controller.scaleNodeGroup("default", nodeGroupsState["default"])
+		require.NoError(t, err)
+		assert.Equal(t, 0, nodesDelta)
+	})
+
+	t.Run("flag enabled - still scales up when genuinely overloaded on untainted nodes", func(t *testing.T) {
+		untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000})
+		taintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000, Tainted: true})
+		nodes := append(untaintedNodes, taintedNodes...)
+
+		// 40 heavy pods only on untainted nodes: 8000 CPU / 10000 capacity = 80%
+		var pods []*v1.Pod
+		for i, node := range untaintedNodes {
+			for j := 0; j < 8; j++ {
+				pods = append(pods, test.BuildTestPod(test.PodOpts{
+					CPU:      []int64{200},
+					Mem:      []int64{800},
+					NodeName: node.Name,
+					Running:  true,
+					Phase:    v1.PodRunning,
+					Name:     fmt.Sprintf("heavy-pod-%d-%d", i, j),
+				}))
+			}
+		}
+
+		controller, nodeGroupsState := buildController(t, nodes, pods, true)
+
+		// 80% > 70% threshold, should scale up
+		nodesDelta, err := controller.scaleNodeGroup("default", nodeGroupsState["default"])
+		require.NoError(t, err)
+		assert.True(t, nodesDelta > 0, "expected scale up but got delta %v", nodesDelta)
+	})
+
+	t.Run("flag enabled - pending unscheduled pods still count toward demand", func(t *testing.T) {
+		untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000})
+		taintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000, Tainted: true})
+		nodes := append(untaintedNodes, taintedNodes...)
+
+		// 25 moderate pods on untainted nodes (50% utilisation)
+		var pods []*v1.Pod
+		for i, node := range untaintedNodes {
+			for j := 0; j < 5; j++ {
+				pods = append(pods, test.BuildTestPod(test.PodOpts{
+					CPU:      []int64{200},
+					Mem:      []int64{800},
+					NodeName: node.Name,
+					Running:  true,
+					Phase:    v1.PodRunning,
+					Name:     fmt.Sprintf("moderate-pod-%d-%d", i, j),
+				}))
+			}
+		}
+		// Add a large pending unscheduled pod that pushes demand over the threshold
+		pods = append(pods, test.BuildTestPod(test.PodOpts{
+			CPU:     []int64{5000},
+			Mem:     []int64{20000},
+			Phase:   v1.PodPending,
+			Running: false,
+			Name:    "large-pending-pod",
+		}))
+
+		controller, nodeGroupsState := buildController(t, nodes, pods, true)
+
+		// 25 untainted pods (5000 CPU) + 1 pending (5000 CPU) = 10000 / 10000 = 100% > 70%
+		nodesDelta, err := controller.scaleNodeGroup("default", nodeGroupsState["default"])
+		require.NoError(t, err)
+		assert.True(t, nodesDelta > 0, "expected scale up due to pending pod but got delta %v", nodesDelta)
+	})
 }
 
 func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
@@ -1406,7 +1586,7 @@ func TestScaleNodeGroupNodeMaxAge(t *testing.T) {
 			"max_node_age enabled, scaled down to zero",
 			args{
 				nodes: []*v1.Node{},
-				pods: nil,
+				pods:  nil,
 				nodeGroupOptions: NodeGroupOptions{
 					Name:                    "default",
 					CloudProviderGroupName:  "default",
