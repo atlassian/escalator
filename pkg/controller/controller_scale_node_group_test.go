@@ -1252,16 +1252,16 @@ func TestScaleDesiredNodesExceedsMaxNodes(t *testing.T) {
 	}
 }
 
-func TestScaleNodeGroupExcludeTaintedNodePods(t *testing.T) {
-	buildController := func(t *testing.T, nodes []*v1.Node, pods []*v1.Pod, excludeTaintedNodePods bool) (*Controller, map[string]*NodeGroupState) {
+func TestScaleNodeGroupExcludeUnavailableNodePods(t *testing.T) {
+	buildController := func(t *testing.T, nodes []*v1.Node, pods []*v1.Pod, excludeUnavailableNodePods bool) (*Controller, map[string]*NodeGroupState) {
 		t.Helper()
 		nodeGroupOpts := NodeGroupOptions{
-			Name:                    "default",
-			CloudProviderGroupName:  "default",
-			MinNodes:                5,
-			MaxNodes:                100,
-			ScaleUpThresholdPercent: 70,
-			ExcludeTaintedNodePods:  excludeTaintedNodePods,
+			Name:                       "default",
+			CloudProviderGroupName:     "default",
+			MinNodes:                   5,
+			MaxNodes:                   100,
+			ScaleUpThresholdPercent:    70,
+			ExcludeUnavailableNodePods: excludeUnavailableNodePods,
 		}
 		nodeGroups := []NodeGroupOptions{nodeGroupOpts}
 		client, opts, err := buildTestClient(nodes, pods, nodeGroups, ListerOptions{})

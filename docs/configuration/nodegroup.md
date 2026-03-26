@@ -17,7 +17,7 @@ node_groups:
     max_nodes: 30
     dry_mode: false
     scale_on_starve: false
-    exclude_tainted_node_pods: false
+    exclude_unavailable_node_pods: false
     taint_upper_capacity_threshold_percent: 40
     taint_lower_capacity_threshold_percent: 10
     slow_node_removal_rate: 2
@@ -109,7 +109,7 @@ whenever there is a pod that cannot currently be scheduled due to no node having
 Warning: You have to be extra careful around pod request sizes not exceeding node capacity when this option is enabled,
 or you may find the escalator always creates the maximum number of nodes.
 
-### `exclude_tainted_node_pods`
+### `exclude_unavailable_node_pods`
 
 When enabled, Escalator will exclude pods running on unavailable nodes from demand in the utilisation calculation. Unavailable nodes are tainted, force tainted, and cordoned nodes.
 
