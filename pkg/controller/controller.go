@@ -237,8 +237,20 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// Filter into untainted and tainted nodes
 	untaintedNodes, taintedNodes, forceTaintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
+	// Filter to pods on untainted nodes
+	if nodeGroup.Opts.ExcludeTaintedNodePods {
+		untaintedPods := k8s.FilterPodsByNode(pods, untaintedNodes, true)
+		numberOfPods := len(pods)
+		numberOfExcludedPods := numberOfPods - len(untaintedPods)
+		pods = untaintedPods
+
+		log.WithField("nodegroup", nodegroup).Infof("pods total: %v (%v excluded from unavailable nodes)", numberOfPods, numberOfExcludedPods)
+		metrics.NodeGroupExcludedPods.WithLabelValues(nodegroup).Set(float64(numberOfExcludedPods))
+	} else {
+		log.WithField("nodegroup", nodegroup).Infof("pods total: %v", len(pods))
+	}
+
 	// Metrics and Logs
-	log.WithField("nodegroup", nodegroup).Infof("pods total: %v", len(pods))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining total: %v", len(allNodes))
 	log.WithField("nodegroup", nodegroup).Infof("cordoned nodes remaining total: %v", len(cordonedNodes))
 	log.WithField("nodegroup", nodegroup).Infof("nodes remaining untainted: %v", len(untaintedNodes))

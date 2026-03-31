@@ -71,6 +71,32 @@ func CalculatePodsRequestedUsage(pods []*v1.Pod) (PodRequestedUsage, error) {
 	return ret, nil
 }
 
+// FilterPodsByNode returns the list of pods that are scheduled to a node contained
+// in the provided list, optionally included unscheduled pods
+func FilterPodsByNode(pods []*v1.Pod, nodes []*v1.Node, includeUnscheduled bool) []*v1.Pod {
+	nodesMap := make(map[string]struct{})
+	for _, n := range nodes {
+		nodesMap[n.Name] = struct{}{} // marker
+	}
+
+	filtered := make([]*v1.Pod, 0, len(pods))
+	for _, pod := range pods {
+		name := pod.Spec.NodeName
+
+		// handle unscheduled pods
+		if len(name) == 0 && includeUnscheduled {
+			filtered = append(filtered, pod)
+			continue
+		}
+
+		_, found := nodesMap[name]
+		if found {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered
+}
+
 // CalculateNodesCapacity calculates the total Allocatable node capacity for all nodes,
 // as well as the 2 nodes with the largest available CPU and memory
 func CalculateNodesCapacity(nodes []*v1.Node, pods []*v1.Pod) (NodeAvailableCapacity, error) {
