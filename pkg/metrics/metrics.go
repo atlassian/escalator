@@ -72,6 +72,15 @@ var (
 		},
 		[]string{"node_group"},
 	)
+	// NodeGroupExcludedPods pods excluded from consideration by specific node groups
+	NodeGroupExcludedPods = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_excluded_pods",
+			Namespace: NAMESPACE,
+			Help:      "pods excluded from consideration by specific node groups (running on tainted or cordoned nodes)",
+		},
+		[]string{"node_group"},
+	)
 	// NodeGroupUnhealthy nodes considered by specific node groups that are unhealthy
 	NodeGroupUnhealthy = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
