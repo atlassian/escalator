@@ -218,6 +218,109 @@ func TestCalculatePodsRequestTotal(t *testing.T) {
 	}
 }
 
+func TestFilterPodsByNode(t *testing.T) {
+	nodeA := test.BuildTestNode(test.NodeOpts{Name: "node-a", CPU: 1000, Mem: 1000})
+	nodeB := test.BuildTestNode(test.NodeOpts{Name: "node-b", CPU: 1000, Mem: 1000})
+	nodeC := test.BuildTestNode(test.NodeOpts{Name: "node-c", CPU: 1000, Mem: 1000})
+
+	podOnA := test.BuildTestPod(test.PodOpts{Name: "pod-a", CPU: []int64{100}, Mem: []int64{100}, NodeName: "node-a"})
+	podOnA2 := test.BuildTestPod(test.PodOpts{Name: "pod-a2", CPU: []int64{100}, Mem: []int64{100}, NodeName: "node-a"})
+	podOnB := test.BuildTestPod(test.PodOpts{Name: "pod-b", CPU: []int64{100}, Mem: []int64{100}, NodeName: "node-b"})
+	podOnC := test.BuildTestPod(test.PodOpts{Name: "pod-c", CPU: []int64{100}, Mem: []int64{100}, NodeName: "node-c"})
+	unscheduledPod1 := test.BuildTestPod(test.PodOpts{Name: "unscheduled-1", CPU: []int64{100}, Mem: []int64{100}})
+	unscheduledPod2 := test.BuildTestPod(test.PodOpts{Name: "unscheduled-2", CPU: []int64{100}, Mem: []int64{100}})
+
+	type args struct {
+		pods               []*v1.Pod
+		nodes              []*v1.Node
+		includeUnscheduled bool
+	}
+	tests := []struct {
+		name     string
+		args     args
+		expected []*v1.Pod
+	}{
+		{
+			"empty pods and empty nodes",
+			args{
+				[]*v1.Pod{},
+				[]*v1.Node{},
+				true,
+			},
+			[]*v1.Pod{},
+		},
+		{
+			"pods matching nodes are included",
+			args{
+				[]*v1.Pod{podOnA, podOnB, podOnC},
+				[]*v1.Node{nodeA, nodeB, nodeC},
+				true,
+			},
+			[]*v1.Pod{podOnA, podOnB, podOnC},
+		},
+		{
+			"pods not matching nodes are excluded",
+			args{
+				[]*v1.Pod{podOnA, podOnC},
+				[]*v1.Node{nodeA, nodeB},
+				true,
+			},
+			[]*v1.Pod{podOnA},
+		},
+		{
+			"multiple pods on nodes are included",
+			args{
+				[]*v1.Pod{podOnA, podOnA2, podOnB},
+				[]*v1.Node{nodeA},
+				true,
+			},
+			[]*v1.Pod{podOnA, podOnA2},
+		},
+		{
+			"unscheduled pods included when flag is true",
+			args{
+				[]*v1.Pod{podOnA, podOnB, unscheduledPod1},
+				[]*v1.Node{nodeA},
+				true,
+			},
+			[]*v1.Pod{podOnA, unscheduledPod1},
+		},
+		{
+			"unscheduled pods excluded when flag is false",
+			args{
+				[]*v1.Pod{podOnA, podOnB, unscheduledPod1},
+				[]*v1.Node{nodeA},
+				false,
+			},
+			[]*v1.Pod{podOnA},
+		},
+		{
+			"all unscheduled pods included when flag is true",
+			args{
+				[]*v1.Pod{unscheduledPod1, unscheduledPod2},
+				[]*v1.Node{},
+				true,
+			},
+			[]*v1.Pod{unscheduledPod1, unscheduledPod2},
+		},
+		{
+			"all unscheduled pods excluded when flag is false",
+			args{
+				[]*v1.Pod{unscheduledPod1, unscheduledPod2},
+				[]*v1.Node{},
+				false,
+			},
+			[]*v1.Pod{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := k8s.FilterPodsByNode(tt.args.pods, tt.args.nodes, tt.args.includeUnscheduled)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestCalculateNodesCapacity(t *testing.T) {
 	n1 := test.BuildTestNode(test.NodeOpts{
 		CPU: 1000,
