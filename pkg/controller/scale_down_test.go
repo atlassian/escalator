@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -722,4 +723,122 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestTryRemoveTaintedNodes_ExcludeTaintedNodePods verifies that when
+// ExcludeTaintedNodePods is enabled, a tainted node that still has running
+// (non-daemonset) pods is NOT deleted via the soft path even after the
+// soft_delete_grace_period has elapsed.
+//
+// This is the regression test for the bug where NodeInfoMap was built from the
+// already-filtered pod list, making NodeEmpty() always return true for tainted
+// nodes and causing premature soft-path deletion of nodes with running pods.
+func TestTryRemoveTaintedNodes_ExcludeTaintedNodePods(t *testing.T) {
+	minNodes := 5
+	maxNodes := 20
+	softDeleteGracePeriod := "1m"
+	hardDeleteGracePeriod := "10m"
+
+	nodeGroupOpts := NodeGroupOptions{
+		Name:                   "default",
+		CloudProviderGroupName: "default",
+		MinNodes:               minNodes,
+		MaxNodes:               maxNodes,
+		// Soft period has elapsed so the node is eligible for soft deletion
+		SoftDeleteGracePeriod:  softDeleteGracePeriod,
+		HardDeleteGracePeriod:  hardDeleteGracePeriod,
+		ExcludeTaintedNodePods: true,
+	}
+	nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+
+	// Build one tainted node whose escalator taint timestamp is 5 minutes in
+	// the past — beyond SoftDeleteGracePeriod (1m) but within HardDeleteGracePeriod (10m).
+	taintedNode := test.BuildTestNode(test.NodeOpts{
+		Name:    "tainted-node-with-pods",
+		CPU:     2000,
+		Mem:     8000,
+		Tainted: false, // we set the taint manually below to control the timestamp
+	})
+	taintTimestamp := time.Now().Add(-5 * time.Minute)
+	taintedNode.Spec.Taints = []v1.Taint{
+		{
+			Key:    k8s.ToBeRemovedByAutoscalerKey,
+			Value:  strconv.FormatInt(taintTimestamp.Unix(), 10),
+			Effect: v1.TaintEffectNoSchedule,
+		},
+	}
+
+	// Build some untainted nodes to satisfy MinNodes and capacity requirements.
+	untaintedNodes := test.BuildTestNodes(5, test.NodeOpts{CPU: 2000, Mem: 8000})
+	allNodes := append(untaintedNodes, taintedNode)
+
+	// Place a regular (non-daemonset) running pod on the tainted node.
+	// This pod should prevent soft-path deletion.
+	podOnTaintedNode := test.BuildTestPod(test.PodOpts{
+		Name:     "job-pod-on-tainted-node",
+		CPU:      []int64{500},
+		Mem:      []int64{1000},
+		NodeName: taintedNode.Name,
+		Running:  true,
+		Phase:    v1.PodRunning,
+	})
+
+	// Also put some pods on untainted nodes (for capacity calculations).
+	var allPods []*v1.Pod
+	allPods = append(allPods, podOnTaintedNode)
+	for i, node := range untaintedNodes {
+		allPods = append(allPods, test.BuildTestPod(test.PodOpts{
+			Name:     fmt.Sprintf("untainted-pod-%d", i),
+			CPU:      []int64{200},
+			Mem:      []int64{800},
+			NodeName: node.Name,
+			Running:  true,
+			Phase:    v1.PodRunning,
+		}))
+	}
+
+	client, opts, err := buildTestClient(allNodes, allPods, nodeGroups, ListerOptions{})
+	require.NoError(t, err)
+
+	testCloudProvider := test.NewCloudProvider(1)
+	testCloudProvider.RegisterNodeGroup(test.NewNodeGroup(
+		nodeGroupOpts.CloudProviderGroupName,
+		nodeGroupOpts.Name,
+		int64(minNodes),
+		int64(maxNodes),
+		int64(len(allNodes)),
+	))
+
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+		client:     *client,
+	})
+
+	// Build NodeInfoMap from ALL pods (including the pod on the tainted node).
+	// This is what the fixed code does: NodeInfoMap is constructed before the
+	// ExcludeTaintedNodePods filter so it accurately reflects tainted-node state.
+	nodeGroupsState[nodeGroupOpts.Name].NodeInfoMap = k8s.CreateNodeNameToInfoMap(allPods, allNodes)
+
+	c := &Controller{
+		Client:        client,
+		Opts:          opts,
+		stopChan:      nil,
+		nodeGroups:    nodeGroupsState,
+		cloudProvider: testCloudProvider,
+	}
+
+	scaleOptions := scaleOpts{
+		nodes:             allNodes,
+		taintedNodes:      []*v1.Node{taintedNode},
+		forceTaintedNodes: []*v1.Node{},
+		untaintedNodes:    untaintedNodes,
+		nodeGroup:         nodeGroupsState[nodeGroupOpts.Name],
+	}
+
+	// The tainted node has a running pod, so it must NOT be deleted via the
+	// soft path (soft grace period elapsed but hard grace period has not).
+	removed, err := c.TryRemoveTaintedNodes(scaleOptions, true)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, removed,
+		"tainted node with a running pod must not be deleted via the soft path when ExcludeTaintedNodePods is enabled")
 }

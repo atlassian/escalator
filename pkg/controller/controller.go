@@ -237,7 +237,14 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	// Filter into untainted and tainted nodes
 	untaintedNodes, taintedNodes, forceTaintedNodes, cordonedNodes := c.filterNodes(nodeGroup, allNodes)
 
-	// Filter to pods on untainted nodes
+	// Build NodeInfoMap BEFORE filtering tainted node pods so it always reflects
+	// the true pod state on every node. TryRemoveTaintedNodes uses NodeInfoMap to
+	// determine whether a tainted node is empty; if we built it from an already-
+	// filtered pod list, NodeEmpty() would incorrectly return true for tainted nodes
+	// that still have running pods, causing premature soft-path deletion.
+	nodeGroup.NodeInfoMap = k8s.CreateNodeNameToInfoMap(pods, allNodes)
+
+	// Filter to pods on untainted nodes (for capacity calculations only)
 	if nodeGroup.Opts.ExcludeTaintedNodePods {
 		untaintedPods := k8s.FilterPodsByNode(pods, untaintedNodes, true)
 		numberOfPods := len(pods)
@@ -281,10 +288,6 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 		)
 		return 0, err
 	}
-
-	// update the map of node to nodeinfo
-	// for working out which pods are on which nodes
-	nodeGroup.NodeInfoMap = k8s.CreateNodeNameToInfoMap(pods, allNodes)
 
 	// Calc capacity for untainted nodes
 	podRequests, err := k8s.CalculatePodsRequestedUsage(pods)
