@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -722,4 +723,225 @@ func TestController_TryRemoveTaintedNodes(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// Test verifies that when ExcludeTaintedNodePods is enabled, a tainted node that still has running
+// (non-daemonset) pods is NOT deleted via the soft path even after the
+// soft_delete_grace_period has elapsed.
+func TestTryRemoveTaintedNodes_WithExcludeTaintedNodePodsAndTaintedNodeHasPods(t *testing.T) {
+	minNodes := 0
+	maxNodes := 20
+	softDeleteGracePeriod := "1m"
+	hardDeleteGracePeriod := "10m"
+
+	// Thresholds are set so that ~50% utilisation (from untainted pods only)
+	// falls between TaintUpperCapacityThresholdPercent and ScaleUpThresholdPercent,
+	// leaving nodesDelta=0 and routing execution to TryRemoveTaintedNodes.
+	scaleUpThresholdPercent := 70
+	taintUpperCapacityThresholdPercent := 40
+	taintLowerCapacityThresholdPercent := 20
+
+	nodeGroupOpts := NodeGroupOptions{
+		Name:                               "default",
+		CloudProviderGroupName:             "default",
+		MinNodes:                           minNodes,
+		MaxNodes:                           maxNodes,
+		ScaleUpThresholdPercent:            scaleUpThresholdPercent,
+		TaintUpperCapacityThresholdPercent: taintUpperCapacityThresholdPercent,
+		TaintLowerCapacityThresholdPercent: taintLowerCapacityThresholdPercent,
+		SoftDeleteGracePeriod:              softDeleteGracePeriod,
+		HardDeleteGracePeriod:              hardDeleteGracePeriod,
+		ExcludeTaintedNodePods:             true,
+	}
+	nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+
+	// Build one tainted node whose escalator taint timestamp is 5 minutes in
+	// the past — beyond SoftDeleteGracePeriod (1m) but within HardDeleteGracePeriod (10m).
+	taintedNode := test.BuildTestNode(test.NodeOpts{
+		Name:    "tainted-node-with-pods",
+		CPU:     2000,
+		Mem:     8000,
+		Tainted: false, // we set the taint manually below to control the timestamp
+	})
+	taintTimestamp := time.Now().Add(-5 * time.Minute)
+	taintedNode.Spec.Taints = []v1.Taint{
+		{
+			Key:    k8s.ToBeRemovedByAutoscalerKey,
+			Value:  strconv.FormatInt(taintTimestamp.Unix(), 10),
+			Effect: v1.TaintEffectNoSchedule,
+		},
+	}
+
+	// Build untainted nodes for capacity calculations.
+	untaintedNodes := test.BuildTestNodes(2, test.NodeOpts{CPU: 2000, Mem: 8000})
+	allNodes := append(untaintedNodes, taintedNode)
+
+	// Place a regular (non-daemonset) running pod on the tainted node.
+	// This pod should prevent soft-path deletion.
+	podOnTaintedNode := test.BuildTestPod(test.PodOpts{
+		Name:     "job-pod-on-tainted-node",
+		CPU:      []int64{500},
+		Mem:      []int64{1000},
+		NodeName: taintedNode.Name,
+		Running:  true,
+		Phase:    v1.PodRunning,
+	})
+
+	// Put pods on untainted nodes at ~50% utilisation so the controller neither
+	// scales up (< 70%) nor scales down (> 40%), landing on nodesDelta=0 and
+	// exercising TryRemoveTaintedNodes via scaleNodeGroup.
+	// Each untainted node: 2000m CPU. 2 nodes × 1000m = 2000m / 4000m total = 50%.
+	var allPods []*v1.Pod
+	allPods = append(allPods, podOnTaintedNode)
+	for i, node := range untaintedNodes {
+		allPods = append(allPods, test.BuildTestPod(test.PodOpts{
+			Name:     fmt.Sprintf("untainted-pod-%d", i),
+			CPU:      []int64{1000},
+			Mem:      []int64{4000},
+			NodeName: node.Name,
+			Running:  true,
+			Phase:    v1.PodRunning,
+		}))
+	}
+
+	client, opts, err := buildTestClient(allNodes, allPods, nodeGroups, ListerOptions{})
+	require.NoError(t, err)
+
+	testCloudProvider := test.NewCloudProvider(1)
+	initialNodeCount := int64(len(allNodes))
+	testNodeGroup := test.NewNodeGroup(
+		nodeGroupOpts.CloudProviderGroupName,
+		nodeGroupOpts.Name,
+		int64(minNodes),
+		int64(maxNodes),
+		initialNodeCount,
+	)
+	testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+		client:     *client,
+	})
+
+	c := &Controller{
+		Client:        client,
+		Opts:          opts,
+		stopChan:      nil,
+		nodeGroups:    nodeGroupsState,
+		cloudProvider: testCloudProvider,
+	}
+
+	// Drive the full scaleNodeGroup path so the NodeInfoMap ordering fix is
+	// exercised end-to-end: scaleNodeGroup must build NodeInfoMap before the
+	// ExcludeTaintedNodePods filter runs, otherwise NodeEmpty() incorrectly
+	// returns true for tainted nodes that still have running pods.
+	nodesDelta, err := c.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+	assert.NoError(t, err)
+	assert.Equal(t, 0, nodesDelta,
+		"tainted node with a running pod must not be deleted via the soft path when ExcludeTaintedNodePods is enabled")
+	assert.Equal(t, initialNodeCount, testNodeGroup.TargetSize(),
+		"cloud provider DeleteNodes should not have been called")
+}
+
+func TestTryRemoveTaintedNodes_WithExcludeTaintedNodePodsAndTaintedNodeHasNoPods(t *testing.T) {
+	minNodes := 0
+	maxNodes := 20
+	softDeleteGracePeriod := "1m"
+	hardDeleteGracePeriod := "10m"
+
+	// Thresholds are set so that ~50% utilisation (from untainted pods only)
+	// falls between TaintUpperCapacityThresholdPercent and ScaleUpThresholdPercent,
+	// leaving nodesDelta=0 and routing execution to TryRemoveTaintedNodes.
+	scaleUpThresholdPercent := 70
+	taintUpperCapacityThresholdPercent := 40
+	taintLowerCapacityThresholdPercent := 20
+
+	nodeGroupOpts := NodeGroupOptions{
+		Name:                               "default",
+		CloudProviderGroupName:             "default",
+		MinNodes:                           minNodes,
+		MaxNodes:                           maxNodes,
+		ScaleUpThresholdPercent:            scaleUpThresholdPercent,
+		TaintUpperCapacityThresholdPercent: taintUpperCapacityThresholdPercent,
+		TaintLowerCapacityThresholdPercent: taintLowerCapacityThresholdPercent,
+		SoftDeleteGracePeriod:              softDeleteGracePeriod,
+		HardDeleteGracePeriod:              hardDeleteGracePeriod,
+		ExcludeTaintedNodePods:             true,
+	}
+	nodeGroups := []NodeGroupOptions{nodeGroupOpts}
+
+	// Build one tainted node whose escalator taint timestamp is 5 minutes in
+	// the past — beyond SoftDeleteGracePeriod (1m) but within HardDeleteGracePeriod (10m).
+	// This node has NO pods, so it should be deleted via the soft path.
+	taintedNode := test.BuildTestNode(test.NodeOpts{
+		Name:    "tainted-node-no-pods",
+		CPU:     2000,
+		Mem:     8000,
+		Tainted: false, // we set the taint manually below to control the timestamp
+	})
+	taintTimestamp := time.Now().Add(-5 * time.Minute)
+	taintedNode.Spec.Taints = []v1.Taint{
+		{
+			Key:    k8s.ToBeRemovedByAutoscalerKey,
+			Value:  strconv.FormatInt(taintTimestamp.Unix(), 10),
+			Effect: v1.TaintEffectNoSchedule,
+		},
+	}
+
+	// Build untainted nodes for capacity calculations.
+	untaintedNodes := test.BuildTestNodes(2, test.NodeOpts{CPU: 2000, Mem: 8000})
+	allNodes := append(untaintedNodes, taintedNode)
+
+	// Put pods on untainted nodes at ~50% utilisation so the controller neither
+	// scales up (< 70%) nor scales down (> 40%), landing on nodesDelta=0 and
+	// exercising TryRemoveTaintedNodes via scaleNodeGroup.
+	// Each untainted node: 2000m CPU. 2 nodes × 1000m = 2000m / 4000m total = 50%.
+	// No pods on the tainted node.
+	var allPods []*v1.Pod
+	for i, node := range untaintedNodes {
+		allPods = append(allPods, test.BuildTestPod(test.PodOpts{
+			Name:     fmt.Sprintf("untainted-pod-%d", i),
+			CPU:      []int64{1000},
+			Mem:      []int64{4000},
+			NodeName: node.Name,
+			Running:  true,
+			Phase:    v1.PodRunning,
+		}))
+	}
+
+	client, opts, err := buildTestClient(allNodes, allPods, nodeGroups, ListerOptions{})
+	require.NoError(t, err)
+
+	testCloudProvider := test.NewCloudProvider(1)
+	initialNodeCount := int64(len(allNodes))
+	testNodeGroup := test.NewNodeGroup(
+		nodeGroupOpts.CloudProviderGroupName,
+		nodeGroupOpts.Name,
+		int64(minNodes),
+		int64(maxNodes),
+		initialNodeCount,
+	)
+	testCloudProvider.RegisterNodeGroup(testNodeGroup)
+
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+		client:     *client,
+	})
+
+	c := &Controller{
+		Client:        client,
+		Opts:          opts,
+		stopChan:      nil,
+		nodeGroups:    nodeGroupsState,
+		cloudProvider: testCloudProvider,
+	}
+
+	// Drive the full scaleNodeGroup path. The tainted node has no pods,
+	// so it should be deleted via the soft path.
+	nodesDelta, err := c.scaleNodeGroup(nodeGroupOpts.Name, nodeGroupsState[nodeGroupOpts.Name])
+	assert.NoError(t, err)
+	assert.Equal(t, 0, nodesDelta,
+		"nodesDelta should be 0 as utilisation is within thresholds")
+	assert.Equal(t, initialNodeCount-1, testNodeGroup.TargetSize(),
+		"cloud provider DeleteNodes should have been called for the empty tainted node")
 }
