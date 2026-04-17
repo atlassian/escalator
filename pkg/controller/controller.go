@@ -35,6 +35,9 @@ type NodeGroupState struct {
 	taintTracker      []string
 	forceTaintTracker []string
 
+	// tracks when nodes were last untainted, keyed by node name
+	untaintTracker map[string]time.Time
+
 	// used for tracking scale delta across runs, useful for reducing hysteresis
 	scaleDelta   int
 	lastScaleOut time.Time
@@ -100,7 +103,8 @@ func NewController(opts Opts, stopChan <-chan struct{}) (*Controller, error) {
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
 				nodegroup:           nodeGroupOpts.Name,
 			},
-			scaleDelta: 0,
+			scaleDelta:     0,
+			untaintTracker: make(map[string]time.Time),
 		}
 	}
 
@@ -220,6 +224,19 @@ func (c *Controller) scaleNodeGroup(nodegroup string, nodeGroup *NodeGroupState)
 	if err != nil {
 		log.Errorf("Failed to list nodes: %v", err)
 		return 0, err
+	}
+
+	// Clean up untaint tracker for nodes that no longer exist
+	if len(nodeGroup.untaintTracker) > 0 {
+		activeNodes := make(map[string]bool, len(allNodes))
+		for _, node := range allNodes {
+			activeNodes[node.Name] = true
+		}
+		for name := range nodeGroup.untaintTracker {
+			if !activeNodes[name] {
+				delete(nodeGroup.untaintTracker, name)
+			}
+		}
 	}
 
 	// store a cached version of node capacity
