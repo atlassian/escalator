@@ -335,6 +335,24 @@ var (
 		},
 		[]string{"node_group", "node"},
 	)
+	// NodeGroupScaleUpCircuitBreakerOpen indicates if the scale-up circuit breaker is open (1) or closed (0)
+	NodeGroupScaleUpCircuitBreakerOpen = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "node_group_scale_up_circuit_breaker_open",
+			Namespace: NAMESPACE,
+			Help:      "indicates if the scale-up circuit breaker is open (1) or closed (0)",
+		},
+		[]string{"node_group"},
+	)
+	// NodeGroupScaleUpFailedScaleEvents counts scale-up requests where the running node count did not reach the requested target
+	NodeGroupScaleUpFailedScaleEvents = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      "node_group_scale_up_failed_scale_events",
+			Namespace: NAMESPACE,
+			Help:      "number of scale-up requests where the running node count did not reach the requested target size",
+		},
+		[]string{"node_group"},
+	)
 )
 
 func init() {
@@ -372,6 +390,8 @@ func init() {
 	prometheus.MustRegister(CloudProviderTargetSize)
 	prometheus.MustRegister(CloudProviderSize)
 	prometheus.MustRegister(NodeDeleteErrors)
+	prometheus.MustRegister(NodeGroupScaleUpCircuitBreakerOpen)
+	prometheus.MustRegister(NodeGroupScaleUpFailedScaleEvents)
 }
 
 // Start starts the metrics endpoint on a new routine

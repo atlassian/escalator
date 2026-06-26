@@ -34,7 +34,11 @@ func (c *Controller) ScaleUp(opts scaleOpts) (int, error) {
 		return 0, err
 	}
 
-	opts.nodeGroup.scaleUpLock.lock(added)
+	// Only engage the scale lock when capacity was actually requested. A circuit
+	// breaker block returns zero and must not be recorded as an in-flight scale.
+	if added > 0 {
+		opts.nodeGroup.scaleUpLock.lock(added)
+	}
 	return untainted + added, nil
 }
 
@@ -69,6 +73,15 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 	}
 
 	if nodesToAdd > 0 {
+		// The breaker logs its own state transitions; keep this at debug to avoid
+		// repeating a warning on every scan while it stays open.
+		if !opts.nodeGroup.scaleUpCircuitBreaker.allow(cloudProviderNodeGroup.Size()) {
+			log.WithField("nodegroup", nodegroupName).
+				Debugf("scale-up circuit breaker open: refusing to increase desired count (target %v, running %v)",
+					cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.Size())
+			return 0, nil
+		}
+
 		drymode := c.dryMode(opts.nodeGroup)
 		log.WithField("drymode", drymode).
 			WithField("nodegroup", nodegroupName).
@@ -80,6 +93,7 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 				log.Errorf("failed to set cloud provider node group size: %v", err)
 				return 0, err
 			}
+			opts.nodeGroup.scaleUpCircuitBreaker.recordScaleUp(cloudProviderNodeGroup.TargetSize())
 		}
 	} else {
 		return 0, fmt.Errorf("adding %v nodes would breach max cloud provider node group size (%v)", nodesToAdd, cloudProviderNodeGroup.MaxSize())

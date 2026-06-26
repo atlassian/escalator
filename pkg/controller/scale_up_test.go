@@ -233,6 +233,79 @@ func TestControllerUntaintNewestN(t *testing.T) {
 	}
 }
 
+// TestScaleUpCircuitBreakerIntegration verifies that repeated stuck scale-ups
+// eventually stop increasing TargetSize once the breaker trips.
+func TestScaleUpCircuitBreakerIntegration(t *testing.T) {
+	const (
+		minNodes  = 2
+		maxNodes  = 20
+		threshold = 3
+	)
+
+	nodeGroup := NodeGroupOptions{
+		Name:                    "default",
+		CloudProviderGroupName:  "default",
+		MinNodes:                minNodes,
+		MaxNodes:                maxNodes,
+		ScaleUpThresholdPercent: 70,
+		ScaleUpFailureThreshold: threshold,
+		ScaleUpFailureCooldown:  "10m",
+	}
+	nodeGroups := []NodeGroupOptions{nodeGroup}
+
+	testCloudProvider := test.NewCloudProvider(1)
+	cloudNG := test.NewNodeGroup(
+		nodeGroup.CloudProviderGroupName,
+		nodeGroup.Name,
+		int64(minNodes),
+		int64(maxNodes),
+		int64(minNodes),
+	)
+	// Decouple actual from desired so IncreaseSize raises TargetSize but Size() stays fixed.
+	cloudNG.SetDecoupleActual(true)
+	cloudNG.SetActualSize(int64(minNodes))
+	testCloudProvider.RegisterNodeGroup(cloudNG)
+
+	nodeGroupsState := BuildNodeGroupsState(nodeGroupsStateOpts{
+		nodeGroups: nodeGroups,
+	})
+
+	controller := &Controller{
+		Opts:          Opts{NodeGroups: nodeGroups, DryMode: false},
+		nodeGroups:    nodeGroupsState,
+		cloudProvider: testCloudProvider,
+	}
+
+	opts := scaleOpts{
+		nodesDelta: 2,
+		nodeGroup:  nodeGroupsState[nodeGroup.Name],
+	}
+
+	// The first `threshold` scale-ups are permitted; each one raises TargetSize
+	// but Size() stays at minNodes (ASG stuck).
+	var lastPermittedTarget int64
+	for i := 0; i < threshold; i++ {
+		added, err := controller.scaleUpCloudProviderNodeGroup(opts)
+		assert.NoError(t, err)
+		assert.Greater(t, added, 0, "iteration %d should be permitted", i)
+		lastPermittedTarget = cloudNG.TargetSize()
+	}
+
+	// The next call must be blocked (breaker tripped).
+	added, err := controller.scaleUpCloudProviderNodeGroup(opts)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, added, "breaker should block the scale-up")
+	assert.Equal(t, lastPermittedTarget, cloudNG.TargetSize(), "TargetSize must be frozen after breaker trips")
+
+	// Further calls must also be blocked.
+	for i := 0; i < 3; i++ {
+		added, err = controller.scaleUpCloudProviderNodeGroup(opts)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, added)
+		assert.Equal(t, lastPermittedTarget, cloudNG.TargetSize())
+	}
+}
+
 func TestCalculateNodesToAdd(t *testing.T) {
 
 	type args struct {

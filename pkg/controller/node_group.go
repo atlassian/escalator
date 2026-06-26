@@ -65,12 +65,16 @@ type NodeGroupOptions struct {
 	// allowed in the nodegroup at any given time.
 	MaxUnhealthyNodesPercent int `json:"max_unhealthy_nodes_percent,omitempty" yaml:"max_unhealthy_nodes_percent,omitempty"`
 
+	ScaleUpFailureThreshold int    `json:"scale_up_failure_threshold,omitempty" yaml:"scale_up_failure_threshold,omitempty"`
+	ScaleUpFailureCooldown  string `json:"scale_up_failure_cooldown,omitempty" yaml:"scale_up_failure_cooldown,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration    time.Duration
 	hardDeleteGracePeriodDuration    time.Duration
 	scaleUpCoolDownPeriodDuration    time.Duration
 	maxNodeAgeDuration               time.Duration
 	unhealthyNodeGracePeriodDuration time.Duration
+	scaleUpFailureCooldownDuration   time.Duration
 }
 
 // AWSNodeGroupOptions represents a nodegroup running on a cluster that is
@@ -156,6 +160,10 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 		checkThat(nodegroup.MaxUnhealthyNodesPercent < 100, "max_unhealthy_nodes_percent must be less than 100")
 	}
 
+	if nodegroup.ScaleUpFailureThreshold > 0 {
+		checkThat(nodegroup.ScaleUpFailureCooldownDuration() > 0, "scale_up_failure_cooldown must be a positive Go duration when scale_up_failure_threshold is set")
+	}
+
 	return problems
 }
 
@@ -227,6 +235,19 @@ func (n *NodeGroupOptions) MaxNodeAgeDuration() time.Duration {
 	}
 
 	return n.maxNodeAgeDuration
+}
+
+// ScaleUpFailureCooldownDuration lazily returns/parses the scaleUpFailureCooldown string into a duration
+func (n *NodeGroupOptions) ScaleUpFailureCooldownDuration() time.Duration {
+	if n.scaleUpFailureCooldownDuration == 0 {
+		duration, err := time.ParseDuration(n.ScaleUpFailureCooldown)
+		if err != nil {
+			return 0
+		}
+		n.scaleUpFailureCooldownDuration = duration
+	}
+
+	return n.scaleUpFailureCooldownDuration
 }
 
 // UnhealthyNodeGracePeriodDuration lazily returns/parses the unhealthyNodeGracePeriod string into a duration
@@ -388,6 +409,11 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 			scaleUpLock: scaleLock{
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
 				nodegroup:           ng.Name,
+			},
+			scaleUpCircuitBreaker: scaleUpCircuitBreaker{
+				failureThreshold: ng.ScaleUpFailureThreshold,
+				cooldown:         ng.ScaleUpFailureCooldownDuration(),
+				nodegroup:        ng.Name,
 			},
 		}
 	}

@@ -25,6 +25,8 @@ node_groups:
     scale_up_threshold_percent: 70
     scale_up_cool_down_period: 2m
     scale_up_cool_down_timeout: 10m
+    scale_up_failure_threshold: 5
+    scale_up_failure_cooldown: 30m
     soft_delete_grace_period: 1m
     hard_delete_grace_period: 10m
     taint_effect: NoExecute
@@ -176,6 +178,34 @@ the node failed to register with Kubernetes in time.
 
 Having the scale up activity timeout isn't necessarily a bad thing, it just acts as a fail safe in case scaling 
 activities take too long so that the scale lock isn't permanently enabled.
+
+### `scale_up_failure_threshold` and `scale_up_failure_cooldown`
+
+These options enable a scale-up circuit breaker that stops Escalator from repeatedly raising the ASG desired count
+when the cloud provider cannot actually deliver new nodes (for example, when an instance type is temporarily out of
+capacity in an availability zone). Without it, Escalator keeps increasing the desired count every scan interval while
+pods stay pending, driving the desired count up to `max_nodes` even though no instances are launching.
+
+A scale-up is counted as failed when the running node count (the ASG actual size) has not reached the desired count
+requested by the previous scale-up by the time the next scale-up is evaluated. `scale_up_failure_threshold` is the
+number of consecutive failed scale-ups that trips the breaker. Once tripped, Escalator stops increasing the desired
+count for that node group. Untainting of existing tainted nodes is unaffected, so already-running capacity can still
+be reused.
+
+Because fulfilment is judged once per scale-up (which is itself paced by `scale_up_cool_down_period`), set the cooldown
+long enough for the cloud provider to launch and attach instances. The same guidance already applies to a healthy
+scale-up. If the cooldown is shorter than typical instance launch latency, a healthy-but-slow node group could be
+mistaken for a stuck one.
+
+`scale_up_failure_cooldown` is how long the breaker stays open before allowing a single half-open probe scale-up. If
+that probe also fails to reach its requested target, the breaker re-opens immediately; if running capacity has
+recovered, normal scaling resumes.
+
+The feature is opt-in and disabled by default. Leave `scale_up_failure_threshold` unset (or `0`) to disable it.
+`scale_up_failure_cooldown` must be a positive Go duration when `scale_up_failure_threshold` is greater than `0`.
+
+Two metrics are exported while this is enabled: `escalator_node_group_scale_up_circuit_breaker_open` (1 when open, 0
+when closed) and `escalator_node_group_scale_up_failed_scale_events` (count of failed scale-up requests).
 
 ### `soft_delete_grace_period` and `hard_delete_grace_period`
 
