@@ -181,27 +181,27 @@ activities take too long so that the scale lock isn't permanently enabled.
 ### `scale_up_failure_threshold`
 
 This option enables a scale-up circuit breaker that stops Escalator from repeatedly raising the ASG desired count
-when the cloud provider cannot actually deliver new nodes (for example, when an instance type is temporarily out of
-capacity in an availability zone). Without it, Escalator keeps increasing the desired count every scan interval while
-pods stay pending, driving the desired count up to `max_nodes` even though no instances are launching.
+when the cloud provider cannot deliver new nodes (for example, when an instance type is temporarily out of capacity in
+an availability zone). Without it, Escalator keeps increasing the desired count every scan interval while pods stay
+pending, driving the desired count up to `max_nodes` even though no instances are launching.
 
-A scale-up is counted as failed when the running count has not grown at all since the previous scale-up by the time the
-next scale-up is evaluated — the cloud provider delivered no new capacity in the interim. `scale_up_failure_threshold`
-is the number of consecutive failed scale-ups that trips the breaker. Once tripped, Escalator stops increasing the
-desired count for that node group. Untainting of existing tainted nodes is unaffected, so already-running capacity can
-still be reused.
+A scale-up is counted as failed when the running count has not grown since the previous scale-up by the time the next
+scale-up is evaluated. That means the cloud provider delivered no new capacity in the interim.
+`scale_up_failure_threshold` is the number of consecutive failed scale-ups that trips the breaker. Once tripped,
+Escalator stops increasing the desired count for that node group. Untainting of existing tainted nodes is unaffected,
+so already-running capacity can still be reused.
 
-Judging on "did the running count grow" rather than "did it reach the previous target" keeps a busy-but-healthy node
-group from tripping. A group whose desired count rises every scan while instances launch steadily (just slower than
-demand) is still making progress and does not accrue failures; only a group that adds no capacity at all does.
+Judging on whether the running count grew, rather than whether it reached the previous target, keeps a busy-but-healthy
+node group from tripping. A group whose desired count rises every scan while instances launch steadily, just slower
+than demand, is still making progress and does not accrue failures. Only a group that adds no capacity at all does.
 
 While the breaker is open there is no cooldown or waiting period. Escalator keeps looping and evaluating as normal, but
 holds the desired count steady rather than raising it further. When the running count catches up to the current desired
-count — that is, the cloud provider has finally delivered the capacity — the breaker closes and normal scaling resumes
-on the next scan. This means recovery is picked up as soon as capacity is available, without introducing scaling
-latency. The recovery check uses the *current* desired count, not a value frozen at trip time, so if the desired count
-is lowered externally while the breaker is open (a scale-down as demand falls, or a manual reset) the breaker still
-recovers instead of staying stuck.
+count, the cloud provider has finally delivered the capacity, so the breaker closes and normal scaling resumes on the
+next scan. Recovery is picked up as soon as capacity is available, without introducing scaling latency. The recovery
+check uses the current desired count, not a value frozen at trip time, so if the desired count is lowered externally
+while the breaker is open (a scale-down as demand falls, or a manual reset) the breaker still recovers instead of
+staying stuck.
 
 The "running count" here is the ASG's instance count (`Size()`), i.e. the instances the ASG has, not the number of
 Ready Kubernetes nodes. This targets the out-of-capacity case, where no instances launch at all. If instances launch
@@ -222,17 +222,17 @@ count stays at 100. The breaker is set to `scale_up_failure_threshold: 3`.
 | Time  | Desired (breaker disabled) | Desired (breaker enabled)                  | Running |
 |-------|----------------------------|--------------------------------------------|---------|
 | 00:00 | 150                        | 150                                        | 100     |
-| 05:00 | 200                        | 200 (failure 1 — running didn't grow)      | 100     |
+| 05:00 | 200                        | 200 (failure 1, running didn't grow)       | 100     |
 | 10:00 | 250                        | 250 (failure 2)                            | 100     |
-| 15:00 | 300                        | 250 (opens on failure 3 — desired held)    | 100     |
+| 15:00 | 300                        | 250 (opens on failure 3, desired held)     | 100     |
 | 25:00 | 400                        | 250 (held)                                 | 100     |
 | 45:00 | 600 (max)                  | 250 (held)                                 | 100     |
 | AZ recovers | 600 (500-node overshoot) | 250 (delivered), breaker closes       | 250     |
 
-With the breaker disabled the desired count climbs to the max of 600 while only 100 nodes run — a 500-node gap that all
-tries to launch at once when the AZ recovers, overshooting real demand. With the breaker it caps at 250 and holds
-there. When the AZ recovers, the 250 requested nodes launch, the running count catches up to the held desired count of
-250, the breaker closes, and scaling resumes against real demand.
+With the breaker disabled the desired count climbs to the max of 600 while only 100 nodes run. That is a 500-node gap
+where all of them try to launch at once when the AZ recovers and overshoot real demand. With the breaker it caps at 250
+and holds there. When the AZ recovers, the 250 requested nodes launch, the running count catches up to the held desired
+count of 250, the breaker closes, and scaling resumes against real demand.
 
 ### `soft_delete_grace_period` and `hard_delete_grace_period`
 
