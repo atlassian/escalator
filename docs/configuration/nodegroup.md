@@ -185,26 +185,54 @@ when the cloud provider cannot actually deliver new nodes (for example, when an 
 capacity in an availability zone). Without it, Escalator keeps increasing the desired count every scan interval while
 pods stay pending, driving the desired count up to `max_nodes` even though no instances are launching.
 
-A scale-up is counted as failed when the running node count (the ASG actual size) has not reached the desired count
-requested by the previous scale-up by the time the next scale-up is evaluated. `scale_up_failure_threshold` is the
-number of consecutive failed scale-ups that trips the breaker. Once tripped, Escalator stops increasing the desired
-count for that node group. Untainting of existing tainted nodes is unaffected, so already-running capacity can still
-be reused.
+A scale-up is counted as failed when the running count has not grown at all since the previous scale-up by the time the
+next scale-up is evaluated — the cloud provider delivered no new capacity in the interim. `scale_up_failure_threshold`
+is the number of consecutive failed scale-ups that trips the breaker. Once tripped, Escalator stops increasing the
+desired count for that node group. Untainting of existing tainted nodes is unaffected, so already-running capacity can
+still be reused.
+
+Judging on "did the running count grow" rather than "did it reach the previous target" keeps a busy-but-healthy node
+group from tripping. A group whose desired count rises every scan while instances launch steadily (just slower than
+demand) is still making progress and does not accrue failures; only a group that adds no capacity at all does.
 
 While the breaker is open there is no cooldown or waiting period. Escalator keeps looping and evaluating as normal, but
-holds the desired count steady at the target it last requested. When the running count catches up to that frozen target
-— that is, the cloud provider has finally delivered the capacity — the breaker closes and normal scaling resumes on the
-next scan. This means recovery is picked up as soon as capacity is available, without introducing scaling latency.
+holds the desired count steady rather than raising it further. When the running count catches up to the current desired
+count — that is, the cloud provider has finally delivered the capacity — the breaker closes and normal scaling resumes
+on the next scan. This means recovery is picked up as soon as capacity is available, without introducing scaling
+latency. The recovery check uses the *current* desired count, not a value frozen at trip time, so if the desired count
+is lowered externally while the breaker is open (a scale-down as demand falls, or a manual reset) the breaker still
+recovers instead of staying stuck.
 
-Because fulfilment is judged once per scale-up (which is itself paced by `scale_up_cool_down_period`), set
-`scale_up_cool_down_period` long enough for the cloud provider to launch and attach instances. The same guidance already
-applies to a healthy scale-up. If it is shorter than typical instance launch latency, a healthy-but-slow node group
-could be mistaken for a stuck one.
+The "running count" here is the ASG's instance count (`Size()`), i.e. the instances the ASG has, not the number of
+Ready Kubernetes nodes. This targets the out-of-capacity case, where no instances launch at all. If instances launch
+but never join the cluster (for example a broken bootstrap), Escalator sees the count grow and treats that as capacity
+arriving, so the breaker will not trip on that failure mode.
 
 The feature is opt-in and disabled by default. Leave `scale_up_failure_threshold` unset (or `0`) to disable it.
 
 Two metrics are exported while this is enabled: `escalator_node_group_scale_up_circuit_breaker_open` (1 when open, 0
 when closed) and `escalator_node_group_scale_up_failed_scale_events` (count of failed scale-up requests).
+
+#### Worked example
+
+A node group with `max_nodes: 600`, running 100, `scale_up_cool_down_period: 5m`, wanting roughly +50 nodes each loop
+to clear a backlog of pending pods. An instance type is out of capacity in the AZ, so nothing launches and the running
+count stays at 100. The breaker is set to `scale_up_failure_threshold: 3`.
+
+| Time  | Desired (breaker disabled) | Desired (breaker enabled)                  | Running |
+|-------|----------------------------|--------------------------------------------|---------|
+| 00:00 | 150                        | 150                                        | 100     |
+| 05:00 | 200                        | 200 (failure 1 — running didn't grow)      | 100     |
+| 10:00 | 250                        | 250 (failure 2)                            | 100     |
+| 15:00 | 300                        | 250 (opens on failure 3 — desired held)    | 100     |
+| 25:00 | 400                        | 250 (held)                                 | 100     |
+| 45:00 | 600 (max)                  | 250 (held)                                 | 100     |
+| AZ recovers | 600 (500-node overshoot) | 250 (delivered), breaker closes       | 250     |
+
+With the breaker disabled the desired count climbs to the max of 600 while only 100 nodes run — a 500-node gap that all
+tries to launch at once when the AZ recovers, overshooting real demand. With the breaker it caps at 250 and holds
+there. When the AZ recovers, the 250 requested nodes launch, the running count catches up to the held desired count of
+250, the breaker closes, and scaling resumes against real demand.
 
 ### `soft_delete_grace_period` and `hard_delete_grace_period`
 

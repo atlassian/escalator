@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	"github.com/atlassian/escalator/pkg/metrics"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,31 +29,52 @@ type scaleUpCircuitBreaker struct {
 
 	state               circuitState
 	consecutiveFailures int
-	lastRequestedTarget int64 // desired count requested at the last allowed scale-up
+	lastObservedSize    int64 // running count observed at the last allowed scale-up
 	sawScaleUp          bool  // an allowed scale-up is awaiting a fulfilment judgement
+}
+
+// newScaleUpCircuitBreaker builds a breaker for a node group. When enabled it
+// seeds the "open" gauge to 0 so dashboards have a baseline line to sit on even
+// for a group that never trips.
+func newScaleUpCircuitBreaker(nodegroup string, failureThreshold int) scaleUpCircuitBreaker {
+	b := scaleUpCircuitBreaker{
+		failureThreshold: failureThreshold,
+		nodegroup:        nodegroup,
+	}
+	if b.enabled() {
+		metrics.NodeGroupScaleUpCircuitBreakerOpen.WithLabelValues(nodegroup).Set(0)
+	}
+	return b
 }
 
 func (b *scaleUpCircuitBreaker) enabled() bool {
 	return b.failureThreshold > 0
 }
 
-// allow returns true if a cloud-provider desired-count increase is permitted.
-// It judges the outcome of the previous allowed scale-up before deciding.
+// allow reports whether a cloud-provider desired-count increase is permitted.
+// currentSize is the running count (the ASG actual size) and targetSize is the
+// current desired count. It judges the outcome of the previous allowed scale-up
+// before deciding.
+//
+// A scale-up is judged a failure only when the running count has not grown since
+// the previous allowed scale-up: the cloud provider delivered no new capacity
+// (e.g. an AZ is out of capacity). A group whose running count is still climbing,
+// even slowly and even while desired keeps rising, is considered healthy and does
+// not accrue failures.
 //
 // The breaker has no cooldown timer. It keeps looping as normal while open and
-// simply refuses to raise the desired count until the running count catches up
-// to the target we last requested. Once the cloud provider delivers that
-// capacity, the breaker closes and normal scaling resumes.
-func (b *scaleUpCircuitBreaker) allow(currentSize int64) bool {
+// simply refuses to raise the desired count until the running count catches up to
+// the current desired count. Once the cloud provider delivers that capacity, the
+// breaker closes and normal scaling resumes.
+func (b *scaleUpCircuitBreaker) allow(currentSize, targetSize int64) bool {
 	if !b.enabled() {
 		return true
 	}
 
 	if b.sawScaleUp {
-		// The running count is expected to reach the desired count we requested
-		// within the scale-up cooldown. If it has not, the cloud provider could
-		// not deliver the capacity (e.g. AZ out of capacity), so count a failure.
-		if currentSize >= b.lastRequestedTarget {
+		if currentSize > b.lastObservedSize {
+			// Running count grew since the last scale-up: the cloud provider is
+			// delivering capacity, so reset the failure count.
 			b.consecutiveFailures = 0
 		} else {
 			b.consecutiveFailures++
@@ -75,40 +94,34 @@ func (b *scaleUpCircuitBreaker) allow(currentSize int64) bool {
 		}
 		return true
 	case circuitOpen:
-		// Recovery is signalled by the running count reaching the desired count
-		// we froze at when the breaker tripped. No probing or waiting required:
-		// while open the desired count is held steady, so once the cloud provider
-		// delivers that capacity the running count catches up and we resume.
-		if currentSize >= b.lastRequestedTarget {
+		// Recovery is signalled by the running count catching up to the current
+		// desired count. No probing or waiting required: while open the desired
+		// count is held steady, so once the cloud provider delivers that capacity
+		// the running count catches up and we resume. Comparing against the live
+		// desired count (rather than a value frozen at trip time) means an external
+		// scale-down or a manual reset of the desired count also lets the breaker
+		// recover, instead of leaving it stuck open until a restart.
+		if currentSize >= targetSize {
 			b.state = circuitClosed
 			b.consecutiveFailures = 0
 			metrics.NodeGroupScaleUpCircuitBreakerOpen.WithLabelValues(b.nodegroup).Set(0)
 			log.WithField("nodegroup", b.nodegroup).
-				Infof("scale-up circuit breaker closed: running count reached the requested target, resuming scaling")
+				Infof("scale-up circuit breaker closed: running count caught up to desired, resuming scaling")
 			return true
 		}
 		log.WithField("nodegroup", b.nodegroup).
-			Debugf("scale-up circuit breaker still open: running %v has not reached requested target %v",
-				currentSize, b.lastRequestedTarget)
+			Debugf("scale-up circuit breaker still open: running %v has not reached desired %v",
+				currentSize, targetSize)
 		return false
 	}
 
 	return true
 }
 
-// recordScaleUp notes the desired count we just requested so the next allow()
-// call can judge whether the running count actually reached it.
-func (b *scaleUpCircuitBreaker) recordScaleUp(requestedTarget int64) {
-	b.lastRequestedTarget = requestedTarget
+// recordScaleUp notes the running count at the moment of an allowed scale-up so
+// the next allow() call can tell whether the cloud provider delivered any new
+// capacity in the interim.
+func (b *scaleUpCircuitBreaker) recordScaleUp(observedSize int64) {
+	b.lastObservedSize = observedSize
 	b.sawScaleUp = true
-}
-
-func (b scaleUpCircuitBreaker) String() string {
-	return fmt.Sprintf(
-		"circuitBreaker(state=%v, consecutiveFailures=%d, lastRequestedTarget=%d, sawScaleUp=%v)",
-		b.state,
-		b.consecutiveFailures,
-		b.lastRequestedTarget,
-		b.sawScaleUp,
-	)
 }

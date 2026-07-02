@@ -61,11 +61,17 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 	}
 
 	nodegroupName := opts.nodeGroup.Opts.Name
-	nodesToAdd := c.calculateNodesToAdd(int64(opts.nodesDelta), cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.MaxSize())
+	// Read the running and desired counts once, up front. On real AWS these
+	// reflect the values refreshed at the start of the scan; IncreaseSize only
+	// updates the remote desired capacity and does not refresh the local cache,
+	// so reading after the increase would return stale values.
+	currentSize := cloudProviderNodeGroup.Size()
+	targetSize := cloudProviderNodeGroup.TargetSize()
+	nodesToAdd := c.calculateNodesToAdd(int64(opts.nodesDelta), targetSize, cloudProviderNodeGroup.MaxSize())
 	if nodesToAdd <= 0 {
 		err := fmt.Errorf(
 			"refusing to scaleup up beyond the maximum size of the autoscaling group (TargetSize: %v; MaxNodes: %v). Taking no action",
-			cloudProviderNodeGroup.TargetSize(),
+			targetSize,
 			opts.nodeGroup.Opts.MaxNodes,
 		)
 		log.WithError(err).Error("Cancelling scaleup")
@@ -75,10 +81,10 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 	if nodesToAdd > 0 {
 		// The breaker logs its own state transitions; keep this at debug to avoid
 		// repeating a warning on every scan while it stays open.
-		if !opts.nodeGroup.scaleUpCircuitBreaker.allow(cloudProviderNodeGroup.Size()) {
+		if !opts.nodeGroup.scaleUpCircuitBreaker.allow(currentSize, targetSize) {
 			log.WithField("nodegroup", nodegroupName).
-				Debugf("scale-up circuit breaker open: refusing to increase desired count (target %v, running %v)",
-					cloudProviderNodeGroup.TargetSize(), cloudProviderNodeGroup.Size())
+				Debugf("scale-up circuit breaker open: refusing to increase desired count (desired %v, running %v)",
+					targetSize, currentSize)
 			return 0, nil
 		}
 
@@ -93,7 +99,9 @@ func (c *Controller) scaleUpCloudProviderNodeGroup(opts scaleOpts) (int, error) 
 				log.Errorf("failed to set cloud provider node group size: %v", err)
 				return 0, err
 			}
-			opts.nodeGroup.scaleUpCircuitBreaker.recordScaleUp(cloudProviderNodeGroup.TargetSize())
+			// Record the running count at scale-up time so the next scan can tell
+			// whether the cloud provider delivered any new capacity in between.
+			opts.nodeGroup.scaleUpCircuitBreaker.recordScaleUp(currentSize)
 		}
 	} else {
 		return 0, fmt.Errorf("adding %v nodes would breach max cloud provider node group size (%v)", nodesToAdd, cloudProviderNodeGroup.MaxSize())

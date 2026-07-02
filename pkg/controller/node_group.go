@@ -143,6 +143,8 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
 
+	checkThat(nodegroup.ScaleUpFailureThreshold >= 0, "scale_up_failure_threshold must be greater than or equal to 0")
+
 	checkThat(validTaintEffect(nodegroup.TaintEffect), "taint_effect must be valid kubernetes taint")
 
 	checkThat(validAWSLifecycle(nodegroup.AWS.Lifecycle), "aws.lifecycle must be '%v' or '%v' if provided.", aws.LifecycleOnDemand, aws.LifecycleSpot)
@@ -391,10 +393,7 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
 				nodegroup:           ng.Name,
 			},
-			scaleUpCircuitBreaker: scaleUpCircuitBreaker{
-				failureThreshold: ng.ScaleUpFailureThreshold,
-				nodegroup:        ng.Name,
-			},
+			scaleUpCircuitBreaker: newScaleUpCircuitBreaker(ng.Name, ng.ScaleUpFailureThreshold),
 		}
 	}
 	return nodeGroupsState

@@ -281,7 +281,7 @@ func TestScaleUpCircuitBreakerIntegration(t *testing.T) {
 	}
 
 	// The first `threshold` scale-ups are permitted; each one raises TargetSize
-	// but Size() stays at minNodes (ASG stuck).
+	// but Size() stays at minNodes, so the running count never grows (ASG stuck).
 	var lastPermittedTarget int64
 	for i := 0; i < threshold; i++ {
 		added, err := controller.scaleUpCloudProviderNodeGroup(opts)
@@ -306,7 +306,7 @@ func TestScaleUpCircuitBreakerIntegration(t *testing.T) {
 	}
 
 	// The cloud provider finally delivers capacity: the running count catches up
-	// to the frozen target, so the breaker closes and scaling resumes.
+	// to the (frozen) desired count, so the breaker closes and scaling resumes.
 	cloudNG.SetActualSize(lastPermittedTarget)
 	added, err = controller.scaleUpCloudProviderNodeGroup(opts)
 	assert.NoError(t, err)
