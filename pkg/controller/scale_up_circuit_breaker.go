@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/atlassian/escalator/pkg/metrics"
 	log "github.com/sirupsen/logrus"
@@ -28,14 +27,12 @@ func (s circuitState) String() string {
 
 type scaleUpCircuitBreaker struct {
 	failureThreshold int
-	cooldown         time.Duration
 	nodegroup        string
 
 	state               circuitState
 	consecutiveFailures int
 	lastRequestedTarget int64 // desired count requested at the last allowed scale-up
 	sawScaleUp          bool  // an allowed scale-up is awaiting a fulfilment judgement
-	openedAt            time.Time
 }
 
 func (b *scaleUpCircuitBreaker) enabled() bool {
@@ -44,6 +41,11 @@ func (b *scaleUpCircuitBreaker) enabled() bool {
 
 // allow returns true if a cloud-provider desired-count increase is permitted.
 // It judges the outcome of the previous allowed scale-up before deciding.
+//
+// The breaker has no cooldown timer. It keeps looping as normal while open and
+// simply refuses to raise the desired count until the running count catches up
+// to the target we last requested. Once the cloud provider delivers that
+// capacity, the breaker closes and normal scaling resumes.
 func (b *scaleUpCircuitBreaker) allow(currentSize int64) bool {
 	if !b.enabled() {
 		return true
@@ -66,7 +68,6 @@ func (b *scaleUpCircuitBreaker) allow(currentSize int64) bool {
 	case circuitClosed:
 		if b.consecutiveFailures >= b.failureThreshold {
 			b.state = circuitOpen
-			b.openedAt = time.Now()
 			metrics.NodeGroupScaleUpCircuitBreakerOpen.WithLabelValues(b.nodegroup).Set(1)
 			log.WithField("nodegroup", b.nodegroup).
 				Warnf("scale-up circuit breaker tripped after %d consecutive failures", b.consecutiveFailures)
@@ -74,17 +75,21 @@ func (b *scaleUpCircuitBreaker) allow(currentSize int64) bool {
 		}
 		return true
 	case circuitOpen:
-		if time.Since(b.openedAt) >= b.cooldown {
+		// Recovery is signalled by the running count reaching the desired count
+		// we froze at when the breaker tripped. No probing or waiting required:
+		// while open the desired count is held steady, so once the cloud provider
+		// delivers that capacity the running count catches up and we resume.
+		if currentSize >= b.lastRequestedTarget {
 			b.state = circuitClosed
-			// One further failure re-trips immediately.
-			b.consecutiveFailures = b.failureThreshold - 1
+			b.consecutiveFailures = 0
 			metrics.NodeGroupScaleUpCircuitBreakerOpen.WithLabelValues(b.nodegroup).Set(0)
 			log.WithField("nodegroup", b.nodegroup).
-				Infof("scale-up circuit breaker half-open probe: allowing one request after cooldown")
+				Infof("scale-up circuit breaker closed: running count reached the requested target, resuming scaling")
 			return true
 		}
 		log.WithField("nodegroup", b.nodegroup).
-			Debugf("scale-up circuit breaker still open, %v remaining", b.cooldown-time.Since(b.openedAt))
+			Debugf("scale-up circuit breaker still open: running %v has not reached requested target %v",
+				currentSize, b.lastRequestedTarget)
 		return false
 	}
 

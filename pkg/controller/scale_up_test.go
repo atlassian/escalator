@@ -249,7 +249,6 @@ func TestScaleUpCircuitBreakerIntegration(t *testing.T) {
 		MaxNodes:                maxNodes,
 		ScaleUpThresholdPercent: 70,
 		ScaleUpFailureThreshold: threshold,
-		ScaleUpFailureCooldown:  "10m",
 	}
 	nodeGroups := []NodeGroupOptions{nodeGroup}
 
@@ -297,13 +296,22 @@ func TestScaleUpCircuitBreakerIntegration(t *testing.T) {
 	assert.Equal(t, 0, added, "breaker should block the scale-up")
 	assert.Equal(t, lastPermittedTarget, cloudNG.TargetSize(), "TargetSize must be frozen after breaker trips")
 
-	// Further calls must also be blocked.
+	// Further calls must also be blocked while the running count stays behind
+	// the frozen target. There is no cooldown timer to wait out.
 	for i := 0; i < 3; i++ {
 		added, err = controller.scaleUpCloudProviderNodeGroup(opts)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, added)
 		assert.Equal(t, lastPermittedTarget, cloudNG.TargetSize())
 	}
+
+	// The cloud provider finally delivers capacity: the running count catches up
+	// to the frozen target, so the breaker closes and scaling resumes.
+	cloudNG.SetActualSize(lastPermittedTarget)
+	added, err = controller.scaleUpCloudProviderNodeGroup(opts)
+	assert.NoError(t, err)
+	assert.Greater(t, added, 0, "breaker should resume once running reaches the frozen target")
+	assert.Greater(t, cloudNG.TargetSize(), lastPermittedTarget, "TargetSize should increase again after recovery")
 }
 
 func TestCalculateNodesToAdd(t *testing.T) {

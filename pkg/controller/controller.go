@@ -103,7 +103,6 @@ func NewController(opts Opts, stopChan <-chan struct{}) (*Controller, error) {
 			},
 			scaleUpCircuitBreaker: scaleUpCircuitBreaker{
 				failureThreshold: nodeGroupOpts.ScaleUpFailureThreshold,
-				cooldown:         nodeGroupOpts.ScaleUpFailureCooldownDuration(),
 				nodegroup:        nodeGroupOpts.Name,
 			},
 			scaleDelta: 0,
