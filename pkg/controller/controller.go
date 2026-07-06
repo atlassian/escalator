@@ -27,9 +27,10 @@ type Controller struct {
 // NodeGroupState contains everything about a node group in the current state of the application
 type NodeGroupState struct {
 	*NodeGroupLister
-	Opts        NodeGroupOptions
-	NodeInfoMap map[string]*k8s.NodeInfo
-	scaleUpLock scaleLock
+	Opts                  NodeGroupOptions
+	NodeInfoMap           map[string]*k8s.NodeInfo
+	scaleUpLock           scaleLock
+	scaleUpCircuitBreaker scaleUpCircuitBreaker
 
 	// used for tracking which nodes are tainted. testing when in dry mode
 	taintTracker      []string
@@ -100,6 +101,7 @@ func NewController(opts Opts, stopChan <-chan struct{}) (*Controller, error) {
 				minimumLockDuration: nodeGroupOpts.ScaleUpCoolDownPeriodDuration(),
 				nodegroup:           nodeGroupOpts.Name,
 			},
+			scaleUpCircuitBreaker: newScaleUpCircuitBreaker(nodeGroupOpts.Name, nodeGroupOpts.ScaleUpFailureThreshold),
 			scaleDelta: 0,
 		}
 	}

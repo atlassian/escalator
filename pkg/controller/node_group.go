@@ -65,6 +65,8 @@ type NodeGroupOptions struct {
 	// allowed in the nodegroup at any given time.
 	MaxUnhealthyNodesPercent int `json:"max_unhealthy_nodes_percent,omitempty" yaml:"max_unhealthy_nodes_percent,omitempty"`
 
+	ScaleUpFailureThreshold int `json:"scale_up_failure_threshold,omitempty" yaml:"scale_up_failure_threshold,omitempty"`
+
 	// Private variables for storing the parsed duration from the string
 	softDeleteGracePeriodDuration    time.Duration
 	hardDeleteGracePeriodDuration    time.Duration
@@ -140,6 +142,8 @@ func ValidateNodeGroup(nodegroup NodeGroupOptions) []error {
 
 	checkThat(len(nodegroup.ScaleUpCoolDownPeriod) > 0, "scale_up_cool_down_period must not be empty")
 	checkThat(nodegroup.ScaleUpCoolDownPeriodDuration() > 0, "soft_delete_grace_period failed to parse into a time.Duration. check your formatting.")
+
+	checkThat(nodegroup.ScaleUpFailureThreshold >= 0, "scale_up_failure_threshold must be greater than or equal to 0")
 
 	checkThat(validTaintEffect(nodegroup.TaintEffect), "taint_effect must be valid kubernetes taint")
 
@@ -389,6 +393,7 @@ func BuildNodeGroupsState(opts nodeGroupsStateOpts) map[string]*NodeGroupState {
 				minimumLockDuration: ng.ScaleUpCoolDownPeriodDuration(),
 				nodegroup:           ng.Name,
 			},
+			scaleUpCircuitBreaker: newScaleUpCircuitBreaker(ng.Name, ng.ScaleUpFailureThreshold),
 		}
 	}
 	return nodeGroupsState
