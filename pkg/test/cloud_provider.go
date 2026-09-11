@@ -79,23 +79,24 @@ func (i Instance) ID() string {
 
 // NodeGroup is a mock implementation of NodeGroup for testing
 type NodeGroup struct {
-	id         string
-	name       string
-	minSize    int64
-	maxSize    int64
-	actualSize int64
-	targetSize int64
+	id             string
+	name           string
+	minSize        int64
+	maxSize        int64
+	actualSize     int64
+	targetSize     int64
+	decoupleActual bool
 }
 
 // NewNodeGroup creates a new mock NodeGroup
 func NewNodeGroup(id string, name string, minSize int64, maxSize int64, targetSize int64) *NodeGroup {
 	return &NodeGroup{
-		id,
-		name,
-		minSize,
-		maxSize,
-		targetSize,
-		targetSize,
+		id:         id,
+		name:       name,
+		minSize:    minSize,
+		maxSize:    maxSize,
+		actualSize: targetSize,
+		targetSize: targetSize,
 	}
 }
 
@@ -166,11 +167,25 @@ func (n *NodeGroup) Nodes() []string {
 	return nil
 }
 
+// SetDecoupleActual configures whether IncreaseSize updates actualSize.
+// When true, actualSize must be updated explicitly via SetActualSize, simulating
+// an ASG that raises desired capacity but does not deliver running instances.
+func (n *NodeGroup) SetDecoupleActual(b bool) {
+	n.decoupleActual = b
+}
+
+// SetActualSize sets the running instance count independently of targetSize.
+func (n *NodeGroup) SetActualSize(size int64) {
+	n.actualSize = size
+}
+
 // setDesiredSize mock implementation for NodeGroup
 func (n *NodeGroup) setDesiredSize(newSize int64) error {
 	// This is where we would tell the actual provider (AWS etc.) to change the scaling group desired size
 	// but we just update the internal target size of the node group to reflect the remote change
 	n.targetSize = newSize
-	n.actualSize = newSize
+	if !n.decoupleActual {
+		n.actualSize = newSize
+	}
 	return nil
 }
