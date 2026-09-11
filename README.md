@@ -37,7 +37,7 @@ See [Docs](docs/README.md)
 
 - [Kubernetes](https://kubernetes.io/) version 1.24+. Escalator has been tested and deployed on 1.24+ and newer. Older 
 versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
-- [Go](https://golang.org/) version 1.20+
+- [Go](https://golang.org/) version 1.25+
 - Dependencies and their locked versions can be found in `go.mod` and `go.sum`.
 
 ## Building
