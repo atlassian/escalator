@@ -220,8 +220,9 @@ func TestFilterOutNodesTooNew(t *testing.T) {
 				},
 				[]*v1.Node{
 					test.BuildTestNode(test.NodeOpts{Name: "n1", Creation: now.Add(-5 * time.Minute)}),
-					// The threshold needs to be exceeded for the instance to be considered unhealthy
-					test.BuildTestNode(test.NodeOpts{Name: "n2", Creation: now.Add(-10 * time.Minute)}),
+					// The threshold needs to be exceeded for the instance to be considered unhealthy.
+					// Keep a margin to avoid straddling the clock read in filterOutNodesTooNew.
+					test.BuildTestNode(test.NodeOpts{Name: "n2", Creation: now.Add(-10*time.Minute - time.Second)}),
 					test.BuildTestNode(test.NodeOpts{Name: "n3", Creation: now.Add(-15 * time.Minute)}),
 					test.BuildTestNode(test.NodeOpts{Name: "n4", Creation: now.Add(-20 * time.Minute)}),
 				},

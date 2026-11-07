@@ -70,13 +70,13 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	}
 }
 
-// ComputePodResourceRequest returns a framework.Resource that covers the largest
-// width in each resource dimension. Because init-containers run sequentially, we collect
-// the max in each dimension iteratively. In contrast, we sum the resource vectors for
-// regular containers since they run simultaneously.
+// ComputePodResourceRequest returns a Resource covering the largest width in each
+// resource dimension. Regular containers run simultaneously and their requests are
+// summed. Restartable init containers (sidecars) also remain running after startup, so
+// their cumulative requests are included alongside regular containers and in the peak
+// request for each init-container startup phase.
 //
-// If Pod Overhead is specified, the resources defined for Overhead
-// are added to the calculated Resource request sum
+// If Pod Overhead is specified, its resources are added to the calculated request.
 //
 // Example:
 //
@@ -104,10 +104,30 @@ func ComputePodResourceRequest(pod *v1.Pod) *Resource {
 		resource.Add(container.Resources.Requests)
 	}
 
-	// take max_resource(sum_pod, any_init_container)
+	// Init containers run sequentially, except restartable init containers (sidecars)
+	// which continue running alongside later init containers and regular containers.
+	restartableInitRequests := &Resource{}
+	peakInitRequests := &Resource{}
 	for _, container := range pod.Spec.InitContainers {
-		resource.SetMaxResource(container.Resources.Requests)
+		containerRequests := &Resource{}
+		containerRequests.Add(container.Resources.Requests)
+		if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+			resource.Add(container.Resources.Requests)
+			restartableInitRequests.Add(container.Resources.Requests)
+			containerRequests = restartableInitRequests
+		} else {
+			containerRequests.MilliCPU += restartableInitRequests.MilliCPU
+			containerRequests.Memory += restartableInitRequests.Memory
+		}
+
+		peakInitRequests.MilliCPU = max(peakInitRequests.MilliCPU, containerRequests.MilliCPU)
+		peakInitRequests.Memory = max(peakInitRequests.Memory, containerRequests.Memory)
 	}
+
+	// The pod request is the component-wise maximum of the regular-container total
+	// (including sidecars) and the peak request during any init-container phase.
+	resource.MilliCPU = max(resource.MilliCPU, peakInitRequests.MilliCPU)
+	resource.Memory = max(resource.Memory, peakInitRequests.Memory)
 
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil {
